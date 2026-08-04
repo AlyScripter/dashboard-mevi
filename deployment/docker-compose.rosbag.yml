@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  ros-master:
+    image: ros:noetic-ros-base
+    container_name: mevi-ros-master
+    command: roscore
+    networks:
+      - mevi-network
+    restart: unless-stopped
+
+  rosbridge:
+    image: ros:noetic-ros-base
+    container_name: mevi-rosbridge
+    depends_on:
+      - ros-master
+    environment:
+      - ROS_MASTER_URI=http://ros-master:11311
+    command: >
+      bash -c "apt-get update && 
+               apt-get install -y ros-noetic-rosbridge-server && 
+               source /opt/ros/noetic/setup.bash && 
+               roslaunch rosbridge_server rosbridge_websocket.launch"
+    ports:
+      - "9090:9090"
+    networks:
+      - mevi-network
+    restart: unless-stopped
+
+  rosbag-player:
+    image: ros:noetic-ros-base
+    container_name: mevi-rosbag-player
+    depends_on:
+      - ros-master
+    environment:
+      - ROS_MASTER_URI=http://ros-master:11311
+      - ROSBAG_FILE=${ROSBAG_FILE:-cbf_velo_yaw_cte_merged.bag}
+      - LOOP=${LOOP:-true}
+      - RATE=${RATE:-1.0}
+    volumes:
+      - ./rosbags:/rosbags:ro
+    command: >
+      bash -c "source /opt/ros/noetic/setup.bash && 
+               echo 'Playing: /rosbags/$${ROSBAG_FILE}' &&
+               echo 'Loop: $${LOOP}, Rate: $${RATE}' &&
+               if [ \"$${LOOP}\" = \"true\" ]; then
+                 rosbag play /rosbags/$${ROSBAG_FILE} --loop -r $${RATE}
+               else
+                 rosbag play /rosbags/$${ROSBAG_FILE} -r $${RATE}
+               fi"
+    networks:
+      - mevi-network
+
+networks:
+  mevi-network:
+    driver: bridge

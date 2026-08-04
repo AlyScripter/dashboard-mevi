@@ -1,0 +1,70 @@
+version: '3.8'
+
+# ============================================================
+# MEVI Laptop Navigation Docker Compose
+# ============================================================
+# Run complete ROS navigation system from laptop.
+# Hardware connections:
+#   - GPS:      WiFi (192.168.1.106)
+#   - LIDAR:    WiFi (192.168.1.10)
+#   - IMU:      USB  (/dev/ttyUSB0)
+#   - Steering: USB  (/dev/ttyACM0)
+#   - Traction: USB  (/dev/ttyACM1)
+#   - Camera:   USB  (/dev/video0)
+# ============================================================
+
+services:
+  # NAVIGATION (All-in-one container with network_mode: host)
+  navigation:
+    image: ros:noetic-ros-base
+    container_name: mevi-navigation
+    network_mode: host
+    volumes:
+      - ./live:/catkin_ws/src/wp_ex
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
+      - /dev/ttyACM1:/dev/ttyACM1
+    command: |
+      bash -c '
+        echo "=== Installing ROS packages ===" &&
+        apt-get update &&
+        apt-get install -y ros-noetic-rosserial-python ros-noetic-urg-node ros-noetic-rosbridge-server python3-pip &&
+        pip3 install pyproj scipy numpy witmotion pyserial &&
+        
+        echo "=== Setting up catkin workspace ===" &&
+        mkdir -p /catkin_ws/src &&
+        cd /catkin_ws &&
+        source /opt/ros/noetic/setup.bash &&
+        
+        chmod +x /catkin_ws/src/wp_ex/high_level/*.py 2>/dev/null || true &&
+        
+        catkin_make &&
+        source devel/setup.bash &&
+        
+        echo "=== Starting ROS Launch ===" &&
+        roslaunch wp_ex node_b_ros.launch
+      '
+    privileged: true
+    restart: unless-stopped
+
+  # CAMERA SERVER
+  camera:
+    image: python:3.9-slim
+    container_name: mevi-camera
+    network_mode: host
+    volumes:
+      - ./camera:/app
+    devices:
+      - /dev/video0:/dev/video0
+    working_dir: /app
+    command: |
+      bash -c '
+        pip install flask opencv-python-headless &&
+        python3 usb_webcam_server.py --port 8080
+      '
+    privileged: true
+    restart: unless-stopped
+
+
+`

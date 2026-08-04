@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # 1. ROS MASTER (Otak utama ROS)
+  ros-master:
+    image: ros:noetic-ros-base
+    container_name: mevi-ros-master
+    command: roscore
+    networks:
+      - mevi-network
+    restart: unless-stopped
+
+  # 2. ROSBRIDGE (Penghubung ke Flutter via WebSocket)
+  rosbridge:
+    image: ros:noetic-ros-base
+    container_name: mevi-rosbridge
+    depends_on:
+      - ros-master
+    environment:
+      - ROS_MASTER_URI=http://ros-master:11311
+    ports:
+      - "9090:9090"
+    command: >
+      bash -c "apt-get update && 
+               apt-get install -y ros-noetic-rosbridge-server && 
+               source /opt/ros/noetic/setup.bash && 
+               roslaunch rosbridge_server rosbridge_websocket.launch"
+    networks:
+      - mevi-network
+    restart: unless-stopped
+
+  # 3. WEB VIDEO SERVER (Mengubah Topic Gambar jadi Stream HTTP)
+  # Ini akan otomatis berjalan dan menunggu data dari rosbag
+  video-server:
+    image: ros:noetic-ros-base
+    container_name: mevi-video-server
+    depends_on:
+      - ros-master
+    environment:
+      - ROS_MASTER_URI=http://ros-master:11311
+    ports:
+      - "8080:8080" # Port ini yang dipanggil Flutter
+    command: >
+      bash -c "apt-get update && 
+               apt-get install -y ros-noetic-web-video-server && 
+               source /opt/ros/noetic/setup.bash && 
+               rosrun web_video_server web_video_server"
+    networks:
+      - mevi-network
+    restart: unless-stopped
+
+  # 4. ROSBAG PLAYGROUND (Container Manual)
+  # Container ini mount folder 'rosbags' dan diam (idle), menunggu perintah Anda.
+  # ROS sudah ter-source otomatis saat masuk container.
+  rosbag-player:
+    image: ros:noetic-ros-base
+    container_name: mevi-rosbag-player
+    depends_on:
+      - ros-master
+    environment:
+      - ROS_MASTER_URI=http://ros-master:11311
+    volumes:
+      # Mapping folder 'rosbags' - read-write untuk bisa nulis output bag
+      - ./rosbags:/rosbags 
+    # Auto-source ROS setup di bashrc, lalu idle
+    command: >
+      bash -c "echo 'source /opt/ros/noetic/setup.bash' >> ~/.bashrc && 
+               echo 'export ROS_MASTER_URI=http://ros-master:11311' >> ~/.bashrc &&
+               tail -f /dev/null"
+    networks:
+      - mevi-network
+
+networks:
+  mevi-network:
+    driver: bridge

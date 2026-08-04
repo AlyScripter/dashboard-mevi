@@ -1,0 +1,40 @@
+<launch>
+  <!-- ============================================================ -->
+  <!-- GPS and IMU program                                          -->
+  <!-- ============================================================ -->
+  <node pkg="wp_ex" type="ros_gps.py" name="ros_gps_node">
+    <param name="ip_address" value="192.168.1.106" />
+  </node>
+  <node pkg="wp_ex" type="imuusb0.py" name="imu_usb_node" output="screen" />
+
+  <!-- ============================================================ -->
+  <!-- Lidar program                                                -->
+  <!-- ============================================================ -->
+  <node pkg="urg_node" type="urg_node" name="urg_node">
+    <param name="ip_address" value="192.168.1.10" />
+  </node>
+  <node pkg="wp_ex" type="lidarnode_w.py" name="lidarlistenernode" output="screen" />
+
+  <!-- ============================================================ -->
+  <!-- Steer and traction from USB                                  -->
+  <!-- ============================================================ -->
+  <node pkg="rosserial_python" type="serial_node.py" name="serial_node_acm0" output="screen">
+    <param name="port" value="/dev/ttyACM0" />
+  </node>
+  <node pkg="rosserial_python" type="serial_node.py" name="serial_node_acm1" output="screen">
+    <param name="port" value="/dev/ttyACM1" />
+  </node>
+
+  <!-- ============================================================ -->
+  <!-- Navigation program                                           -->
+  <!-- ============================================================ -->
+  <node pkg="wp_ex" type="cbf_navigation_stanley.py" name="waypoint_navigation" output="screen" />
+
+  <!-- ============================================================ -->
+  <!-- ROSBridge WebSocket Server                                   -->
+  <!-- ============================================================ -->
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+    <arg name="port" value="9090"/>
+    <arg name="address" value="0.0.0.0"/>
+  </include>
+</launch>

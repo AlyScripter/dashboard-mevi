@@ -1,0 +1,209 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+.scannerwork/
+.vscode/
+migrate_working_dir/
+.github/
+*.bag
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# API Keys and Secrets (Important for your dashboard app)
+.env
+.env.local
+.env.production
+.env.staging
+
+# MEVI Project Specific
+# =====================
+
+# Python Virtual Environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dummy Data and Testing (DO NOT commit to production)
+**/dummy_data/
+**/test_data/
+**/*_dummy_*
+**/*_test_*
+scripts/data-generation/*_generated_*
+scripts/data-generation/output/
+.html
+# Docker and Monitoring Data
+docker-compose.override.yml
+.docker/
+monitoring/data/
+monitoring/logs/
+
+# Temporary and Cache Files
+*.tmp
+*.cache
+.cache/
+logs/
+*.log
+
+
+# Development Tools Output
+coverage/
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Large asset files (uncomment if you have large assets)
+# *.glb
+# *.gltf
+# *.obj
+# *.mtl
+# *.dae
+
+# WebRTC related
+**/webrtc_logs/
+*.webm.tmp
+*.mp4
+# *.bag
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msi
+*.msp
+*.lnk
+
+# Flutter Web
+/web/dist/
+web/dist/
+
+# Additional Flutter ignores
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# Coverage
+coverage/
+lcov.info
+
+# Test related
+test_driver/screenshots/
+
+# Firebase
+**/google-services.json
+**/GoogleService-Info.plist
+.firebase/
+
+# Backend/Server logs (if any)
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Ignore dummy data script
+scripts/influxdb_dummy_data.py
+# If you generate any output files, add them here
+scripts/data-generation/output/
+
+# Python cache in navigation
+navigation/**/__pycache__/
+navigation/**/*.pyc
+simulator/**/__pycache__/
+simulator/**/*.pyc
+
+# Environment variables
+.env
+.env.*
+!.env.example

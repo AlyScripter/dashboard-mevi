@@ -1,0 +1,148 @@
+{
+  "mission_name": "BRIN Waypoint Mission",
+  "description": "Waypoints for BRIN facility including flight path and points of interest",
+  "location": "BRIN, Bandung, Indonesia",
+  "created_date": "2025-08-27",
+  "total_waypoints": 16,
+  "path_waypoints": 12,
+  "poi_waypoints": 4,
+  "default_altitude": 10.0,
+  "poi_altitude": 15.0,
+  "coordinate_system": "WGS84",
+  "waypoints": [
+    {
+      "name": "path_1",
+      "longitude": 107.6107211528497,
+      "latitude": -6.882577704450938,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_2",
+      "longitude": 107.6107351849094,
+      "latitude": -6.88248117868044,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_3",
+      "longitude": 107.6107437816669,
+      "latitude": -6.882387279633923,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_4",
+      "longitude": 107.6110654517736,
+      "latitude": -6.882403199111345,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_5",
+      "longitude": 107.6110932259504,
+      "latitude": -6.882133310101624,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_6",
+      "longitude": 107.6111965749401,
+      "latitude": -6.881253612476214,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_7",
+      "longitude": 107.6117390639971,
+      "latitude": -6.881309649404917,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_8",
+      "longitude": 107.6117246175148,
+      "latitude": -6.881474283214416,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_9",
+      "longitude": 107.6116913238807,
+      "latitude": -6.881873708611313,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_10",
+      "longitude": 107.6116034396148,
+      "latitude": -6.882736395812703,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_11",
+      "longitude": 107.6114242183287,
+      "latitude": -6.882756128160901,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "path_12",
+      "longitude": 107.6112759131441,
+      "latitude": -6.882745926410803,
+      "altitude": 10.0,
+      "heading": 0.0,
+      "type": "path"
+    },
+    {
+      "name": "gedung_10",
+      "display_name": "Gedung 10",
+      "longitude": 107.6111333063233,
+      "latitude": -6.881784050362436,
+      "altitude": 15.0,
+      "heading": 0.0,
+      "type": "poi"
+    },
+    {
+      "name": "lab_autonomous",
+      "display_name": "Lab Autonomous",
+      "longitude": 107.6114400048955,
+      "latitude": -6.881283780406986,
+      "altitude": 15.0,
+      "heading": 0.0,
+      "type": "poi"
+    },
+    {
+      "name": "gedung_80",
+      "display_name": "Gedung 80",
+      "longitude": 107.610898305495,
+      "latitude": -6.882398919774277,
+      "altitude": 15.0,
+      "heading": 0.0,
+      "type": "poi"
+    },
+    {
+      "name": "pos_satpam",
+      "display_name": "Pos Satpam",
+      "longitude": 107.611279323457,
+      "latitude": -6.88274531661621,
+      "altitude": 15.0,
+      "heading": 0.0,
+      "type": "poi"
+    }
+  ]
+}
+
+
