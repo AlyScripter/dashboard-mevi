@@ -68,7 +68,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
     try {
       _removeOverlay();
       _overlayEntry = _createOverlayEntry();
-      Overlay.of(context, rootOverlay: true).insert(_overlayEntry!);
+      // FIX: rootOverlay:true menaruh dropdown ini di overlay paling atas
+      // aplikasi, terpisah jauh dari search bar (CompositedTransformTarget).
+      // Saat ada rebuild besar di layout utama (mis. preview rute, BEV
+      // panel), CompositedTransformFollower kehilangan sinkronisasi layer
+      // -> 'debugNeedsLayout' assertion. Pakai Overlay terdekat saja.
+      Overlay.of(context).insert(_overlayEntry!);
 
       // Auto-hide overlay after inactivity
       _overlayAutoHide?.cancel();
@@ -103,17 +108,32 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                 isLoading: _isSearching,
                 onSelectResult: _selectSearchResult,
                 onPreview: (trip) {
-                  widget.onPreviewLocation?.call(trip.destination);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Preview: ${trip.name}'),
-                      duration: const Duration(seconds: 2),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  // FIX: tutup dropdown dulu SEBELUM memicu perubahan besar
+                  // di layout utama (preview rute -> setState di parent).
+                  // Kalau overlay masih terpasang saat rebuild besar terjadi,
+                  // CompositedTransformFollower-nya rawan race condition.
+                  _removeOverlay();
+
+                  // FIX: jalankan setelah frame ini selesai layout+paint,
+                  // supaya tidak "memotong" pipeline layout yang sedang
+                  // berjalan di frame yang sama dengan klik ini.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_disposed || !mounted) return;
+                    widget.onPreviewLocation?.call(trip.destination);
+                    // Pakai `this.context` milik SearchBarWidgetState, BUKAN
+                    // `context` dari builder OverlayEntry di atas -- yang itu
+                    // sudah tidak valid setelah _removeOverlay() dipanggil.
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text('Preview: ${trip.name}'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  });
                 },
               ),
             ),
@@ -140,10 +160,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
 
       final lower = query.toLowerCase();
       final filtered = LocationsData.predefinedTrips
-          .where((trip) =>
-              trip.name.toLowerCase().contains(lower) ||
-              trip.description.toLowerCase().contains(lower) ||
-              trip.destination.name.toLowerCase().contains(lower))
+          .where(
+            (trip) =>
+                trip.name.toLowerCase().contains(lower) ||
+                trip.description.toLowerCase().contains(lower) ||
+                trip.destination.name.toLowerCase().contains(lower),
+          )
           .toList();
 
       setState(() {
@@ -176,9 +198,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
@@ -187,8 +207,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(LucideIcons.navigation,
-                  size: 20, color: Colors.blue.shade600),
+              child: Icon(
+                LucideIcons.navigation,
+                size: 20,
+                color: Colors.blue.shade600,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -274,7 +297,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(LucideIcons.circleCheck, color: Colors.white, size: 20),
+                const Icon(
+                  LucideIcons.circleCheck,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -287,8 +314,9 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             backgroundColor: Colors.green.shade600,
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -311,8 +339,9 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             backgroundColor: Colors.red.shade600,
             duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -463,10 +492,7 @@ class _LoadingDialog extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               message,
-              style: const TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ],

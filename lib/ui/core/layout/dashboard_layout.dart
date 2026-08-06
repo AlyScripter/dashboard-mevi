@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../pages/navigation/navigation_page.dart';
 import '../../pages/navigation/navigation_widget.dart';
 import '../widgets/dashboard/weather_time_widget.dart';
+import '../widgets/dashboard/birdeye_overlay_widget.dart';
+import '../../shared/glass_container.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
 import '../../pages/settings/settings_index.dart';
@@ -421,10 +423,12 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
     return Expanded(
       flex: 3,
-      child: Container(
+      child: GlassContainer(
         height: containerHeight,
         padding: EdgeInsets.all(containerPadding),
-        decoration: _overlayBoxDecoration(isLargeScreen),
+        borderRadius: isLargeScreen ? 24 : 20,
+        variant: GlassVariant.light,
+        opacity: 0.55,
         child: Row(
           children: [
             // Left side - Route info
@@ -550,13 +554,15 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
     return Expanded(
       flex: 2,
-      child: Container(
+      child: GlassContainer(
         height: containerHeight,
         padding: EdgeInsets.symmetric(
           horizontal: horizontalPadding,
           vertical: verticalPadding,
         ),
-        decoration: _overlayBoxDecoration(isLargeScreen),
+        borderRadius: isLargeScreen ? 24 : 20,
+        variant: GlassVariant.light,
+        opacity: 0.55,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -654,26 +660,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     // Tablets usually < 13 inches, laptops >= 13 inches
     return diagonal >= 700; // Threshold: ~13 inches in logical pixels
   }
-
-  // Apple-style clean box decoration
-  BoxDecoration _overlayBoxDecoration([bool isLargeScreen = false]) =>
-      BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isLargeScreen ? 24 : 20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: isLargeScreen ? 32 : 24,
-            offset: Offset(0, isLargeScreen ? 8 : 6),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: isLargeScreen ? 12 : 8,
-            offset: Offset(0, isLargeScreen ? 4 : 3),
-          ),
-        ],
-      );
-
+  
   Widget _buildTopOverlay({bool compactMode = false}) {
     final isLargeScreen = _isLargeScreen(context);
     final data = MediaQuery.of(context);
@@ -871,6 +858,14 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         if (_activeMenu == DashboardMenu.camera)
           Container(color: Colors.black, child: const CameraPage()),
         _buildTopOverlay(),
+        // >>> TAMBAHAN: BEV muncul begitu status navigating
+        Positioned(
+          top: 24,
+          left: 24,
+          child: BirdEyeOverlayWidget(
+            active: _routeState == RouteState.navigating,
+          ),
+        ),
         _buildBottomOverlay(),
       ],
     );
@@ -919,10 +914,12 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         children: [
           Expanded(
             flex: 3,
-            child: Container(
+            child: GlassContainer(
               height: containerHeight,
               padding: EdgeInsets.all(containerPadding),
-              decoration: _overlayBoxDecoration(isLargeScreen),
+              borderRadius: isLargeScreen ? 24 : 20,
+              variant: GlassVariant.light,
+              opacity: 0.55,
               child: Row(
                 children: [
                   // Left side - Route info
@@ -985,13 +982,15 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           SizedBox(width: spacing),
           Expanded(
             flex: 2,
-            child: Container(
+            child: GlassContainer(
               height: containerHeight,
               padding: EdgeInsets.symmetric(
                 horizontal: isLargeScreen ? 28.0 : 22.0,
                 vertical: isLargeScreen ? 24.0 : 18.0,
               ),
-              decoration: _overlayBoxDecoration(isLargeScreen),
+              borderRadius: isLargeScreen ? 24 : 20,
+              variant: GlassVariant.light,
+              opacity: 0.55,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [

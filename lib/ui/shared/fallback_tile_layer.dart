@@ -44,7 +44,7 @@ class FallbackTileLayer extends StatelessWidget {
     return TileLayer(
       urlTemplate: MapConfig.openStreetMapUrl,
 
-      // Mengirimkan pengenal aplikasi kustom
+      // Mengirimkan pengenal aplikasi kustomP
       userAgentPackageName: 'com.mevi.dashboard',
 
       // HAPUS kata 'const' di depan Map headers agar bisa dimodifikasi oleh plugin

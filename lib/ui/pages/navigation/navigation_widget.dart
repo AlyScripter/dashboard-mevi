@@ -815,7 +815,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
     final searchBarMaxWidth = isLargeScreen ? 720.0 : 480.0;
 
     final centerBtnRight = isLargeScreen ? 48.0 : 35.0;
-    final centerBtnBottom = isLargeScreen ? 260.0 : 220.0; // Raised above navbar
+    final centerBtnBottom = isLargeScreen
+        ? 260.0
+        : 220.0; // Raised above navbar
 
     return LayoutBuilder(
       builder: (context, constraints) {
