@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/dimensions.dart';
-import '../widgets/sensors/lidar_2d_radar_widget.dart';
+import '../../../core/theme/glass_container.dart';
+import '../../../services/ros_service.dart'; // Import RosService
 import 'status_indicator_panel.dart';
 import '../widgets/dashboard/speed_display_widget.dart';
 import '../widgets/dashboard/battery_indicator_widget.dart';
 import '../widgets/dashboard/gear_selector_widget.dart';
 import '../widgets/dashboard/distance_cards_widget.dart';
+import '../widgets/sensors/vehicle_stage_widget.dart';
 
 class LeftPanel extends StatefulWidget {
   final VoidCallback? onSettingsPressed;
@@ -35,11 +37,15 @@ class _LeftPanelState extends State<LeftPanel> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          right: BorderSide(color: Colors.grey.shade200, width: 1.0),
+      decoration: const BoxDecoration(
+        // Dark gradient panel to match the reference dashboard's dark
+        // cluster theme (was a plain white sidebar before).
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
         ),
+        border: Border(right: BorderSide(color: Color(0xFF1E2430), width: 1.0)),
       ),
       padding: EdgeInsets.symmetric(
         horizontal: AppDimensions.paddingM,
@@ -48,6 +54,29 @@ class _LeftPanelState extends State<LeftPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Battery + efficiency — moved to the very top of the panel and
+          // restyled as a blue glass card, matching the reference
+          // dashboard's "Battery 72% / Fuel 83%" header.
+          BatteryIndicatorWidget(
+            batteryPercent: _batteryPercent,
+            onTap: () {
+              setState(() {
+                _batteryPercent = _batteryPercent > 0.95
+                    ? 0.35
+                    : (_batteryPercent + 0.1).clamp(0.0, 1.0);
+              });
+            },
+          ),
+
+          SizedBox(height: AppDimensions.spacingM),
+
+          // Distance / range cards — also moved up here (also blue glass)
+          // so both top-level stats sit together above the fold, like the
+          // reference.
+          DistanceCardsWidget(batteryPercent: _batteryPercent),
+
+          SizedBox(height: AppDimensions.spacingXL),
+
           // Status indicators
           StatusIndicatorPanel(
             indicatorLampOn: _indicatorLampOn,
@@ -63,89 +92,94 @@ class _LeftPanelState extends State<LeftPanel> {
           // Speed display
           const SpeedDisplayWidget(),
 
-          SizedBox(height: AppDimensions.spacingXL),
+          SizedBox(height: AppDimensions.spacingM),
 
-          // Car and radar visualization
+          // Vehicle stage: road/LIDAR visualization (FrontBevWidget, kept
+          // exactly as before) + 3D car model, painted directly over the
+          // panel's own dark gradient background — no card/box around it,
+          // so the road visually merges into the dashboard rather than
+          // reading as a separate boxed widget.
           Expanded(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: AppDimensions.paddingS),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final availableHeight = constraints.maxHeight;
+                  final availableWidth = constraints.maxWidth;
+                  // ---------------------------------------------------
+                  // 3D MODEL SIZE KNOB — tune these 3 numbers to make
+                  // the car bigger/smaller:
+                  //   - 0.34  : fraction of the available stage height
+                  //             used as the base "carSize" (was 0.52 —
+                  //             lower = smaller model).
+                  //   - 110/200 : min/max clamp on that base size in
+                  //             logical pixels (was 160/280).
+                  // carSize is the base unit the whole stage scales
+                  // from — the on-screen car box itself ends up
+                  // ~1.45x this value (see the `carSize * 1.45` in
+                  // VehicleStageWidget, `lib/ui/core/widgets/sensors/
+                  // vehicle_stage_widget.dart` — shrink that 1.45
+                  // multiplier too if you want the model smaller
+                  // relative to its glow/beam effect specifically,
+                  // rather than everything together).
+                  // ---------------------------------------------------
+                  final carSize = (availableHeight * 0.34)
+                      .clamp(110.0, 200.0)
+                      .clamp(0.0, availableWidth / 1.45);
 
-                  // Calculate proportional car size (65% of available space untuk lebih besar)
-                  final carSize = (availableHeight * 0.65).clamp(280.0, 500.0);
+                  return StreamBuilder<double>(
+                    stream: RosService().steeringAngleStream,
+                    builder: (context, steerSnap) {
+                      final steeringAngle = steerSnap.data ?? 0.0;
 
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // LiDAR 2D Radar (80° FOV, 7 segments) - positioned at top
-                      const Positioned(top: -100, child: Lidar2DRadarWidget()),
-                      // Car image - centered both horizontally and vertically
-                      Center(
-                        child: Image.asset(
-                          'assets/images/mevicar.png',
-                          width: carSize,
-                          height: carSize,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              SizedBox(
-                            width: carSize,
-                            height: carSize,
-                            child: Center(
-                              child: Icon(
-                                Icons.directions_car,
-                                size: carSize * 1.2,
-                                color: Colors.grey.shade500,
-                              ),
+                      return StreamBuilder<double>(
+                        stream: RosService().speedometerRosStream,
+                        builder: (context, speedSnap) {
+                          final speed = speedSnap.data ?? 0.0;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: VehicleStageWidget(
+                              speed: speed,
+                              steeringAngle: steeringAngle,
+                              carSize: carSize,
                             ),
-                          ),
-                        ),
-                      ),
-                    ],
+                          );
+                        },
+                      );
+                    },
                   );
                 },
               ),
             ),
           ),
 
-          // Battery and gear controls
-          SizedBox(height: AppDimensions.spacingM),
-          Center(
-            child: BatteryIndicatorWidget(
-              batteryPercent: _batteryPercent,
-              onTap: () {
-                setState(() {
-                  _batteryPercent = _batteryPercent > 0.95
-                      ? 0.35
-                      : (_batteryPercent + 0.1).clamp(0.0, 1.0);
-                });
-              },
-            ),
-          ),
-
-          SizedBox(height: AppDimensions.spacingS),
-
-          GearSelectorWidget(
-            selectedGear: _gear,
-            onGearChanged: (gear) => setState(() => _gear = gear),
-          ),
-
           SizedBox(height: AppDimensions.spacingM),
 
-          // Distance cards
-          DistanceCardsWidget(batteryPercent: _batteryPercent),
-
-          SizedBox(height: AppDimensions.spacingM),
-
-          // Bottom row: Settings & Collapse buttons
+          // Bottom row: Settings (icon only, bottom-left) — Gear selector
+          // (P/R/N/D, moved here from under the gauge, smaller + thinner
+          // font) centered — Collapse (icon only, bottom-right).
           Row(
             children: [
-              // Settings button
-              Expanded(child: _buildSettingsButton()),
-              const SizedBox(width: 8),
-              // Collapse button
-              _buildCollapseButton(),
+              _buildIconButton(
+                icon: LucideIcons.settings,
+                onTap: widget.onSettingsPressed,
+              ),
+              Expanded(
+                child: Center(
+                  child: GearSelectorWidget(
+                    selectedGear: _gear,
+                    onGearChanged: (gear) => setState(() => _gear = gear),
+                    circleSize: 30,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              _buildIconButton(
+                icon: LucideIcons.panelLeftClose,
+                onTap: widget.onTogglePanel,
+              ),
             ],
           ),
         ],
@@ -153,56 +187,26 @@ class _LeftPanelState extends State<LeftPanel> {
     );
   }
 
-  Widget _buildCollapseButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.onTogglePanel,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            LucideIcons.panelLeftClose,
-            size: 16,
-            color: Colors.grey.shade500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.onSettingsPressed,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(LucideIcons.settings, size: 16, color: Colors.grey.shade500),
-              const SizedBox(width: 8),
-              Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ),
+  /// Shared icon-only glass button for the bottom row (Settings /
+  /// Collapse) — dark ("putih/hitam glass") by default. Pass
+  /// `active: true` for a blue glass variant if a button ever needs to
+  /// show an on/selected state.
+  Widget _buildIconButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    bool active = false,
+  }) {
+    const blue = Color(0xFF2196F3);
+    return GlassChip(
+      onTap: onTap,
+      borderRadius: 12,
+      padding: const EdgeInsets.all(10),
+      tint: active ? blue : Colors.black,
+      tintOpacity: active ? 0.38 : 0.30,
+      child: Icon(
+        icon,
+        size: 18,
+        color: Colors.white.withValues(alpha: active ? 1.0 : 0.85),
       ),
     );
   }

@@ -9,7 +9,7 @@
 import 'package:flutter/material.dart';
 import '../../../../services/ros_service.dart';
 import '../../../pages/data/widgets/sensors/enhanced_lidar_visualization.dart';
-import '../../../shared/glass_container.dart';
+import '../../../../core/theme/glass_container.dart';
 
 class BirdEyeOverlayWidget extends StatelessWidget {
   final bool active;
@@ -36,9 +36,11 @@ class BirdEyeOverlayWidget extends StatelessWidget {
       width: 320,
       height: 320,
       borderRadius: 28,
-      variant: GlassVariant.dark,
-      blur: 22,
-      opacity: 0.35,
+      // GlassContainer punya "variant" secara implisit lewat `tint`:
+      // tint hitam = varian gelap, tint putih = varian terang.
+      tint: Colors.black,
+      tintOpacity: 0.35,
+      blurSigma: 22,
       padding: const EdgeInsets.all(10),
       child: StreamBuilder<List<double>>(
         stream: RosService().lidarStream,

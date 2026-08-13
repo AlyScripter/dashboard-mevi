@@ -5,8 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../pages/navigation/navigation_page.dart';
 import '../../pages/navigation/navigation_widget.dart';
 import '../widgets/dashboard/weather_time_widget.dart';
-import '../widgets/dashboard/birdeye_overlay_widget.dart';
-import '../../shared/glass_container.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
 import '../../pages/settings/settings_index.dart';
@@ -14,6 +12,7 @@ import '../panels/left_panel.dart';
 import '../../../services/navigation_distance_service.dart';
 import '../../../services/trip_service.dart';
 import '../../../services/ros_service.dart';
+import '../../../core/theme/glass_container.dart';
 
 // Enhanced Route State Management
 enum RouteState {
@@ -394,7 +393,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   }
 
   // OPTIMIZED FOR 1920x1080 - Floating navbar version
-  Widget _buildBottomOverlay() {
+  Widget _buildBottomOverlay({bool dark = false}) {
     final isLargeScreen = _isLargeScreen(context);
 
     // Responsive padding - same as fixed navbar
@@ -408,82 +407,88 @@ class _LayoutDashboardState extends State<LayoutDashboard>
       right: horizontalPadding,
       child: Row(
         children: [
-          _buildRouteInfoContainer(isLargeScreen),
+          _buildRouteInfoContainer(isLargeScreen, dark: dark),
           SizedBox(width: containerSpacing),
-          _buildNavigationContainer(isLargeScreen),
+          _buildNavigationContainer(isLargeScreen, dark: dark),
         ],
       ),
     );
   }
 
-  // Floating route info - Apple-style clean
-  Widget _buildRouteInfoContainer(bool isLargeScreen) {
-    final containerHeight = isLargeScreen ? 180.0 : 120.0;
-    final containerPadding = isLargeScreen ? 28.0 : 18.0;
+  // Floating route info — compact glass pill, same size wherever it's
+  // used (Home floating overlay, Data page fixed bar, Camera page) so the
+  // dashboard feels consistent when switching pages. Pass dark: true over
+  // dark backgrounds (the camera feed) so it doesn't wash out.
+  Widget _buildRouteInfoContainer(bool isLargeScreen, {bool dark = false}) {
+    final containerHeight = isLargeScreen ? 96.0 : 76.0;
+    final containerPadding = isLargeScreen ? 18.0 : 14.0;
+    final textColor = dark ? Colors.white : Colors.black87;
+    final subTextColor = dark ? Colors.white70 : Colors.grey.shade600;
 
     return Expanded(
       flex: 3,
       child: GlassContainer(
         height: containerHeight,
-        padding: EdgeInsets.all(containerPadding),
-        borderRadius: isLargeScreen ? 24 : 20,
-        variant: GlassVariant.light,
-        opacity: 0.55,
+        padding: EdgeInsets.symmetric(
+          horizontal: containerPadding,
+          vertical: containerPadding * 0.55,
+        ),
+        borderRadius: isLargeScreen ? 20 : 16,
+        tint: dark ? Colors.black : Colors.white,
+        tintOpacity: dark ? 0.45 : 0.55,
+        borderOpacity: dark ? 0.18 : 0.6,
         child: Row(
           children: [
-            // Left side - Route info
+            Icon(
+              _getRouteStatusIcon(),
+              size: isLargeScreen ? 23.0 : 20.0,
+              color: _getRouteStatusColor(),
+            ),
+            SizedBox(width: isLargeScreen ? 12 : 9),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _getRouteStatusIcon(),
-                        size: isLargeScreen ? 28.0 : 24.0,
-                        color: _getRouteStatusColor(),
-                      ),
-                      SizedBox(width: isLargeScreen ? 14 : 10),
-                      Expanded(
-                        child: Text(
-                          _routeName,
-                          style: TextStyle(
-                            fontSize: isLargeScreen ? 28.0 : 23.0,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                            letterSpacing: -0.5,
-                            height: 1.2,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: isLargeScreen ? 3 : 2,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    _routeName,
+                    style: TextStyle(
+                      fontSize: isLargeScreen ? 18.0 : 16.0,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                  SizedBox(height: isLargeScreen ? 18 : 14),
+                  SizedBox(height: isLargeScreen ? 5 : 3),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildMetricItem(
                         icon: LucideIcons.car,
                         value: _getDisplayDistance(),
-                        isLargeScreen: isLargeScreen,
+                        isLargeScreen: false,
+                        color: subTextColor,
+                        valueColor: textColor,
                       ),
-                      SizedBox(width: isLargeScreen ? 48.0 : 36.0),
+                      SizedBox(width: isLargeScreen ? 20.0 : 14.0),
                       _buildMetricItem(
                         icon: LucideIcons.clock,
                         value: _getDisplayEta(),
-                        isLargeScreen: isLargeScreen,
+                        isLargeScreen: false,
+                        color: subTextColor,
+                        valueColor: textColor,
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            // Right side - Cancel button (Google Maps style)
             if (_showCancelButton) ...[
-              SizedBox(width: isLargeScreen ? 24 : 16),
-              _buildCancelButton(isLargeScreen: isLargeScreen),
+              SizedBox(width: isLargeScreen ? 14 : 10),
+              _buildCancelButton(isLargeScreen: false),
             ],
           ],
         ),
@@ -521,6 +526,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     required IconData icon,
     required String value,
     required bool isLargeScreen,
+    Color? color,
+    Color? valueColor,
   }) {
     final iconSize = isLargeScreen ? 26.0 : 22.0;
     final fontSize = isLargeScreen ? 22.0 : 18.0;
@@ -528,7 +535,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
     return Row(
       children: [
-        Icon(icon, size: iconSize, color: Colors.grey.shade600),
+        Icon(icon, size: iconSize, color: color ?? Colors.grey.shade600),
         SizedBox(width: spacing),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
@@ -538,7 +545,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: valueColor ?? Colors.black87,
               letterSpacing: -0.3,
             ),
           ),
@@ -547,28 +554,25 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     );
   }
 
-  Widget _buildNavigationContainer(bool isLargeScreen) {
-    final containerHeight = isLargeScreen ? 180.0 : 140.0;
-    final horizontalPadding = isLargeScreen ? 28.0 : 22.0;
-    final verticalPadding = isLargeScreen ? 24.0 : 18.0;
+  // Minimalist glass icon strip — same size wherever it appears (Home,
+  // Data, Camera) so the dashboard feels consistent when switching pages.
+  Widget _buildNavigationContainer(bool isLargeScreen, {bool dark = false}) {
+    final containerHeight = isLargeScreen ? 96.0 : 76.0;
 
     return Expanded(
       flex: 2,
       child: GlassContainer(
         height: containerHeight,
-        padding: EdgeInsets.symmetric(
-          horizontal: horizontalPadding,
-          vertical: verticalPadding,
-        ),
-        borderRadius: isLargeScreen ? 24 : 20,
-        variant: GlassVariant.light,
-        opacity: 0.55,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        borderRadius: isLargeScreen ? 20 : 16,
+        tint: dark ? Colors.black : Colors.white,
+        tintOpacity: dark ? 0.45 : 0.55,
+        borderOpacity: dark ? 0.18 : 0.6,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Menu navigation buttons only
             ...DashboardMenu.values.map((menu) {
-              return _buildNavButton(menu: menu, isLargeScreen: isLargeScreen);
+              return _buildNavButtonMinimal(menu: menu, dark: dark);
             }),
           ],
         ),
@@ -576,53 +580,45 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     );
   }
 
-  Widget _buildNavButton({
+  /// Minimal nav button used by the shared floating/fixed navbar above —
+  /// a soft rounded "capsule" glow behind the active icon (Tesla/EV
+  /// cluster style) instead of a flat highlight box or a plain dot.
+  /// The original _buildNavButton is left untouched below since nothing
+  /// else references it anymore, kept only for reference/rollback.
+  Widget _buildNavButtonMinimal({
     required DashboardMenu menu,
-    required bool isLargeScreen,
+    bool dark = false,
   }) {
     final isActive = _activeMenu == menu;
     final config = _getMenuConfig(menu);
+    final activeColor = dark ? Colors.white : Colors.black87;
+    final inactiveColor = dark ? Colors.white38 : Colors.grey.shade400;
 
-    final iconSize = isLargeScreen ? 38.0 : 30.0;
-    final paddingSize = isLargeScreen ? 16.0 : 14.0;
-    final indicatorWidth = isLargeScreen ? 36.0 : 28.0;
-    final indicatorHeight = isLargeScreen ? 4.0 : 3.0;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _setActiveMenu(menu),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.symmetric(vertical: paddingSize),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.all(paddingSize),
-                decoration: BoxDecoration(
-                  color: isActive ? Colors.grey.shade100 : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  config.icon,
-                  size: iconSize,
-                  color: isActive ? Colors.black87 : Colors.grey.shade400,
-                ),
-              ),
-              SizedBox(height: isLargeScreen ? 12 : 8),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: indicatorHeight,
-                width: isActive ? indicatorWidth : 0,
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(indicatorHeight / 2),
-                ),
-              ),
-            ],
-          ),
+    return GestureDetector(
+      onTap: () => _setActiveMenu(menu),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive
+              ? activeColor.withValues(alpha: dark ? 0.16 : 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: dark ? 0.25 : 0.12),
+                    blurRadius: 14,
+                    spreadRadius: -2,
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          config.icon,
+          size: isActive ? 25 : 22,
+          color: isActive ? activeColor : inactiveColor,
         ),
       ),
     );
@@ -660,7 +656,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     // Tablets usually < 13 inches, laptops >= 13 inches
     return diagonal >= 700; // Threshold: ~13 inches in logical pixels
   }
-  
+
   Widget _buildTopOverlay({bool compactMode = false}) {
     final isLargeScreen = _isLargeScreen(context);
     final data = MediaQuery.of(context);
@@ -706,9 +702,12 @@ class _LayoutDashboardState extends State<LayoutDashboard>
               AnimatedBuilder(
                 animation: _panelAnimController,
                 builder: (context, child) {
+                  // Widened from flex:2 to flex:3 so the front BEV
+                  // visualization has enough horizontal room to read
+                  // clearly (per updated design direction).
                   return _isPanelExpanded
                       ? Expanded(
-                          flex: 2,
+                          flex: 3,
                           child: LeftPanel(
                             onSettingsPressed: _openSettings,
                             onTogglePanel: _togglePanel,
@@ -719,7 +718,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                 },
               ),
               Expanded(
-                flex: _isPanelExpanded ? 8 : 1,
+                flex: _isPanelExpanded ? 7 : 1,
                 child: _activeMenu == DashboardMenu.data
                     ? _buildDataLayoutWithFixedNavbar()
                     : _buildDefaultLayoutWithFloatingNavbar(),
@@ -746,11 +745,13 @@ class _LayoutDashboardState extends State<LayoutDashboard>
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOutCubic,
       width: 80,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          right: BorderSide(color: Colors.grey.shade200, width: 1.0),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
         ),
+        border: Border(right: BorderSide(color: Color(0xFF1E2430), width: 1.0)),
       ),
       child: Column(
         children: [
@@ -776,13 +777,13 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             LucideIcons.panelLeftOpen,
             size: 20,
-            color: Colors.grey.shade500,
+            color: Colors.white.withValues(alpha: 0.55),
           ),
         ),
       ),
@@ -803,7 +804,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black87,
+                  color: Colors.white,
                   height: 1,
                 ),
               ),
@@ -813,7 +814,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade500,
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -845,6 +846,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   }
 
   Widget _buildDefaultLayoutWithFloatingNavbar() {
+    final isCameraActive = _activeMenu == DashboardMenu.camera;
     return Stack(
       children: [
         // Keep NavigationPage always active to preserve polyline
@@ -855,18 +857,14 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           navigationKey: navigationWidgetKey,
         ),
         // Overlay other pages on top when active
-        if (_activeMenu == DashboardMenu.camera)
+        if (isCameraActive)
           Container(color: Colors.black, child: const CameraPage()),
         _buildTopOverlay(),
-        // >>> TAMBAHAN: BEV muncul begitu status navigating
-        Positioned(
-          top: 24,
-          left: 24,
-          child: BirdEyeOverlayWidget(
-            active: _routeState == RouteState.navigating,
-          ),
-        ),
-        _buildBottomOverlay(),
+        // Dark glass everywhere now (matches the new dark dashboard
+        // theme) — previously this was only dark on the Camera page and
+        // light glass elsewhere, which looked inconsistent against the
+        // new dark left panel.
+        _buildBottomOverlay(dark: true),
       ],
     );
   }
@@ -898,113 +896,30 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     );
   }
 
-  // CONSISTENT SIZING - Fixed navbar with same dimensions as floating
+  // CONSISTENT SIZING — now reuses the exact same _buildRouteInfoContainer
+  // / _buildNavigationContainer as the Home page's floating overlay
+  // (previously this had its own separate, larger implementation, which
+  // is why the two pages looked like different sizes when switching).
   Widget _buildFixedBottomNavbar() {
     final isLargeScreen = _isLargeScreen(context);
+    final marginSize = isLargeScreen ? 40.0 : 24.0;
+    final spacing = isLargeScreen ? 20.0 : 12.0;
 
-    // Apple-style compact dimensions
-    final marginSize = isLargeScreen ? 40.0 : 28.0;
-    final containerHeight = isLargeScreen ? 180.0 : 140.0;
-    final containerPadding = isLargeScreen ? 28.0 : 22.0;
-    final spacing = isLargeScreen ? 20.0 : 16.0;
+    // Sesuaikan nilai ketinggian ini jika ingin dinaikkan lebih tinggi lagi
+    final bottomMargin = isLargeScreen ? 32.0 : 24.0;
 
-    return Container(
-      margin: EdgeInsets.all(marginSize),
+    return Padding(
+      padding: EdgeInsets.only(
+        left: marginSize,
+        right: marginSize,
+        bottom:
+            bottomMargin, // <-- Menambahkan batas bawah agar widget terangkat naik
+      ),
       child: Row(
         children: [
-          Expanded(
-            flex: 3,
-            child: GlassContainer(
-              height: containerHeight,
-              padding: EdgeInsets.all(containerPadding),
-              borderRadius: isLargeScreen ? 24 : 20,
-              variant: GlassVariant.light,
-              opacity: 0.55,
-              child: Row(
-                children: [
-                  // Left side - Route info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _getRouteStatusIcon(),
-                              size: isLargeScreen ? 28.0 : 24.0,
-                              color: _getRouteStatusColor(),
-                            ),
-                            SizedBox(width: isLargeScreen ? 14 : 10),
-                            Expanded(
-                              child: Text(
-                                _routeName,
-                                style: TextStyle(
-                                  fontSize: isLargeScreen ? 28.0 : 23.0,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                  letterSpacing: -0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: isLargeScreen ? 3 : 2,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: isLargeScreen ? 18 : 14),
-                        Row(
-                          children: [
-                            _buildMetricItem(
-                              icon: LucideIcons.car,
-                              value: _getDisplayDistance(),
-                              isLargeScreen: isLargeScreen,
-                            ),
-                            SizedBox(width: isLargeScreen ? 48.0 : 36.0),
-                            _buildMetricItem(
-                              icon: LucideIcons.clock,
-                              value: _getDisplayEta(),
-                              isLargeScreen: isLargeScreen,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Right side - Cancel button (Google Maps style)
-                  if (_showCancelButton) ...[
-                    SizedBox(width: isLargeScreen ? 24 : 16),
-                    _buildCancelButton(isLargeScreen: isLargeScreen),
-                  ],
-                ],
-              ),
-            ),
-          ),
+          _buildRouteInfoContainer(isLargeScreen, dark: true),
           SizedBox(width: spacing),
-          Expanded(
-            flex: 2,
-            child: GlassContainer(
-              height: containerHeight,
-              padding: EdgeInsets.symmetric(
-                horizontal: isLargeScreen ? 28.0 : 22.0,
-                vertical: isLargeScreen ? 24.0 : 18.0,
-              ),
-              borderRadius: isLargeScreen ? 24 : 20,
-              variant: GlassVariant.light,
-              opacity: 0.55,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Menu navigation buttons only
-                  ...DashboardMenu.values.map((menu) {
-                    return _buildNavButton(
-                      menu: menu,
-                      isLargeScreen: isLargeScreen,
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
+          _buildNavigationContainer(isLargeScreen, dark: true),
         ],
       ),
     );

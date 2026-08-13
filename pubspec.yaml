@@ -92,10 +92,31 @@ dependencies:
   flutter_cube: ^0.1.1
   model_viewer_plus: any
 
+  # Local HTTP server for the Windows 3D viewer: serves the app's own
+  # bundled assets (assets/3d/car_model.glb, model_viewer_plus's JS) over
+  # http://127.0.0.1 instead of file://, because Chromium's fetch() (used
+  # internally by <model-viewer>) refuses to load file:// URLs. See
+  # lib/services/local_asset_server_service.dart for the full explanation.
+  shelf: ^1.4.1
+  shelf_static: ^1.1.2
+
   # Platform-specific - ARM64 compatible
   window_manager: ^0.3.7 # Downgrade for ARM64 compatibility
   fvp: ^0.35.1
-
+  # WebView2-backed 3D viewer for Windows only, see
+  # lib/ui/core/widgets/sensors/car_3d_viewer_windows.dart. This lets
+  # Windows render assets/3d/car_model.glb through the same Chromium
+  # engine Chrome uses, instead of the flutter_cube/OBJ fallback in
+  # car_3d_viewer_desktop.dart (still used on Linux/macOS, since this
+  # package has no implementation for those platforms).
+  webview_windows: ^0.4.0
+  # webview_flutter_windows: ^1.1.1
+  # webview_flutter_windows was removed: it doesn't back model_viewer_plus
+  # on Windows (that package has no Windows implementation to plug it
+  # into — see lib/ui/core/widgets/sensors/car_3d_viewer_desktop.dart for
+  # the full explanation) and nothing else in the app used it.
+  # webview_windows (above) is a separate, Windows-specific package that
+  # car_3d_viewer_windows.dart drives directly instead.
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -129,6 +150,7 @@ flutter:
   assets:
     - assets/images/
     - assets/3d/
+    - assets/3d/car_model.glb
     - assets/internal_route.geojson
     - assets/mevi3d.mtl
     - assets/mevi3d.obj

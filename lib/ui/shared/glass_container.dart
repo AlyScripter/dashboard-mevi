@@ -1,26 +1,35 @@
-// lib/ui/shared/glass_container.dart
-//
-// Reusable glassmorphism container.
-// Pakai ini untuk mengganti Container putih solid / _overlayBoxDecoration
-// di seluruh dashboard supaya konsisten "kaca" nya.
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-enum GlassVariant { light, dark }
-
+/// Reusable frosted-glass container used across the dashboard.
+///
+/// Wraps [child] with a blurred, translucent background, a thin light
+/// border, and a soft shadow. Works well over the map (which is always
+/// colorful) or over a dark background — pass [tint] to bias it toward
+/// white (light glass) or black (dark glass).
+///
+/// Usage:
+/// ```dart
+/// GlassContainer(
+///   borderRadius: 20,
+///   padding: const EdgeInsets.all(16),
+///   child: MyContent(),
+/// )
+/// ```
 class GlassContainer extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry? padding;
-  final EdgeInsetsGeometry? margin;
   final double borderRadius;
-  final double blur;
-  final GlassVariant variant;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? margin;
+  final double blurSigma;
+  final Color tint;
 
-  /// Opacity dasar kaca. 0.35–0.55 biasanya paling enak dilihat.
-  final double opacity;
+  /// Opacity of [tint] used as the glass fill. Lower = more see-through.
+  final double tintOpacity;
 
-  final Border? border;
+  /// Opacity of the white border stroke.
+  final double borderOpacity;
+
   final List<BoxShadow>? boxShadow;
   final double? width;
   final double? height;
@@ -28,13 +37,13 @@ class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
     required this.child,
-    this.padding,
+    this.borderRadius = 20,
+    this.padding = const EdgeInsets.all(16),
     this.margin,
-    this.borderRadius = 24,
-    this.blur = 24,
-    this.variant = GlassVariant.light,
-    this.opacity = 0.45,
-    this.border,
+    this.blurSigma = 18,
+    this.tint = Colors.white,
+    this.tintOpacity = 0.55,
+    this.borderOpacity = 0.6,
     this.boxShadow,
     this.width,
     this.height,
@@ -42,58 +51,38 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = variant == GlassVariant.dark;
-
-    // Base tint kaca: putih untuk panel di atas map/kamera gelap,
-    // gelap untuk panel di atas background terang.
-    final baseColor = isDark ? const Color(0xFF0B0F14) : Colors.white;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : Colors.white.withValues(alpha: 0.6);
-    final highlightColor = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.85);
-
     return Container(
       width: width,
       height: height,
       margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: boxShadow ??
+        boxShadow:
+            boxShadow ??
             [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                blurRadius: 32,
-                offset: const Offset(0, 12),
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
+              // Flat tint only — no diagonal gradient overlay. The
+              // gradient used previously created a visible seam/crease
+              // on wide bars (destination bar, nav icon strip), which
+              // read as a rendering glitch rather than glass.
+              color: tint.withValues(alpha: tintOpacity),
               borderRadius: BorderRadius.circular(borderRadius),
-              border: border ?? Border.all(color: borderColor, width: 1.2),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  baseColor.withValues(alpha: opacity),
-                  baseColor.withValues(alpha: (opacity - 0.15).clamp(0.05, 1.0)),
-                ],
-              ),
-            ),
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(borderRadius),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [highlightColor.withValues(alpha: isDark ? 0.05 : 0.25), Colors.transparent],
-                stops: const [0.0, 0.4],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: borderOpacity),
+                width: 1.0,
               ),
             ),
             child: child,
@@ -104,46 +93,54 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// Tombol bulat kaca — pengganti Container abu-abu di tombol Settings /
-/// Collapse / Cancel supaya seragam dengan tema glass.
-class GlassIconButton extends StatelessWidget {
-  final IconData icon;
+/// A smaller, borderless glass "chip" — for compact icon buttons, pills,
+/// and status dots that need a frosted look without a full card border.
+class GlassChip extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double borderRadius;
+  final Color tint;
+  final double tintOpacity;
   final VoidCallback? onTap;
-  final double size;
-  final GlassVariant variant;
-  final Color? iconColor;
 
-  const GlassIconButton({
+  const GlassChip({
     super.key,
-    required this.icon,
+    required this.child,
+    this.padding = const EdgeInsets.all(10),
+    this.borderRadius = 14,
+    this.tint = Colors.white,
+    this.tintOpacity = 0.5,
     this.onTap,
-    this.size = 44,
-    this.variant = GlassVariant.light,
-    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final content = ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: tintOpacity),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 0.8,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+
+    if (onTap == null) return content;
     return Material(
       color: Colors.transparent,
-      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: GlassContainer(
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          variant: variant,
-          blur: 16,
-          opacity: 0.5,
-          child: Icon(
-            icon,
-            size: size * 0.45,
-            color: iconColor ??
-                (variant == GlassVariant.dark ? Colors.white : Colors.black87),
-          ),
-        ),
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: content,
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:dashboardmevi/services/ros_service.dart';
 import 'package:dashboardmevi/core/theme/dimensions.dart';
+import 'package:dashboardmevi/core/theme/glass_container.dart';
 
 class DistanceCardsWidget extends StatelessWidget {
   final double batteryPercent;
@@ -24,7 +25,7 @@ class DistanceCardsWidget extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                    color: Colors.white,
                   ),
                 );
               },
@@ -67,39 +68,41 @@ class _MetricCard extends StatelessWidget {
       valueText = (valueBuilder as String Function())();
     }
 
-    return Container(
-      height: 90,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusM),
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: AppDimensions.paddingM,
-        vertical: AppDimensions.paddingS,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    // Blue glass tint to match the reference dashboard's top metric cards
+    // (was a neutral white/dark tint before).
+    return GlassContainer(
+      height: 64,
+      borderRadius: AppDimensions.radiusM,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      tint: const Color(0xFF2196F3),
+      tintOpacity: 0.18,
+      borderOpacity: 0.28,
+      blurSigma: 16,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: AppDimensions.iconL, color: Colors.black87),
-          const Spacer(),
-          if (valueText != null)
-            Text(
-              valueText,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            )
-          else if (inner != null)
-            DefaultTextStyle(
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-              child: inner,
-            ),
+          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: valueText != null
+                ? Text(
+                    valueText,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  )
+                : DefaultTextStyle(
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                    child: inner!,
+                  ),
+          ),
         ],
       ),
     );

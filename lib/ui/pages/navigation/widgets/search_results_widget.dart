@@ -48,7 +48,11 @@ class SearchResultsWidget extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(LucideIcons.searchX, size: 32, color: Colors.grey.shade400),
+                Icon(
+                  LucideIcons.searchX,
+                  size: 32,
+                  color: Colors.grey.shade400,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'Tidak ada hasil ditemukan',
@@ -104,10 +108,7 @@ class SearchResultsWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: child,
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(18), child: child),
     );
   }
 }
@@ -130,7 +131,8 @@ class _TripResultItem extends StatelessWidget {
     if (name.contains('gedung')) return LucideIcons.building2;
     if (name.contains('lab')) return LucideIcons.flaskConical;
     if (name.contains('taman')) return LucideIcons.trees;
-    if (name.contains('satpam') || name.contains('pos')) return LucideIcons.shield;
+    if (name.contains('satpam') || name.contains('pos'))
+      return LucideIcons.shield;
     return LucideIcons.mapPin;
   }
 
@@ -162,11 +164,7 @@ class _TripResultItem extends StatelessWidget {
                 color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                _getTripIcon(),
-                size: 22,
-                color: iconColor,
-              ),
+              child: Icon(_getTripIcon(), size: 22, color: iconColor),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -221,14 +219,19 @@ class _TripResultItem extends StatelessWidget {
             ),
             if (onPreview != null)
               IconButton(
-                onPressed: onPreview,
+                // Tooltip dihapus agar tidak bentrok dengan overlay
                 icon: Icon(
                   LucideIcons.eye,
                   size: 20,
                   color: Colors.grey.shade400,
                 ),
-                tooltip: 'Preview lokasi',
                 splashRadius: 22,
+                onPressed: () {
+                  // Menjalankan fungsi preview rute setelah rendering frame selesai
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onPreview!();
+                  });
+                },
               ),
             Icon(
               LucideIcons.chevronRight,
