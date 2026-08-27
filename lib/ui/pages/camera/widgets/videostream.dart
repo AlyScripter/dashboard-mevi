@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 class LocalUvcWidget extends StatefulWidget {
   final BoxFit fit;
@@ -14,12 +15,22 @@ class LocalUvcWidget extends StatefulWidget {
   /// Kalau di Linux label device kosong sebelum permission, widget ini akan
   /// melakukan warmup stream sekali agar label muncul.
   final bool warmupForLabels;
-  
+
   /// Whether to show the source toggle (ROS/USB) in the status bar
   final bool showSourceToggle;
-  
+
   /// Callback when source is changed (true = ROS, false = USB)
   final ValueChanged<bool>? onSourceChanged;
+
+  /// Corner radius used for this widget's own clip + border. Override this
+  /// when embedding inside another rounded frame (e.g. CameraPage) so the
+  /// radii match exactly and the border doesn't look "cut off" at corners.
+  final double borderRadius;
+
+  /// Whether this widget draws its own outer border/shadow. Set to false
+  /// when a parent container (e.g. CameraPage's outer frame) already draws
+  /// a border, to avoid a double/mismatched border.
+  final bool showOwnBorder;
 
   const LocalUvcWidget({
     super.key,
@@ -29,6 +40,8 @@ class LocalUvcWidget extends StatefulWidget {
     this.warmupForLabels = true,
     this.showSourceToggle = false,
     this.onSourceChanged,
+    this.borderRadius = 12,
+    this.showOwnBorder = true,
   });
 
   @override
@@ -164,7 +177,7 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
     for (int i = 0; i < _videoDevices.length; i++) {
       final label = _videoDevices[i].label.toLowerCase();
       final deviceId = _videoDevices[i].deviceId.toLowerCase();
-      
+
       // Match various ZED camera naming patterns
       if (label.contains('zed') ||
           label.contains('stereolabs') ||
@@ -172,13 +185,17 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
           label.contains('sl zed') ||
           deviceId.contains('zed')) {
         if (kDebugMode) {
-          debugPrint('🎥 Found ZED device: label="$label" id=${_videoDevices[i].deviceId}');
+          debugPrint(
+            '🎥 Found ZED device: label="$label" id=${_videoDevices[i].deviceId}',
+          );
         }
         return _videoDevices[i].deviceId;
       }
     }
     if (kDebugMode) {
-      debugPrint('⚠️ No ZED device found among ${_videoDevices.length} devices');
+      debugPrint(
+        '⚠️ No ZED device found among ${_videoDevices.length} devices',
+      );
     }
     return null;
   }
@@ -218,10 +235,7 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
         'frameRate': {'ideal': _idealFps},
       };
 
-      final constraints = <String, dynamic>{
-        'audio': false,
-        'video': video,
-      };
+      final constraints = <String, dynamic>{'audio': false, 'video': video};
 
       if (kDebugMode) {
         debugPrint('📹 Constraints: $constraints');
@@ -287,19 +301,36 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.30),
-            blurRadius: 8,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        // REVISI: gradient gelap-navy (tema glass hitam-biru) alih-alih
+        // Colors.black polos, dan radius/border sekarang bisa diatur dari
+        // luar (widget.borderRadius, widget.showOwnBorder) supaya saat
+        // dibungkus CameraPage lengkungannya sama persis dan tidak dobel
+        // border dengan radius berbeda.
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+        ),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        border: widget.showOwnBorder
+            ? Border.all(
+                color: AppColors.glassBlueBorder.withValues(alpha: 0.55),
+                width: 1.2,
+              )
+            : null,
+        boxShadow: widget.showOwnBorder
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.30),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -318,20 +349,12 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
                 color: Colors.black.withValues(alpha: 0.70),
                 child: Center(child: _buildStatus()),
               ),
-            
+
             // Source toggle (ROS/USB) - positioned at bottom left when enabled
             if (widget.showSourceToggle)
-              Positioned(
-                bottom: 10,
-                left: 10,
-                child: _buildSourceToggle(),
-              ),
+              Positioned(bottom: 10, left: 10, child: _buildSourceToggle()),
 
-            Positioned(
-              bottom: 10,
-              right: 10,
-              child: _buildBadge(),
-            ),
+            Positioned(bottom: 10, right: 10, child: _buildBadge()),
           ],
         ),
       ),
@@ -341,9 +364,33 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
   Widget _buildVideo() {
     if (_renderer.srcObject == null || !_renderer.renderVideo) {
       return Container(
-        color: Colors.grey.shade900,
-        child: const Center(
-          child: Icon(Icons.videocam_off, size: 64, color: Colors.grey),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.videocam_off,
+                size: 64,
+                color: AppColors.glassBlueBorder.withValues(alpha: 0.65),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No signal',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -396,8 +443,11 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
               child: DropdownButton<String>(
                 isExpanded: true,
                 dropdownColor: Colors.grey.shade900,
-                value: _selectedDeviceId != null &&
-                        _videoDevices.any((d) => d.deviceId == _selectedDeviceId)
+                value:
+                    _selectedDeviceId != null &&
+                        _videoDevices.any(
+                          (d) => d.deviceId == _selectedDeviceId,
+                        )
                     ? _selectedDeviceId
                     : null,
                 hint: const Text(
@@ -587,20 +637,20 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
     final host = (_selectedDeviceId == null)
         ? 'default'
         : (_selectedDeviceId!.length > 8
-            ? _selectedDeviceId!.substring(0, 8)
-            : _selectedDeviceId!);
+              ? _selectedDeviceId!.substring(0, 8)
+              : _selectedDeviceId!);
 
     final text = _hasError
         ? 'Offline'
         : _isInitializing
-            ? 'Connecting'
-            : 'Live';
+        ? 'Connecting'
+        : 'Live';
 
     final color = _hasError
         ? Colors.red
         : _isInitializing
-            ? Colors.orange
-            : Colors.green;
+        ? Colors.orange
+        : Colors.green;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -616,8 +666,8 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
             _hasError
                 ? Icons.videocam_off
                 : _isInitializing
-                    ? Icons.hourglass_empty
-                    : Icons.videocam,
+                ? Icons.hourglass_empty
+                : Icons.videocam,
             size: 14,
             color: color,
           ),
@@ -635,7 +685,7 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
       ),
     );
   }
-  
+
   /// Build source toggle widget (ROS/USB)
   Widget _buildSourceToggle() {
     return Container(
@@ -649,20 +699,20 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
         children: [
           _buildSourceToggleButton(
             label: 'ROS',
-            isSelected: false,  // USB widget shows, so ROS is not selected
+            isSelected: false, // USB widget shows, so ROS is not selected
             onTap: () => widget.onSourceChanged?.call(true),
           ),
           const SizedBox(width: 4),
           _buildSourceToggleButton(
             label: 'USB',
-            isSelected: true,  // USB widget shows, so USB is selected
-            onTap: () {},  // Already on USB
+            isSelected: true, // USB widget shows, so USB is selected
+            onTap: () {}, // Already on USB
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildSourceToggleButton({
     required String label,
     required bool isSelected,

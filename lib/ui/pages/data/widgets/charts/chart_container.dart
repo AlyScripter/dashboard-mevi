@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../../core/theme/colors.dart';
 
 class ChartContainer extends StatelessWidget {
   final IconData icon;
@@ -14,15 +15,26 @@ class ChartContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Blue-black glass theme: dark navy card + glowing blue border,
+    // replacing the old plain white card so chart panels (LiDAR,
+    // Steering, CTE, Speed, IMU...) match the rest of the dashboard.
     return Container(
       width: double.infinity,
       height: double.infinity,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurface,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 1)),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.4),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -30,12 +42,12 @@ class ChartContainer extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: Colors.black87),
+              Icon(icon, size: 16, color: AppColors.glassBlueBorder),
               const SizedBox(width: 6),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.black87,
+                style: TextStyle(
+                  color: AppColors.glassTextPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),

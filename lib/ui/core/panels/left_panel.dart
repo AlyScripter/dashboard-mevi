@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../core/theme/glass_container.dart';
+import '../../../core/theme/colors.dart';
 import '../../../services/ros_service.dart'; // Import RosService
 import 'status_indicator_panel.dart';
 import '../widgets/dashboard/speed_display_widget.dart';
 import '../widgets/dashboard/battery_indicator_widget.dart';
 import '../widgets/dashboard/gear_selector_widget.dart';
-import '../widgets/dashboard/distance_cards_widget.dart';
 import '../widgets/sensors/vehicle_stage_widget.dart';
 
 class LeftPanel extends StatefulWidget {
@@ -54,9 +54,11 @@ class _LeftPanelState extends State<LeftPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Battery + efficiency — moved to the very top of the panel and
-          // restyled as a blue glass card, matching the reference
-          // dashboard's "Battery 72% / Fuel 83%" header.
+          // Battery + estimated range — sits at the very top of the panel,
+          // borderless/card-less to match the reference dashboard's
+          // "Battery 72% / Fuel 83%" header exactly. The old "Efisiensi"
+          // stat and the separate "50 m" distance card have been removed
+          // so only these two remain, giving the panel more room below.
           BatteryIndicatorWidget(
             batteryPercent: _batteryPercent,
             onTap: () {
@@ -67,13 +69,6 @@ class _LeftPanelState extends State<LeftPanel> {
               });
             },
           ),
-
-          SizedBox(height: AppDimensions.spacingM),
-
-          // Distance / range cards — also moved up here (also blue glass)
-          // so both top-level stats sit together above the fold, like the
-          // reference.
-          DistanceCardsWidget(batteryPercent: _batteryPercent),
 
           SizedBox(height: AppDimensions.spacingXL),
 
@@ -191,6 +186,9 @@ class _LeftPanelState extends State<LeftPanel> {
   /// Collapse) — dark ("putih/hitam glass") by default. Pass
   /// `active: true` for a blue glass variant if a button ever needs to
   /// show an on/selected state.
+  /// REVISI: border sekarang biru neon (disamakan dengan search bar,
+  /// destination bar, dan strip navigasi) menggantikan border putih
+  /// tipis sebelumnya.
   Widget _buildIconButton({
     required IconData icon,
     required VoidCallback? onTap,
@@ -203,6 +201,9 @@ class _LeftPanelState extends State<LeftPanel> {
       padding: const EdgeInsets.all(10),
       tint: active ? blue : Colors.black,
       tintOpacity: active ? 0.38 : 0.30,
+      borderColor: AppColors.glassBlueBorder,
+      borderOpacity: 0.85,
+      borderWidth: 1.2,
       child: Icon(
         icon,
         size: 18,

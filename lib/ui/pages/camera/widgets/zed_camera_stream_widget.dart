@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:dashboardmevi/services/data_source_service.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 class ZedCameraStreamWidget extends StatefulWidget {
   final String? streamUrl;
@@ -15,15 +16,25 @@ class ZedCameraStreamWidget extends StatefulWidget {
 
   /// Port web_video_server di Jetson
   final int webVideoPort;
-  
+
   /// Whether to show the source toggle (ROS/USB) in the status bar
   final bool showSourceToggle;
-  
+
   /// Whether this widget is currently the ROS source (for toggle display)
   final bool isRosSource;
-  
+
   /// Callback when source is changed (true = ROS, false = USB)
   final ValueChanged<bool>? onSourceChanged;
+
+  /// Corner radius used for this widget's own clip + border. Override this
+  /// when embedding inside another rounded frame (e.g. CameraPage) so the
+  /// radii match exactly and the border doesn't look "cut off" at corners.
+  final double borderRadius;
+
+  /// Whether this widget draws its own outer border/shadow. Set to false
+  /// when a parent container (e.g. CameraPage's outer frame) already draws
+  /// a border, to avoid a double/mismatched border.
+  final bool showOwnBorder;
 
   const ZedCameraStreamWidget({
     super.key,
@@ -36,6 +47,8 @@ class ZedCameraStreamWidget extends StatefulWidget {
     this.showSourceToggle = false,
     this.isRosSource = true,
     this.onSourceChanged,
+    this.borderRadius = 12,
+    this.showOwnBorder = true,
   });
 
   @override
@@ -117,12 +130,12 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
   @override
   void initState() {
     super.initState();
-    
+
     if (_hasInitialized) {
       print('⚠️ ZED WIDGET: Already initialized, skipping');
       return;
     }
-    
+
     _hasInitialized = true;
     print('==================== ZED WIDGET INIT ====================');
     print('Widget created, preparing to initialize...');
@@ -134,24 +147,24 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
 
   Future<void> _initializeService() async {
     print('📱 Initializing DataSourceService...');
-    
+
     try {
       await _dataSourceService.initialize();
       print('📱 DataSourceService initialized');
-      
+
       if (!mounted) {
         print('⚠️ Widget unmounted after DataSourceService init');
         return;
       }
-      
+
       _dataSourceService.addListener(_onDataSourceChanged);
       print('📱 Listener added to DataSourceService');
       print('📱 Starting connection to stream...');
       print('📱 Stream URL will be: $_streamUrl');
-      
+
       // Small delay to ensure widget is fully mounted
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       if (mounted) {
         _connectToStream();
       } else {
@@ -195,18 +208,18 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
     print('🔵 _connectToStream() called');
     final url = _streamUrl;
     print('🔵 URL retrieved: $url');
-    
+
     // Skip if already connecting or connected to the same URL
     if (_isConnecting) {
       print('⚠️ Skipping: already connecting in progress');
       return;
     }
-    
+
     if (_isConnected && _lastUsedUrl == url) {
       print('⚠️ Skipping: already connected to same URL');
       return;
     }
-    
+
     print('🔵 Proceeding with connection...');
     _lastUsedUrl = url;
 
@@ -227,7 +240,7 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       print('⚠️ Widget not mounted, aborting');
       return;
     }
-    
+
     print('🔵 Setting state to connecting...');
     setState(() {
       _isConnecting = true;
@@ -246,18 +259,20 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       // Attempt MJPEG stream connection
       print('🔵 Creating HTTP request...');
       final request = http.Request('GET', Uri.parse(url));
-      request.headers['Connection'] = 'keep-alive'; 
+      request.headers['Connection'] = 'keep-alive';
       request.headers['Cache-Control'] = 'no-cache';
       print('🔵 Sending request to $url...');
       print('🔵 Request headers: ${request.headers}');
-      
-      final response = await _httpClient!.send(request).timeout(
-        const Duration(seconds: 5), // Increased timeout
-        onTimeout: () {
-          print('❌ Request timed out after 5 seconds');
-          throw TimeoutException('Stream connection timed out');
-        },
-      );
+
+      final response = await _httpClient!
+          .send(request)
+          .timeout(
+            const Duration(seconds: 5), // Increased timeout
+            onTimeout: () {
+              print('❌ Request timed out after 5 seconds');
+              throw TimeoutException('Stream connection timed out');
+            },
+          );
 
       print('📡 Response received!');
       print('📡 Response status: ${response.statusCode}');
@@ -274,7 +289,9 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
           _isConnected = true;
           _isConnecting = false;
         });
-        print('✅ State updated: connected=$_isConnected, connecting=$_isConnecting');
+        print(
+          '✅ State updated: connected=$_isConnected, connecting=$_isConnecting',
+        );
 
         print('✅ Connected! Starting stream processing...');
         _processMjpegStream(response.stream);
@@ -284,7 +301,7 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       }
     } catch (e) {
       debugPrint('❌ Stream connection failed to $url: $e');
-      
+
       // Smart Fallback: If we failed to connect to a remote IP, try localhost
       // This handles the case where user has a saved IP but is running local docker
       final uri = Uri.parse(url);
@@ -306,7 +323,7 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       }
     }
   }
-  
+
   // Temporary override for fallback
   String? _streamUrlOverride;
 
@@ -342,10 +359,13 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
         timer.cancel();
         return;
       }
-      
+
       // Only check stall AFTER we've received at least one frame
-      if (lastFrameTime != null && DateTime.now().difference(lastFrameTime!).inSeconds > 5) {
-        debugPrint('⚠️ Stream stalled (no frames for 5s). Switching to Snapshot Polling.');
+      if (lastFrameTime != null &&
+          DateTime.now().difference(lastFrameTime!).inSeconds > 5) {
+        debugPrint(
+          '⚠️ Stream stalled (no frames for 5s). Switching to Snapshot Polling.',
+        );
         timer.cancel();
         _startSnapshotPolling();
       }
@@ -354,8 +374,10 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
     _streamSubscription = stream.listen(
       (data) {
         bytesReceived += data.length;
-        debugPrint('📦 Received ${data.length} bytes (total: $bytesReceived bytes, frames: $totalFrames)');
-        
+        debugPrint(
+          '📦 Received ${data.length} bytes (total: $bytesReceived bytes, frames: $totalFrames)',
+        );
+
         lastFrameTime = DateTime.now();
         buffer.addAll(data);
 
@@ -372,14 +394,18 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
             if (startIndex == -1) {
               // No start marker found yet
               if (buffer.length > 2000000) {
-                debugPrint('⚠️ Buffer overflow without JPEG start marker! Clearing buffer.');
+                debugPrint(
+                  '⚠️ Buffer overflow without JPEG start marker! Clearing buffer.',
+                );
                 buffer.clear();
               }
               break;
             }
-            
+
             if (startIndex > 0) {
-              debugPrint('🔍 Found JPEG start at index $startIndex (skipped ${startIndex} bytes)');
+              debugPrint(
+                '🔍 Found JPEG start at index $startIndex (skipped ${startIndex} bytes)',
+              );
             }
             buffer = buffer.sublist(startIndex);
             foundStart = true;
@@ -409,7 +435,9 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
           foundStart = false;
           totalFrames++;
 
-          debugPrint('🖼️ Complete frame #$totalFrames extracted (${frameData.length} bytes)');
+          debugPrint(
+            '🖼️ Complete frame #$totalFrames extracted (${frameData.length} bytes)',
+          );
 
           if (mounted) {
             setState(() => _currentFrame = frameData);
@@ -432,17 +460,17 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
   // Fallback: Poll /snapshot endpoint
   void _startSnapshotPolling() {
     if (_useSnapshotPolling) return; // Already polling
-    
+
     _streamSubscription?.cancel();
     _streamSubscription = null;
     _watchdogTimer?.cancel();
     _watchdogTimer = null;
-    
+
     if (!mounted) return;
     setState(() {
       _useSnapshotPolling = true;
       _isConnecting = false;
-      _isConnected = true; 
+      _isConnected = true;
     });
 
     // Construct snapshot URL (replace /stream with /snapshot)
@@ -451,13 +479,17 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
     debugPrint('📸 Starting Snapshot Polling: $snapshotUrl');
 
     _snapshotTimer?.cancel();
-    _snapshotTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+    _snapshotTimer = Timer.periodic(const Duration(milliseconds: 100), (
+      timer,
+    ) async {
       if (!mounted) {
         timer.cancel();
         return;
       }
       try {
-        final response = await http.get(Uri.parse(snapshotUrl)).timeout(const Duration(seconds: 1));
+        final response = await http
+            .get(Uri.parse(snapshotUrl))
+            .timeout(const Duration(seconds: 1));
         if (response.statusCode == 200) {
           if (mounted) {
             setState(() => _currentFrame = response.bodyBytes);
@@ -496,19 +528,37 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       width: widget.width,
       height: widget.height,
       decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        // REVISI: dulu polos Colors.black — sekarang disamakan dengan
+        // tema "glass hitam-biru" panel kiri (gradient gelap navy).
+        // Border/shadow sekarang opsional (showOwnBorder) dan radiusnya
+        // memakai widget.borderRadius, supaya saat dibungkus frame lain
+        // (CameraPage) radiusnya bisa disamakan persis dan tidak dobel
+        // border dengan lengkungan yang berbeda ("putus" di sudut).
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+        ),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        border: widget.showOwnBorder
+            ? Border.all(
+                color: AppColors.glassBlueBorder.withValues(alpha: 0.55),
+                width: 1.2,
+              )
+            : null,
+        boxShadow: widget.showOwnBorder
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -629,10 +679,37 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
       );
     }
 
+    // REVISI: dulu Colors.grey.shade900 polos — sekarang gradient
+    // gelap-navy yang sama dengan panel kiri, ikon & aksen biru neon,
+    // supaya konsisten dengan tema "glass hitam-biru" dashboard.
     return Container(
-      color: Colors.grey.shade900,
-      child: const Center(
-        child: Icon(Icons.videocam_off, size: 64, color: Colors.grey),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.videocam_off,
+              size: 64,
+              color: AppColors.glassBlueBorder.withValues(alpha: 0.65),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No signal',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -646,9 +723,15 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
           const SizedBox(height: 16),
-          const Text('Connecting to ZED (ROS)...', style: TextStyle(color: Colors.white, fontSize: 14)),
+          const Text(
+            'Connecting to ZED (ROS)...',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
           const SizedBox(height: 8),
-          Text(_streamUrl, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(
+            _streamUrl,
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
+          ),
         ],
       );
     }
@@ -661,12 +744,23 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
           const SizedBox(height: 16),
           const Text(
             'ZED Stream Error',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(_errorMessage, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+          Text(
+            _errorMessage,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
-          Text('URL: $_streamUrl', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(
+            'URL: $_streamUrl',
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
+          ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: _connectToStream,
@@ -697,7 +791,7 @@ class _ZedCameraStreamWidgetState extends State<ZedCameraStreamWidget> {
     if (_isConnected) return 'Live';
     return 'Offline';
   }
-  
+
   /// Build a source toggle button (ROS/USB)
   Widget _buildSourceToggleButton({
     required String label,

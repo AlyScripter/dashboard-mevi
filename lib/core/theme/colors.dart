@@ -45,4 +45,22 @@ class AppColors {
   // Additional Colors
   static const Color onPrimary = Color(0xFFFFFFFF);
   static const Color onSurface = Color(0xFFFFFFFF);
+
+  // Blue-Black Glass Theme (destination bar, nav strip, search bar,
+  // dropdowns, dialogs) — deep navy glass with a soft blue glow border,
+  // used to give the floating widgets a premium "cockpit HUD" look.
+  // REVISI: sebelumnya navy tint ini terlalu terang/tembus (0xFF0A0E1A @
+  // opacity rendah di masing-masing widget) sehingga search bar, dropdown
+  // hasil pencarian, dan bar destinasi terlihat "beda sendiri" dari panel
+  // kiri yang solid hitam. Sekarang dibuat hitam pekat (senada dengan
+  // gradient panel kiri 0xFF12161F -> 0xFF0A0D13) + border biru neon yang
+  // lebih menyala, supaya semua widget kaca di dashboard senada.
+  static const Color glassNavyTint = Color(0xFF090B10);
+  static const Color glassBlueBorder = Color(0xFF22B2FF);
+  static const Color glassBlueGlow = Color(0xFF22B2FF);
+  static const Color glassSurface = Color(0xFF10151F);
+  static const Color glassSurfaceAlt = Color(0xFF151B28);
+  static const Color glassDivider = Color(0xFF232B3B);
+  static const Color glassTextPrimary = Color(0xFFF3F6FC);
+  static const Color glassTextSecondary = Color(0xFF9AA7BD);
 }

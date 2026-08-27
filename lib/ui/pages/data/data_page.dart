@@ -14,6 +14,7 @@ import 'widgets/charts/speed_chart.dart';
 import 'widgets/charts/imu_chart.dart';
 import 'widgets/navigation/simple_trajectory_widget.dart';
 import 'utils/data_utils.dart';
+import '../../../core/theme/colors.dart';
 
 class DataPage extends StatefulWidget {
   const DataPage({super.key});
@@ -161,15 +162,27 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Background dot
+                      // Background dot — blue-black glass theme: active
+                      // dot glows neon blue instead of solid black.
                       Container(
                         width: isActive ? 10 : 10,
                         height: isActive ? 10 : 10,
                         decoration: BoxDecoration(
                           color: isActive
-                              ? Colors.black.withValues(alpha: 0.8)
-                              : Colors.black.withValues(alpha: 0.3),
+                              ? AppColors.glassBlueBorder
+                              : Colors.white.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: isActive
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.glassBlueGlow.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    blurRadius: 6,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
                         ),
                       ),
                       // Animated overlay for active dot
@@ -183,7 +196,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                               color: Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Colors.black.withValues(
+                                color: AppColors.glassBlueBorder.withValues(
                                   alpha: 0.3 + (animationValue * 0.4),
                                 ),
                                 width: 2,
@@ -324,7 +337,17 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
             DataUtils.findNearestObstacle(lidarRanges) ?? 0.0;
 
         return Container(
-          color: const Color(0xFFF2F2F2),
+          // Blue-black glass theme: same dark navy gradient used by the
+          // left panel (0xFF12161F -> 0xFF0A0D13) instead of the old flat
+          // light-grey (0xFFF2F2F2) background, so the Data page reads as
+          // part of the same dark cockpit dashboard.
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+            ),
+          ),
           padding: const EdgeInsets.only(left: 8, right: 8, top: 10, bottom: 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -347,10 +370,10 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                   children: [
                     Text(
                       _getPageTitle(_currentPageIndex),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                        color: AppColors.glassTextPrimary,
                       ),
                     ),
                     Row(
@@ -360,7 +383,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black.withValues(alpha: 0.6),
+                            color: AppColors.glassTextSecondary,
                           ),
                         ),
                       ],

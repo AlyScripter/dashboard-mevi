@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'lidar_painters.dart';
+import '../../../../../core/theme/colors.dart';
 
 enum LidarVisualizationMode {
   polar, // Polar coordinate view (traditional)
@@ -27,7 +28,7 @@ class EnhancedLidarVisualization extends StatefulWidget {
     this.intensities = const [],
     // Default FOV matches lidarnode_w.py: -40° to +40° (front-only)
     this.angleMin = -40 * math.pi / 180, // -40 degrees in radians
-    this.angleMax = 40 * math.pi / 180,  // +40 degrees in radians
+    this.angleMax = 40 * math.pi / 180, // +40 degrees in radians
     // 7 segments: [40, 30, 20, 0, -20, -30, -40] = 80° / 7 ≈ 11.4° per segment
     this.angleIncrement = 80 * math.pi / 180 / 7, // ~11.4 degrees per segment
     this.rangeMin = 0.0,
@@ -49,15 +50,19 @@ class _EnhancedLidarVisualizationState
   double _zoomLevel = 1.0;
   Offset _panOffset = Offset.zero;
 
-  // Clean light theme colors
-  static const Color _primaryColor = Color(0xFF2563EB); // Clean blue
-  static const Color _accentColor = Color(0xFF10B981); // Clean green
-  static const Color _surfaceColor = Color(0xFFFAFAFA); // Light surface
-  static const Color _cardColor = Color(0xFFFFFFFF); // Pure white cards
-  static const Color _textPrimary = Color(0xFF111827); // Dark text
-  static const Color _textSecondary = Color(0xFF6B7280); // Gray text
-  static const Color _borderColor = Color(0xFFE5E7EB); // Light border
-  static const Color _gridColor = Color(0xFFF3F4F6); // Subtle grid
+  // Blue-black glass theme colors — swapped from the old light theme so
+  // the LiDAR card matches the rest of the cockpit dashboard. The point
+  // colors inside the radar itself (green/orange/red = safe/caution/near,
+  // and the intensity gradient) are left untouched in lidar_painters.dart
+  // since those carry actual sensor meaning and shouldn't be reskinned.
+  static const Color _primaryColor = AppColors.glassBlueBorder; // Neon blue
+  static const Color _accentColor = Color(0xFF34D399); // Emerald (scanning)
+  static const Color _surfaceColor = AppColors.glassSurfaceAlt; // Inner panel
+  static const Color _cardColor = AppColors.glassSurface; // Card/menu bg
+  static const Color _textPrimary = AppColors.glassTextPrimary;
+  static const Color _textSecondary = AppColors.glassTextSecondary;
+  static const Color _borderColor = AppColors.glassBlueBorder; // Neon edge
+  static const Color _gridColor = Color(0xFF1E2633); // Subtle dark grid
 
   @override
   void initState() {
@@ -71,18 +76,15 @@ class _EnhancedLidarVisualizationState
       decoration: BoxDecoration(
         color: _cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _borderColor, width: 1),
+        border: Border.all(
+          color: _borderColor.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 20,
             offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
             spreadRadius: 0,
           ),
         ],
@@ -104,9 +106,9 @@ class _EnhancedLidarVisualizationState
   Widget _buildVisualization() {
     return Container(
       decoration: BoxDecoration(
-        color: _surfaceColor.withValues(alpha: 0.3),
+        color: _surfaceColor.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderColor.withValues(alpha: 0.5)),
+        border: Border.all(color: _borderColor.withValues(alpha: 0.2)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -198,7 +200,10 @@ class _EnhancedLidarVisualizationState
         ),
         borderData: FlBorderData(
           show: true,
-          border: Border.all(color: _borderColor, width: 1.5),
+          border: Border.all(
+            color: _borderColor.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
         ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
@@ -284,7 +289,10 @@ class _EnhancedLidarVisualizationState
         ),
         borderData: FlBorderData(
           show: true,
-          border: Border.all(color: _borderColor, width: 1.5),
+          border: Border.all(
+            color: _borderColor.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
         ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
@@ -375,12 +383,13 @@ class _EnhancedLidarVisualizationState
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _surfaceColor,
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
+        border: Border(top: BorderSide(color: _gridColor, width: 1)),
       ),
       child: Row(
         children: [

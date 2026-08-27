@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../../services/ros_service.dart';
+import '../../../../../core/theme/colors.dart';
 import '../../models/data_point.dart';
 
 class SteeringAngleChart extends StatefulWidget {
@@ -40,13 +41,17 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
       height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurface,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: AppColors.glassBlueGlow.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -55,14 +60,18 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
         children: [
           Row(
             children: [
-              const Icon(Icons.turn_right, color: Colors.blue, size: 20),
+              Icon(
+                Icons.turn_right,
+                color: AppColors.glassBlueBorder,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Steering Angle',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: AppColors.glassTextPrimary,
                 ),
               ),
               const Spacer(),
@@ -109,7 +118,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                         horizontalInterval: 10,
                         getDrawingHorizontalLine: (value) {
                           return FlLine(
-                            color: Colors.grey.shade300,
+                            color: AppColors.glassDivider,
                             strokeWidth: 1,
                           );
                         },
@@ -123,9 +132,9 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                             getTitlesWidget: (value, meta) {
                               return Text(
                                 '${value.toInt()}°',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey,
+                                  color: AppColors.glassTextSecondary,
                                 ),
                               );
                             },
@@ -144,7 +153,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                       borderData: FlBorderData(
                         show: true,
                         border: Border.all(
-                          color: Colors.grey.shade300,
+                          color: AppColors.glassDivider,
                           width: 1,
                         ),
                       ),
@@ -165,25 +174,29 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                               )
                               .toList(),
                           isCurved: true,
-                          color: Colors.blue,
+                          color: AppColors.glassBlueBorder,
                           barWidth: 3,
                           isStrokeCapRound: true,
                           dotData: FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.blue.withValues(alpha: 0.1),
+                            color: AppColors.glassBlueBorder.withValues(
+                              alpha: 0.12,
+                            ),
                           ),
                         ),
                       ],
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (touchedSpot) =>
+                              AppColors.glassSurfaceAlt,
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((LineBarSpot touchedSpot) {
                               return LineTooltipItem(
                                 '${touchedSpot.y.toStringAsFixed(1)}°',
-                                const TextStyle(
-                                  color: Colors.white,
+                                TextStyle(
+                                  color: AppColors.glassTextPrimary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               );
@@ -193,10 +206,13 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                       ),
                     ),
                   )
-                : const Center(
+                : Center(
                     child: Text(
                       'Waiting for steering data...',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                      style: TextStyle(
+                        color: AppColors.glassTextSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
           ),

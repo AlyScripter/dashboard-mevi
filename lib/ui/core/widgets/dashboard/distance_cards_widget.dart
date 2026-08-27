@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:dashboardmevi/services/ros_service.dart';
 import 'package:dashboardmevi/core/theme/dimensions.dart';
 import 'package:dashboardmevi/core/theme/glass_container.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 class DistanceCardsWidget extends StatelessWidget {
   final double batteryPercent;
@@ -70,13 +71,17 @@ class _MetricCard extends StatelessWidget {
 
     // Blue glass tint to match the reference dashboard's top metric cards
     // (was a neutral white/dark tint before).
+    // REVISI: border biru neon (disamakan dengan search bar/navigasi)
+    // menggantikan border putih tipis sebelumnya.
     return GlassContainer(
       height: 64,
       borderRadius: AppDimensions.radiusM,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       tint: const Color(0xFF2196F3),
       tintOpacity: 0.18,
-      borderOpacity: 0.28,
+      borderColor: AppColors.glassBlueBorder,
+      borderOpacity: 0.85,
+      borderWidth: 1.4,
       blurSigma: 16,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

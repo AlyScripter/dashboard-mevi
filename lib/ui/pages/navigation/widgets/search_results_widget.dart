@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 // import 'package:lucide_icons_flutter/lucide_icons_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../data/locations_data.dart';
+import '../../../../core/theme/colors.dart';
 
 class SearchResultsWidget extends StatelessWidget {
   final List<TripData> searchResults;
@@ -33,7 +34,10 @@ class SearchResultsWidget extends StatelessWidget {
             child: SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2.5),
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Color(0xFF7DB4FF),
+              ),
             ),
           ),
         ),
@@ -51,12 +55,15 @@ class SearchResultsWidget extends StatelessWidget {
                 Icon(
                   LucideIcons.searchX,
                   size: 32,
-                  color: Colors.grey.shade400,
+                  color: AppColors.glassTextSecondary,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'Tidak ada hasil ditemukan',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                  style: TextStyle(
+                    color: AppColors.glassTextSecondary,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -72,7 +79,7 @@ class SearchResultsWidget extends StatelessWidget {
         itemCount: searchResults.length,
         separatorBuilder: (_, __) => Divider(
           height: 1,
-          color: Colors.grey.shade100,
+          color: AppColors.glassDivider,
           indent: 56,
           endIndent: 16,
         ),
@@ -88,27 +95,36 @@ class SearchResultsWidget extends StatelessWidget {
     );
   }
 
+  // REVISI 2: bukan glass/blur lagi — solid hitam biasa + border biru
+  // neon saja, tanpa BackdropFilter, senada dengan search bar & panel
+  // kiri (flat modern minimalis).
   Widget _buildContainer({required Widget child}) {
     return Container(
       width: 520,
       constraints: const BoxConstraints(maxHeight: 420),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.40),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ClipRRect(borderRadius: BorderRadius.circular(18), child: child),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.glassNavyTint,
+            border: Border.all(
+              color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
+              width: 1.4,
+            ),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -161,7 +177,7 @@ class _TripResultItem extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
+                color: iconColor.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(_getTripIcon(), size: 22, color: iconColor),
@@ -176,7 +192,7 @@ class _TripResultItem extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: AppColors.glassTextPrimary,
                       letterSpacing: -0.3,
                     ),
                     maxLines: 1,
@@ -185,31 +201,31 @@ class _TripResultItem extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         LucideIcons.mapPin,
                         size: 13,
-                        color: Colors.grey.shade400,
+                        color: AppColors.glassTextSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${trip.waypoints.length} titik',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade500,
+                          color: AppColors.glassTextSecondary,
                         ),
                       ),
                       const SizedBox(width: 14),
-                      Icon(
+                      const Icon(
                         LucideIcons.clock,
                         size: 13,
-                        color: Colors.grey.shade400,
+                        color: AppColors.glassTextSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${trip.estimatedDuration.toInt()} mnt',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade500,
+                          color: AppColors.glassTextSecondary,
                         ),
                       ),
                     ],
@@ -220,10 +236,10 @@ class _TripResultItem extends StatelessWidget {
             if (onPreview != null)
               IconButton(
                 // Tooltip dihapus agar tidak bentrok dengan overlay
-                icon: Icon(
+                icon: const Icon(
                   LucideIcons.eye,
                   size: 20,
-                  color: Colors.grey.shade400,
+                  color: AppColors.glassTextSecondary,
                 ),
                 splashRadius: 22,
                 onPressed: () {
@@ -233,10 +249,10 @@ class _TripResultItem extends StatelessWidget {
                   });
                 },
               ),
-            Icon(
+            const Icon(
               LucideIcons.chevronRight,
               size: 20,
-              color: Colors.grey.shade300,
+              color: AppColors.glassTextSecondary,
             ),
           ],
         ),

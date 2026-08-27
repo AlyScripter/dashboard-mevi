@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../../services/ros_service.dart';
+import '../../../../../core/theme/colors.dart';
 import '../../models/data_point.dart';
 
 class CteChart extends StatefulWidget {
@@ -40,13 +41,17 @@ class _CteChartState extends State<CteChart> {
       height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurface,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: AppColors.glassBlueGlow.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -57,12 +62,12 @@ class _CteChartState extends State<CteChart> {
             children: [
               const Icon(Icons.track_changes, color: Colors.orange, size: 20),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Cross Track Error',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: AppColors.glassTextPrimary,
                 ),
               ),
               const Spacer(),
@@ -107,7 +112,7 @@ class _CteChartState extends State<CteChart> {
                         horizontalInterval: 0.5,
                         getDrawingHorizontalLine: (value) {
                           return FlLine(
-                            color: Colors.grey.shade300,
+                            color: AppColors.glassDivider,
                             strokeWidth: 1,
                           );
                         },
@@ -121,9 +126,9 @@ class _CteChartState extends State<CteChart> {
                             getTitlesWidget: (value, meta) {
                               return Text(
                                 '${value.toStringAsFixed(1)}m',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey,
+                                  color: AppColors.glassTextSecondary,
                                 ),
                               );
                             },
@@ -142,7 +147,7 @@ class _CteChartState extends State<CteChart> {
                       borderData: FlBorderData(
                         show: true,
                         border: Border.all(
-                          color: Colors.grey.shade300,
+                          color: AppColors.glassDivider,
                           width: 1,
                         ),
                       ),
@@ -169,19 +174,21 @@ class _CteChartState extends State<CteChart> {
                           dotData: FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.orange.withValues(alpha: 0.1),
+                            color: Colors.orange.withValues(alpha: 0.12),
                           ),
                         ),
                       ],
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (touchedSpot) =>
+                              AppColors.glassSurfaceAlt,
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((LineBarSpot touchedSpot) {
                               return LineTooltipItem(
                                 '${touchedSpot.y.toStringAsFixed(2)}m',
-                                const TextStyle(
-                                  color: Colors.white,
+                                TextStyle(
+                                  color: AppColors.glassTextPrimary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               );
@@ -191,10 +198,13 @@ class _CteChartState extends State<CteChart> {
                       ),
                     ),
                   )
-                : const Center(
+                : Center(
                     child: Text(
                       'Waiting for CTE data...',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                      style: TextStyle(
+                        color: AppColors.glassTextSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
           ),

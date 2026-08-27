@@ -7,6 +7,7 @@ import '../../../../../services/ros_service.dart';
 import '../../../../../services/waypoint_service.dart';
 import '../../../../../model/waypoint.dart';
 import '../../../../../data/locations_data.dart';
+import '../../../../../core/theme/colors.dart';
 
 // Map dependencies (using existing resources)
 import 'package:flutter_map/flutter_map.dart';
@@ -524,7 +525,8 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
     final double dLat = (pos2.latitude - pos1.latitude) * (math.pi / 180);
     final double dLon = (pos2.longitude - pos1.longitude) * (math.pi / 180);
 
-    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(pos1.latitude * (math.pi / 180)) *
             math.cos(pos2.latitude * (math.pi / 180)) *
             math.sin(dLon / 2) *
@@ -994,7 +996,7 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
               ),
             ),
           ],
-          popupBackgroundColor: Colors.white.withAlpha(204),
+          popupBackgroundColor: AppColors.glassSurfaceAlt.withAlpha(230),
         ),
       ],
     );
@@ -1029,9 +1031,11 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
 
     if (_waypointMission == null) return markers;
 
-    for (int i = 0;
-        i < _waypointMission!.waypoints.length && i < waypointPoints.length;
-        i++) {
+    for (
+      int i = 0;
+      i < _waypointMission!.waypoints.length && i < waypointPoints.length;
+      i++
+    ) {
       final waypoint = _waypointMission!.waypoints[i];
       final point = waypointPoints[i];
 
@@ -1134,12 +1138,16 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurface,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
+            color: AppColors.glassBlueGlow.withValues(alpha: 0.08),
+            blurRadius: 20,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1181,11 +1189,15 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.glassSurfaceAlt,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
               blurRadius: 12,
               offset: const Offset(0, 2),
             ),
@@ -1197,15 +1209,15 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
             Icon(
               _useMapView ? LucideIcons.radar : LucideIcons.map,
               size: 18,
-              color: const Color(0xFF007AFF),
+              color: AppColors.glassBlueBorder,
             ),
             const SizedBox(width: 8),
             Text(
               _useMapView ? 'Custom View' : 'Map View',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: AppColors.glassTextPrimary,
               ),
             ),
           ],
@@ -1218,11 +1230,15 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurfaceAlt,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1242,7 +1258,7 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
           _buildLegendItem('Deviation', const Color(0xFFFF9500)),
           const SizedBox(height: 6),
           // Vehicle
-          _buildLegendItem('Vehicle', Colors.grey.shade700),
+          _buildLegendItem('Vehicle', AppColors.glassTextSecondary),
         ],
       ),
     );
@@ -1252,11 +1268,15 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurfaceAlt,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1270,8 +1290,8 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               '${_zoomLevel.toStringAsFixed(1)}x',
-              style: const TextStyle(
-                color: Colors.black87,
+              style: TextStyle(
+                color: AppColors.glassTextPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1279,7 +1299,7 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
           ),
           _buildZoomButton(LucideIcons.plus, _zoomIn),
           const SizedBox(width: 8),
-          Container(width: 1, height: 20, color: Colors.grey.shade300),
+          Container(width: 1, height: 20, color: AppColors.glassDivider),
           const SizedBox(width: 8),
           _buildZoomButton(LucideIcons.maximize2, _resetZoom),
         ],
@@ -1294,10 +1314,11 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: AppColors.glassSurface,
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.glassDivider, width: 1),
         ),
-        child: Icon(icon, size: 16, color: Colors.grey.shade700),
+        child: Icon(icon, size: 16, color: AppColors.glassTextSecondary),
       ),
     );
   }
@@ -1309,16 +1330,13 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         Text(
           label,
           style: TextStyle(
-            color: Colors.grey.shade700,
+            color: AppColors.glassTextSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -1377,7 +1395,8 @@ class ROSTrajectoryPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     _canvasSize = size;
     _center = Offset(size.width / 2, size.height / 2) + panOffset;
-    _scale = math.min(size.width, size.height) *
+    _scale =
+        math.min(size.width, size.height) *
         8.0 *
         zoomLevel; // Apply zoom to scale
 
@@ -1396,7 +1415,7 @@ class ROSTrajectoryPainter extends CustomPainter {
 
   void _drawBackground(Canvas canvas) {
     final paint = Paint()
-      ..color = Colors.grey.shade50
+      ..color = AppColors.glassNavyTint
       ..style = PaintingStyle.fill;
 
     canvas.drawRect(
@@ -1407,7 +1426,7 @@ class ROSTrajectoryPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas) {
     final paint = Paint()
-      ..color = Colors.grey.shade300
+      ..color = AppColors.glassBlueBorder.withAlpha(20)
       ..strokeWidth = 0.5;
 
     const int gridLines = 10;

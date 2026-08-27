@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../model/location.dart';
 import '../../../../data/locations_data.dart';
 import '../../../../services/trip_service.dart';
+import '../../../../core/theme/glass_container.dart';
+import '../../../../core/theme/colors.dart';
 import 'search_results_widget.dart';
 
 class SearchBarWidget extends StatefulWidget {
@@ -196,21 +198,28 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.glassSurface,
+        surfaceTintColor: Colors.transparent,
         elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.glassBlueBorder.withValues(alpha: 0.25),
+            width: 1,
+          ),
+        ),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.glassBlueBorder.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 LucideIcons.navigation,
                 size: 20,
-                color: Colors.blue.shade600,
+                color: const Color(0xFF7DB4FF),
               ),
             ),
             const SizedBox(width: 12),
@@ -218,7 +227,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
               child: Text(
                 'Konfirmasi Perjalanan',
                 style: TextStyle(
-                  color: Colors.black87,
+                  color: AppColors.glassTextPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -233,7 +242,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             Text(
               trip.name,
               style: const TextStyle(
-                color: Colors.black87,
+                color: AppColors.glassTextPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -241,7 +250,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             const SizedBox(height: 4),
             Text(
               trip.destination.name,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              style: const TextStyle(
+                color: AppColors.glassTextSecondary,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 16),
             _TripDetailCard(trip: trip),
@@ -252,7 +264,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.grey.shade600,
+              foregroundColor: AppColors.glassTextSecondary,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             child: const Text('Batal'),
@@ -262,7 +274,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             label: const Text('Mulai Perjalanan'),
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor: AppColors.glassBlueBorder,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -376,31 +388,33 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
 
     return CompositedTransformTarget(
       link: _layerLink,
-      child: Container(
+      // REVISI 2: bukan glass/blur lagi — solid hitam biasa + border
+      // biru neon, gaya flat modern minimalis (blurSigma: 0 = tanpa
+      // BackdropFilter sama sekali).
+      child: GlassContainer(
         height: barHeight,
         width: barWidth,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        borderRadius: borderRadius,
+        padding: EdgeInsets.zero,
+        blurSigma: 0,
+        tint: AppColors.glassNavyTint,
+        tintOpacity: 1.0,
+        borderColor: AppColors.glassBlueBorder,
+        borderOpacity: 0.85,
+        borderWidth: 1.4,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
         child: Row(
           children: [
             const SizedBox(width: 18),
             Icon(
               LucideIcons.search,
-              color: Colors.grey.shade400,
+              color: const Color(0xFF7DB4FF),
               size: iconSize,
             ),
             const SizedBox(width: 14),
@@ -413,10 +427,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                     _showTripSuggestions();
                   }
                 },
+                cursorColor: AppColors.glassBlueBorder,
                 decoration: InputDecoration(
                   hintText: 'Cari tujuan perjalanan...',
                   hintStyle: TextStyle(
-                    color: Colors.grey.shade400,
+                    color: AppColors.glassTextSecondary,
                     fontSize: fontSize,
                     fontWeight: FontWeight.w400,
                     letterSpacing: -0.3,
@@ -425,14 +440,24 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 style: TextStyle(
-                  color: Colors.black87,
+                  color: AppColors.glassTextPrimary,
                   fontSize: fontSize,
                   fontWeight: FontWeight.w500,
                   letterSpacing: -0.3,
                 ),
               ),
             ),
-            if (_searchController.text.isNotEmpty)
+            // Tombol X: sebelumnya hanya muncul kalau ada teks yang
+            // diketik. Masalahnya, tap kosong pada search bar juga
+            // langsung memunculkan daftar saran tujuan (lihat
+            // _showTripSuggestions di atas) — jadi kalau user tap lalu
+            // berubah pikiran, tidak ada cara menutup listnya karena
+            // teksnya masih kosong. Sekarang tombol X juga muncul kalau
+            // daftar tujuan sedang tampil (_showSearchResults), tidak
+            // cuma saat ada teks.
+            if (_searchController.text.isNotEmpty ||
+                _showSearchResults ||
+                _isSearching)
               GestureDetector(
                 onTap: () {
                   _searchController.clear();
@@ -440,19 +465,21 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   setState(() {
                     _searchResults = [];
                     _showSearchResults = false;
+                    _isSearching = false;
                   });
+                  FocusScope.of(context).unfocus();
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(10),
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: Colors.white.withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       LucideIcons.x,
-                      color: Colors.grey.shade500,
+                      color: AppColors.glassTextSecondary,
                       size: 14,
                     ),
                   ),
@@ -474,25 +501,35 @@ class _LoadingDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.glassSurface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
       content: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 40,
               height: 40,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                color: Colors.blue.shade600,
+                color: Color(0xFF7DB4FF),
               ),
             ),
             const SizedBox(height: 20),
             Text(
               message,
-              style: const TextStyle(color: Colors.black87, fontSize: 14),
+              style: const TextStyle(
+                color: AppColors.glassTextPrimary,
+                fontSize: 14,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -512,17 +549,17 @@ class _TripDetailCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppColors.glassSurfaceAlt,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.glassDivider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             trip.description,
-            style: TextStyle(
-              color: Colors.grey.shade700,
+            style: const TextStyle(
+              color: AppColors.glassTextSecondary,
               fontSize: 13,
               height: 1.4,
             ),
@@ -558,19 +595,19 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.glassSurface,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.glassDivider),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade600),
+          Icon(icon, size: 14, color: const Color(0xFF7DB4FF)),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade700,
+            style: const TextStyle(
+              color: AppColors.glassTextSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),

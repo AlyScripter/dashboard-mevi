@@ -13,6 +13,7 @@ import '../../../services/navigation_distance_service.dart';
 import '../../../services/trip_service.dart';
 import '../../../services/ros_service.dart';
 import '../../../core/theme/glass_container.dart';
+import '../../../core/theme/colors.dart';
 
 // Enhanced Route State Management
 enum RouteState {
@@ -434,15 +435,41 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           vertical: containerPadding * 0.55,
         ),
         borderRadius: isLargeScreen ? 20 : 16,
-        tint: dark ? Colors.black : Colors.white,
-        tintOpacity: dark ? 0.45 : 0.55,
-        borderOpacity: dark ? 0.18 : 0.6,
+        // REVISI 2: bar destinasi (dark mode) sekarang flat hitam biasa +
+        // border biru neon, tanpa efek kaca/blur (blurSigma: 0). Varian
+        // light tetap glass seperti semula karena tidak dikomplain.
+        blurSigma: dark ? 0 : 18,
+        tint: dark ? AppColors.glassNavyTint : Colors.white,
+        tintOpacity: dark ? 1.0 : 0.55,
+        borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
+        borderOpacity: dark ? 0.85 : 0.6,
+        borderWidth: dark ? 1.4 : 1.0,
+        boxShadow: dark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
         child: Row(
           children: [
-            Icon(
-              _getRouteStatusIcon(),
-              size: isLargeScreen ? 23.0 : 20.0,
-              color: _getRouteStatusColor(),
+            Container(
+              width: isLargeScreen ? 44 : 38,
+              height: isLargeScreen ? 44 : 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dark
+                    ? _getRouteStatusColor().withValues(alpha: 0.16)
+                    : Colors.transparent,
+              ),
+              child: Icon(
+                _getRouteStatusIcon(),
+                size: isLargeScreen ? 23.0 : 20.0,
+                color: _getRouteStatusColor(),
+              ),
             ),
             SizedBox(width: isLargeScreen ? 12 : 9),
             Expanded(
@@ -455,7 +482,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                     _routeName,
                     style: TextStyle(
                       fontSize: isLargeScreen ? 18.0 : 16.0,
-                      fontWeight: FontWeight.w600,
+                      // REVISI: font destinasi dibikin lebih tipis (was
+                      // w600/semi-bold) sesuai permintaan.
+                      fontWeight: FontWeight.w300,
                       color: textColor,
                       letterSpacing: -0.3,
                     ),
@@ -565,9 +594,24 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         height: containerHeight,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         borderRadius: isLargeScreen ? 20 : 16,
-        tint: dark ? Colors.black : Colors.white,
-        tintOpacity: dark ? 0.45 : 0.55,
-        borderOpacity: dark ? 0.18 : 0.6,
+        // REVISI 2: strip ikon (map/kamera/database) juga flat hitam
+        // biasa + border biru neon, tanpa efek blur — sama seperti bar
+        // destinasi di atas.
+        blurSigma: dark ? 0 : 18,
+        tint: dark ? AppColors.glassNavyTint : Colors.white,
+        tintOpacity: dark ? 1.0 : 0.55,
+        borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
+        borderOpacity: dark ? 0.85 : 0.6,
+        borderWidth: dark ? 1.4 : 1.0,
+        boxShadow: dark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -591,7 +635,10 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   }) {
     final isActive = _activeMenu == menu;
     final config = _getMenuConfig(menu);
-    final activeColor = dark ? Colors.white : Colors.black87;
+    // Active state now glows blue on the dark cockpit glass instead of a
+    // flat white highlight, matching the blue-black theme.
+    final activeGlow = dark ? AppColors.glassBlueGlow : Colors.black87;
+    final activeIconColor = dark ? const Color(0xFF7DB4FF) : Colors.black87;
     final inactiveColor = dark ? Colors.white38 : Colors.grey.shade400;
 
     return GestureDetector(
@@ -602,13 +649,13 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isActive
-              ? activeColor.withValues(alpha: dark ? 0.16 : 0.08)
+              ? activeGlow.withValues(alpha: dark ? 0.20 : 0.08)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: activeColor.withValues(alpha: dark ? 0.25 : 0.12),
+                    color: activeGlow.withValues(alpha: dark ? 0.45 : 0.12),
                     blurRadius: 14,
                     spreadRadius: -2,
                   ),
@@ -618,7 +665,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         child: Icon(
           config.icon,
           size: isActive ? 25 : 22,
-          color: isActive ? activeColor : inactiveColor,
+          color: isActive ? activeIconColor : inactiveColor,
         ),
       ),
     );
@@ -693,9 +740,10 @@ class _LayoutDashboardState extends State<LayoutDashboard>
       children: [
         // Main dashboard (always rendered)
         Container(
-          color: _activeMenu == DashboardMenu.data
-              ? const Color(0xFFF2F2F2)
-              : Colors.black,
+          // Blue-black glass theme: Data page now paints its own dark navy
+          // gradient (see DataPage), so the outer shell stays plain black
+          // for every menu instead of switching to a light grey for Data.
+          color: Colors.black,
           child: Row(
             children: [
               // Animated Left Panel

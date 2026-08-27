@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:dashboardmevi/config/api_keys.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 class WeatherTimeWidget extends StatefulWidget {
   const WeatherTimeWidget({
@@ -141,8 +142,8 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
         final screenH = data.size.height;
         final availW =
             (constraints.maxWidth.isFinite && constraints.maxWidth > 0)
-                ? constraints.maxWidth
-                : screenW;
+            ? constraints.maxWidth
+            : screenW;
 
         // Calculate diagonal to detect device type (laptop vs tablet)
         final diagonal =
@@ -156,73 +157,73 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
         final timeFont = widget.embedded
             ? 20.0
             : widget.compactMode
-                ? (isLargeScreen
-                    ? 18.0
-                    : isTablet
-                        ? 16.0
-                        : 14.0)
-                : (isLargeScreen
-                    ? 24.0
-                    : compact
-                        ? 16.0
-                        : 20.0);
+            ? (isLargeScreen
+                  ? 18.0
+                  : isTablet
+                  ? 16.0
+                  : 14.0)
+            : (isLargeScreen
+                  ? 24.0
+                  : compact
+                  ? 16.0
+                  : 20.0);
         final weatherFont = widget.compactMode
             ? (isLargeScreen
-                ? 14.0
-                : isTablet
-                    ? 12.0
-                    : 11.0)
+                  ? 14.0
+                  : isTablet
+                  ? 12.0
+                  : 11.0)
             : (isLargeScreen
-                ? 18.0
-                : compact
-                    ? 12.0
-                    : 16.0);
+                  ? 18.0
+                  : compact
+                  ? 12.0
+                  : 16.0);
         final iconSize = widget.compactMode
             ? (isLargeScreen
-                ? 20.0
-                : isTablet
-                    ? 18.0
-                    : 16.0)
+                  ? 20.0
+                  : isTablet
+                  ? 18.0
+                  : 16.0)
             : (isLargeScreen
-                ? 28.0
-                : compact
-                    ? 18.0
-                    : 24.0);
+                  ? 28.0
+                  : compact
+                  ? 18.0
+                  : 24.0);
         final gap = widget.compactMode
             ? (isLargeScreen
-                ? 10.0
-                : isTablet
-                    ? 8.0
-                    : 6.0)
+                  ? 10.0
+                  : isTablet
+                  ? 8.0
+                  : 6.0)
             : (isLargeScreen
-                ? 16.0
-                : compact
-                    ? 8.0
-                    : 12.0);
+                  ? 16.0
+                  : compact
+                  ? 8.0
+                  : 12.0);
         final containerHeight = widget.embedded
             ? null
             : widget.compactMode
-                ? (isLargeScreen
-                    ? 48.0
-                    : isTablet
-                        ? 42.0
-                        : 36.0)
-                : (isLargeScreen
-                    ? 70.0
-                    : compact
-                        ? 38.0
-                        : 58.0);
+            ? (isLargeScreen
+                  ? 48.0
+                  : isTablet
+                  ? 42.0
+                  : 36.0)
+            : (isLargeScreen
+                  ? 70.0
+                  : compact
+                  ? 38.0
+                  : 58.0);
         final horizontalPadding = widget.compactMode
             ? (isLargeScreen
-                ? 14.0
-                : isTablet
-                    ? 12.0
-                    : 10.0)
+                  ? 14.0
+                  : isTablet
+                  ? 12.0
+                  : 10.0)
             : (isLargeScreen
-                ? 20.0
-                : compact
-                    ? 12.0
-                    : 16.0);
+                  ? 20.0
+                  : compact
+                  ? 12.0
+                  : 16.0);
 
         final content = Row(
           mainAxisSize: MainAxisSize.min,
@@ -232,7 +233,7 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
               style: TextStyle(
                 fontSize: timeFont,
                 fontWeight: FontWeight.w900,
-                color: Colors.black87,
+                color: AppColors.glassTextPrimary,
               ),
             ),
             if (widget.showWeather) ...[
@@ -241,7 +242,10 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                 SizedBox(
                   width: iconSize,
                   height: iconSize,
-                  child: const CircularProgressIndicator(strokeWidth: 2),
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF7DB4FF),
+                  ),
                 )
               else if (_hasError)
                 IconButton(
@@ -253,7 +257,11 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
               else if (_weatherCondition != null &&
                   _temperature != null &&
                   _weatherIcon != null) ...[
-                Icon(_weatherIcon, size: iconSize, color: Colors.black87),
+                Icon(
+                  _weatherIcon,
+                  size: iconSize,
+                  color: const Color(0xFF7DB4FF),
+                ),
                 SizedBox(width: gap / 1.2),
                 // Make weather text flexible so it wraps or truncates based on space
                 ConstrainedBox(
@@ -263,7 +271,7 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                     style: TextStyle(
                       fontSize: weatherFont,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: AppColors.glassTextPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -274,6 +282,9 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
           ],
         );
 
+        // REVISI: box cuaca/waktu sekarang solid hitam + border biru neon,
+        // tanpa blur, disamakan dengan search bar / destination bar /
+        // panel kiri (sebelumnya kotak putih polos, beda sendiri).
         final box = Container(
           height: containerHeight,
           padding: EdgeInsets.symmetric(
@@ -281,13 +292,17 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
             vertical: 12,
           ),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: AppColors.glassNavyTint,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
+              width: 1.4,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -303,8 +318,8 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
             maxWidth: isLargeScreen
                 ? 520
                 : compact
-                    ? 260
-                    : 480, // Match search bar width for tablet
+                ? 260
+                : 480, // Match search bar width for tablet
           ),
           child: SizedBox(height: containerHeight ?? 56, child: box),
         );

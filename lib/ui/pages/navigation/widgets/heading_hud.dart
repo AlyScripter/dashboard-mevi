@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dashboardmevi/ui/pages/navigation/bloc/navigation_cubit.dart';
 import 'package:dashboardmevi/services/ros_service.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 class HeadingHUD extends StatelessWidget {
   const HeadingHUD({super.key});
@@ -66,19 +67,22 @@ class HeadingHUD extends StatelessWidget {
               vertical: verticalPadding,
             ),
             width: containerWidth,
+            // REVISI: solid hitam + border biru neon, tanpa blur,
+            // disamakan dengan search bar / destination bar / panel kiri
+            // (sebelumnya kotak putih polos, beda sendiri dari widget
+            // lain di dashboard).
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.glassNavyTint,
               borderRadius: BorderRadius.circular(borderRadiusValue),
+              border: Border.all(
+                color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
+                width: 1.4,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 16,
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 14,
                   offset: const Offset(0, 4),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -87,7 +91,11 @@ class HeadingHUD extends StatelessWidget {
               children: [
                 Transform.rotate(
                   angle: heading * (math.pi / 180),
-                  child: Icon(Icons.navigation, size: iconSize),
+                  child: Icon(
+                    Icons.navigation,
+                    size: iconSize,
+                    color: const Color(0xFF7DB4FF),
+                  ),
                 ),
                 SizedBox(width: spacing),
                 Column(
@@ -98,14 +106,14 @@ class HeadingHUD extends StatelessWidget {
                       '${heading.toStringAsFixed(0)}°',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                        color: AppColors.glassTextPrimary,
                         fontSize: fontSizeHeading,
                       ),
                     ),
                     Text(
                       _headingToCardinal(heading),
                       style: TextStyle(
-                        color: Colors.black54,
+                        color: AppColors.glassTextSecondary,
                         fontSize: fontSizeCardinal,
                       ),
                     ),
