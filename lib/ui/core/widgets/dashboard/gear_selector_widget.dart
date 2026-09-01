@@ -21,6 +21,12 @@ class GearSelectorWidget extends StatelessWidget {
   /// lighter weight (e.g. FontWeight.w500) for a "thinner" look.
   final FontWeight fontWeight;
 
+  /// Layout direction for the gear pills. Defaults to [Axis.horizontal]
+  /// (the original P R N D row). Pass [Axis.vertical] to stack them
+  /// top-to-bottom instead — used by the BEV page's left-side rail so
+  /// the selector reads as a descending column rather than a row.
+  final Axis direction;
+
   const GearSelectorWidget({
     super.key,
     required this.selectedGear,
@@ -29,16 +35,20 @@ class GearSelectorWidget extends StatelessWidget {
     this.circleSize = 44,
     this.fontSize = 16,
     this.fontWeight = FontWeight.w800,
+    this.direction = Axis.horizontal,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Flex(
+      direction: direction,
       mainAxisSize: MainAxisSize.min,
       children: gears.map((gear) {
         final isActive = gear == selectedGear;
         return Padding(
-          padding: EdgeInsets.symmetric(horizontal: circleSize * 0.09),
+          padding: direction == Axis.horizontal
+              ? EdgeInsets.symmetric(horizontal: circleSize * 0.09)
+              : EdgeInsets.symmetric(vertical: circleSize * 0.09),
           child: GestureDetector(
             onTap: () => onGearChanged(gear),
             child: AnimatedContainer(

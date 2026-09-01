@@ -1,117 +1,68 @@
 import 'package:flutter/material.dart';
-// import 'package:lucide_icons_flutter/lucide_icons_flutter.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'widgets/data_source_section.dart';
 import 'widgets/about_section.dart';
+import '../../../core/theme/colors.dart';
 
 /// Settings Page - Dedicated page for all app settings
+///
+/// REVISI: dihapus bar/app-bar-nya sepenuhnya (tidak ada lagi ikon panah
+/// kembali atau ikon gerigi) — hanya menyisakan judul teks "Settings"
+/// polos langsung di atas konten, tanpa kotak/background terpisah.
+/// Data Source & About sekarang disusun berdampingan (kiri-kanan) alih-
+/// alih ditumpuk atas-bawah, supaya semuanya muat tanpa perlu scroll
+/// halaman. Latar halaman dibuat gelap pekat, sementara kedua kartu
+/// section diberi warna navy-biru yang jelas lebih terang supaya
+/// kontras dengan latar dan tidak menyatu — senada dengan referensi
+/// panel "CONTROL".
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onBack;
 
-  const SettingsPage({
-    super.key,
-    this.onBack,
-  });
+  const SettingsPage({super.key, this.onBack});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  void _handleBack() {
-    if (widget.onBack != null) {
-      widget.onBack!();
-    } else {
-      Navigator.of(context).pop();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: Column(
-        children: [
-          // Custom App Bar
-          _buildAppBar(),
-
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DataSourceSection(),
-                      SizedBox(height: 20),
-                      AboutSection(),
-                      SizedBox(height: 32),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: AppColors.settingsPageBg,
       child: SafeArea(
-        bottom: false,
-        child: Row(
-          children: [
-            // Back button
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _handleBack,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    LucideIcons.arrowLeft,
-                    size: 20,
-                    color: Colors.grey.shade700,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settings',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.glassTextPrimary,
+                  letterSpacing: -0.3,
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-
-            // Title
-            Icon(LucideIcons.settings, size: 22, color: Colors.blue.shade600),
-            const SizedBox(width: 10),
-            const Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-                letterSpacing: -0.3,
+              const SizedBox(height: 18),
+              // Two side-by-side panels instead of a single scrolling
+              // column — Data Source on the left, About on the right —
+              // so both are visible together without scrolling the page.
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Expanded(
+                      child: SingleChildScrollView(child: DataSourceSection()),
+                    ),
+                    SizedBox(width: 20),
+                    Expanded(
+                      child: SingleChildScrollView(child: AboutSection()),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

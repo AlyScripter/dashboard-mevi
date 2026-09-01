@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 // import 'package:lucide_icons_flutter/lucide_icons_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../../core/theme/colors.dart';
 
 /// About Section for Settings Page
 class AboutSection extends StatelessWidget {
@@ -11,13 +12,17 @@ class AboutSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.settingsCardBg,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.glassBlueBorder.withValues(alpha: 0.45),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -30,13 +35,13 @@ class AboutSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   LucideIcons.info,
                   size: 18,
-                  color: Colors.grey.shade600,
+                  color: AppColors.glassTextSecondary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -45,7 +50,7 @@ class AboutSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: AppColors.glassTextPrimary,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -59,7 +64,7 @@ class AboutSection extends StatelessWidget {
           _buildInfoRow('Platform', 'Flutter Linux'),
 
           const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade200, height: 1),
+          Divider(color: AppColors.glassDivider, height: 1),
           const SizedBox(height: 14),
 
           // Hardware Info
@@ -68,7 +73,7 @@ class AboutSection extends StatelessWidget {
           _buildHardwareGrid(),
 
           const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade200, height: 1),
+          Divider(color: AppColors.glassDivider, height: 1),
           const SizedBox(height: 14),
 
           // Credits
@@ -78,7 +83,7 @@ class AboutSection extends StatelessWidget {
             'MEVI Autonomous Vehicle Project • Dashboard for monitoring and control',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade500,
+              color: AppColors.glassTextSecondary,
               height: 1.4,
             ),
           ),
@@ -99,8 +104,9 @@ class AboutSection extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children:
-          items.map((item) => _buildHardwareChip(item.$1, item.$2)).toList(),
+      children: items
+          .map((item) => _buildHardwareChip(item.$1, item.$2))
+          .toList(),
     );
   }
 
@@ -108,21 +114,21 @@ class AboutSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: AppColors.glassSurfaceAlt,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.glassDivider),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade500),
+          Icon(icon, size: 14, color: AppColors.glassTextSecondary),
           const SizedBox(width: 6),
           Text(
             name,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
+              color: AppColors.glassTextPrimary,
             ),
           ),
         ],
@@ -138,14 +144,14 @@ class AboutSection extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 12, color: AppColors.glassTextSecondary),
           ),
           Text(
             value,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: AppColors.glassTextPrimary,
             ),
           ),
         ],
@@ -159,7 +165,7 @@ class AboutSection extends StatelessWidget {
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w600,
-        color: Colors.grey.shade400,
+        color: AppColors.glassTextSecondary,
         letterSpacing: 0.8,
       ),
     );

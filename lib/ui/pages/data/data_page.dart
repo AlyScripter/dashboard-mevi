@@ -33,6 +33,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   Timer? _dataTimer;
   StreamSubscription? _speedSubscription;
   StreamSubscription? _lidarSubscription;
+  StreamSubscription? _lidar2DSubscription;
   StreamSubscription? _obstacleSubscription;
   StreamSubscription? _imuSubscription;
 
@@ -51,6 +52,16 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   double lidarAngleMax = math.pi;
   double lidarAngleIncrement = 0.01745329; // ~1 degree
   double lidarRangeMax = 30.0;
+
+  // Full-resolution ~270° scan for the "2D LiDAR" view (raw /scan data,
+  // straight from the Hokuyo driver via rosbag/rosbridge — kept separate
+  // from the downsampled `lidarRanges` above used by the other view modes).
+  List<double> lidar2DRanges = [];
+  double lidar2DAngleMin = -2.3561944901923448; // -135°
+  double lidar2DAngleIncrement = 0.004363323129985824; // 0.25°
+  double lidar2DRangeMin = 0.02;
+  double lidar2DRangeMax = 30.0;
+
   double batterySoc = 85.0;
   double currentSpeed = 0.0;
   double imuYaw = 0.0;
@@ -92,6 +103,17 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
             (index) => math.Random().nextDouble(),
           );
         }
+      });
+    });
+
+    // Full-resolution ~270° scan, dedicated to the "2D LiDAR" view.
+    _lidar2DSubscription = rosService.lidar2DStream.listen((scan) {
+      setState(() {
+        lidar2DRanges = scan.ranges;
+        lidar2DAngleMin = scan.angleMin;
+        lidar2DAngleIncrement = scan.angleIncrement;
+        lidar2DRangeMin = scan.rangeMin;
+        lidar2DRangeMax = scan.rangeMax;
       });
     });
 
@@ -231,6 +253,11 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
               angleIncrement: lidarAngleIncrement,
               rangeMax: lidarRangeMax,
               mode: LidarVisualizationMode.polar,
+              lidar2DRanges: lidar2DRanges,
+              lidar2DAngleMin: lidar2DAngleMin,
+              lidar2DAngleIncrement: lidar2DAngleIncrement,
+              lidar2DRangeMin: lidar2DRangeMin,
+              lidar2DRangeMax: lidar2DRangeMax,
             ),
           ),
         );
@@ -422,6 +449,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     _dataTimer?.cancel();
     _speedSubscription?.cancel();
     _lidarSubscription?.cancel();
+    _lidar2DSubscription?.cancel();
     _obstacleSubscription?.cancel();
     _imuSubscription?.cancel();
     super.dispose();

@@ -63,4 +63,12 @@ class AppColors {
   static const Color glassDivider = Color(0xFF232B3B);
   static const Color glassTextPrimary = Color(0xFFF3F6FC);
   static const Color glassTextSecondary = Color(0xFF9AA7BD);
+
+  // Settings page — flat near-black shell + distinctly blue-navy section
+  // cards (per the reference EV "CONTROL" panel: dark shell, lighter
+  // blue-tinted tiles), so Data Source / About visibly pop off the page
+  // instead of blending into it like the plain glassSurface tone did.
+  static const Color settingsPageBg = Color(0xFF0E1116);
+  static const Color settingsCardBg = Color(0xFF16273F);
+  static const Color settingsCardBgAlt = Color(0xFF1C3252);
 }

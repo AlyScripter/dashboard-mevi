@@ -62,6 +62,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
       NavigationDistanceService();
 
   StreamSubscription<InAppNotification>? _inAppSubscription;
+  StreamSubscription<double>? _rosLatSubscription;
+  StreamSubscription<double>? _rosLngSubscription;
+  StreamSubscription<double>? _rosSpeedSubscription;
 
   // State management
   bool _isLoading = false;
@@ -113,6 +116,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
   @override
   void dispose() {
     _inAppSubscription?.cancel();
+    _rosLatSubscription?.cancel();
+    _rosLngSubscription?.cancel();
+    _rosSpeedSubscription?.cancel();
     _locationUpdateTimer?.cancel(); // Cancel if exists
     _gpsSimulatorTimer?.cancel();
     debugPrint('🛑 NavigationWidget disposed');
@@ -152,10 +158,16 @@ class NavigationWidgetState extends State<NavigationWidget> {
 
   void _setupRosStreams() {
     // Listen to ROS GPS latitude updates
-    rosService.gpsStream
+    _rosLatSubscription = rosService.gpsStream
         .map((gps) => gps["lat"]!)
         .listen(
           (lat) {
+            // The stream keeps emitting for as long as RosService is
+            // alive (it's a global singleton), independent of whether
+            // this widget is still on screen. Bail out if we've already
+            // been disposed (e.g. user navigated away to another page)
+            // so we never call setState() on a defunct State.
+            if (!mounted) return;
             if (_currentPosition != null) {
               setState(() {
                 _currentPosition = LatLng(lat, _currentPosition!.longitude);
@@ -184,10 +196,11 @@ class NavigationWidgetState extends State<NavigationWidget> {
         );
 
     // Listen to ROS GPS longitude updates
-    rosService.gpsStream
+    _rosLngSubscription = rosService.gpsStream
         .map((gps) => gps["lng"]!)
         .listen(
           (lon) {
+            if (!mounted) return;
             if (_currentPosition != null) {
               setState(() {
                 _currentPosition = LatLng(_currentPosition!.latitude, lon);
@@ -216,8 +229,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
         );
 
     // Optional: Listen to ROS speed for debugging
-    rosService.speedometerRosStream.listen(
+    _rosSpeedSubscription = rosService.speedometerRosStream.listen(
       (speed) {
+        if (!mounted) return;
         debugPrint(
           '🚗 Current speed from ROS: ${speed.toStringAsFixed(1)} km/h',
         );
@@ -337,6 +351,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
     try {
       String geoJsonString = geoJsonData;
       await _geoJsonRouteManager.loadGeoJsonData(geoJsonString);
+      if (!mounted) return;
       setState(() {
         _geoJsonLocations = GeoJsonParser.parseGeoJson(geoJsonString);
 
@@ -573,6 +588,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
   }
 
   void _setLoadingState(bool isLoading) {
+    if (!mounted) return;
     setState(() {
       _isLoading = isLoading;
     });
@@ -814,10 +830,21 @@ class NavigationWidgetState extends State<NavigationWidget> {
     final searchBarLeft = isLargeScreen ? 48.0 : 16.0;
     final searchBarMaxWidth = isLargeScreen ? 720.0 : 480.0;
 
+    // REVISI: tombol "pusatkan ke mobil" diturunkan dan disejajarkan
+    // dengan pill "Tentukan destinasi Anda" (bottom pill di
+    // dashboard_layout.dart pakai bottomPadding 40/24 & tinggi 72/62),
+    // bukan lagi mengambang di tengah layar menumpuk area logo peta.
+    // Offset dihitung supaya titik tengah tombol sejajar dengan titik
+    // tengah pill tersebut.
     final centerBtnRight = isLargeScreen ? 48.0 : 35.0;
+    final centerBtnSize = isLargeScreen ? 56.0 : 48.0;
+    const routePillBottomPadding = {'large': 40.0, 'small': 24.0};
+    const routePillHeight = {'large': 72.0, 'small': 62.0};
     final centerBtnBottom = isLargeScreen
-        ? 260.0
-        : 220.0; // Raised above navbar
+        ? routePillBottomPadding['large']! +
+              (routePillHeight['large']! - centerBtnSize) / 2
+        : routePillBottomPadding['small']! +
+              (routePillHeight['small']! - centerBtnSize) / 2;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -867,6 +894,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
               right: centerBtnRight,
               bottom: centerBtnBottom,
               child: CenterOnCarButton(
+                size: centerBtnSize,
                 onPressed: () {
                   try {
                     centerOnCurrentPosition();

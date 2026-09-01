@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'lidar_painters.dart';
+import 'lidar_2d_scan_painter.dart';
 import '../../../../../core/theme/colors.dart';
 
 enum LidarVisualizationMode {
@@ -10,6 +11,7 @@ enum LidarVisualizationMode {
   range, // Range vs angle line chart
   heatmap, // Intensity heatmap
   birdEye, // Bird's eye view
+  lidar2D, // Full-resolution 270° top-down X/Y scan (matplotlib-style)
 }
 
 class EnhancedLidarVisualization extends StatefulWidget {
@@ -21,6 +23,17 @@ class EnhancedLidarVisualization extends StatefulWidget {
   final double rangeMin;
   final double rangeMax;
   final LidarVisualizationMode mode;
+
+  // ---- Dedicated full-resolution 270° scan, for LidarVisualizationMode.lidar2D ----
+  // Kept separate from `ranges` above (which is downsampled to 360 bins
+  // across a full -180..180 sweep for the other view modes) so the 2D
+  // top-down plot can reproduce the real ~270° Hokuyo geometry exactly,
+  // straight from the /scan rosbag data.
+  final List<double> lidar2DRanges;
+  final double lidar2DAngleMin;
+  final double lidar2DAngleIncrement;
+  final double lidar2DRangeMin;
+  final double lidar2DRangeMax;
 
   const EnhancedLidarVisualization({
     super.key,
@@ -35,6 +48,14 @@ class EnhancedLidarVisualization extends StatefulWidget {
     // Max range matches lidarnode_w.py thresholds (max 3m for center)
     this.rangeMax = 3.0,
     this.mode = LidarVisualizationMode.polar,
+    this.lidar2DRanges = const [],
+    // Real Hokuyo /scan geometry for the ~270° full scan.
+    this.lidar2DAngleMin = -2.3561944901923448, // -135°
+    this.lidar2DAngleIncrement = 0.004363323129985824, // 0.25°
+    this.lidar2DRangeMin = 0.02,
+    // 20x20m view, matching the reference Python (matplotlib) single-scan
+    // radar plot the dark theme/marker style was ported from.
+    this.lidar2DRangeMax = 20.0,
   });
 
   @override
@@ -129,6 +150,8 @@ class _EnhancedLidarVisualizationState
         return _buildHeatmapView();
       case LidarVisualizationMode.birdEye:
         return _buildBirdEyeView();
+      case LidarVisualizationMode.lidar2D:
+        return _buildLidar2DView();
     }
   }
 
@@ -380,6 +403,34 @@ class _EnhancedLidarVisualizationState
     );
   }
 
+  Widget _buildLidar2DView() {
+    // Near-black chart background, matching the reference Python
+    // single-scan radar plot and the rest of the dark cockpit dashboard
+    // (Lidar2DScanPainter also paints this same tone as its canvas
+    // background, this just avoids a flash before the first paint).
+    return Container(
+      color: const Color(0xFF0A0D13),
+      padding: const EdgeInsets.all(4),
+      child: CustomPaint(
+        painter: Lidar2DScanPainter(
+          ranges: widget.lidar2DRanges,
+          angleMin: widget.lidar2DAngleMin,
+          angleIncrement: widget.lidar2DAngleIncrement,
+          rangeMin: widget.lidar2DRangeMin,
+          rangeMax: widget.lidar2DRangeMax,
+          // Zoomed display window, independent of the sensor's actual
+          // rangeMax (which can be 30m from the real Hokuyo/rosbag data
+          // — see widget.lidar2DRangeMax) — keeps the plot at a fixed,
+          // readable 20x20m like the reference video regardless of what
+          // the live scan reports as its physical spec.
+          viewRangeMeters: 20.0,
+          title: 'MEVI - Single LiDAR Scan',
+        ),
+        size: Size.infinite,
+      ),
+    );
+  }
+
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -398,14 +449,14 @@ class _EnhancedLidarVisualizationState
               children: [
                 _buildStatItem(
                   'Data Points',
-                  '${widget.ranges.length}',
+                  '${_currentMode == LidarVisualizationMode.lidar2D ? widget.lidar2DRanges.length : widget.ranges.length}',
                   _accentColor,
                   Icons.scatter_plot_rounded,
                 ),
                 const SizedBox(width: 12),
                 _buildStatItem(
                   'Max Range',
-                  '${widget.rangeMax.toStringAsFixed(1)}m',
+                  '${(_currentMode == LidarVisualizationMode.lidar2D ? widget.lidar2DRangeMax : widget.rangeMax).toStringAsFixed(1)}m',
                   _primaryColor,
                   Icons.straighten_rounded,
                 ),
@@ -590,6 +641,11 @@ class _EnhancedLidarVisualizationState
           Icons.visibility_rounded,
           'Bird\'s Eye',
         ),
+        _buildMenuItem(
+          LidarVisualizationMode.lidar2D,
+          Icons.explore_rounded,
+          '2D LiDAR',
+        ),
       ],
     );
   }
@@ -606,6 +662,8 @@ class _EnhancedLidarVisualizationState
         return Icons.gradient_rounded;
       case LidarVisualizationMode.birdEye:
         return Icons.visibility_rounded;
+      case LidarVisualizationMode.lidar2D:
+        return Icons.explore_rounded;
     }
   }
 
@@ -621,6 +679,8 @@ class _EnhancedLidarVisualizationState
         return 'Heatmap';
       case LidarVisualizationMode.birdEye:
         return 'Bird\'s Eye';
+      case LidarVisualizationMode.lidar2D:
+        return '2D LiDAR';
     }
   }
 

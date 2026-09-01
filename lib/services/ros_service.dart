@@ -7,6 +7,42 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'logging_service.dart';
 
+/// Full-resolution 2D LiDAR scan snapshot, used by the "2D LiDAR" data
+/// visualization page (Cartesian X/Y scatter, matplotlib-style).
+///
+/// This is kept separate from the legacy `lidarStream` (which downsamples
+/// every /scan message to 360 bins spanning -180..+180 for the
+/// polar/cartesian/heatmap/bird's-eye views). The MEVI LiDAR (Hokuyo URG,
+/// frame_id "laser") publishes /scan messages with two different angular
+/// configurations mixed on the same topic:
+///   - ~270° FOV, 1081 points, 0.25° resolution  -> full surround scan
+///   - ~60°  FOV,  241 points, 0.25° resolution  -> narrow front-only scan
+/// Only the ~270° ("full") scan is kept here, since that's the one that
+/// should be rendered as the 2D top-down scan.
+class LidarScan2D {
+  final List<double> ranges; // raw ranges, meters, NaN = invalid reading
+  final double angleMin; // radians
+  final double angleMax; // radians
+  final double angleIncrement; // radians per sample
+  final double rangeMin; // meters
+  final double rangeMax; // meters
+  final String frameId;
+  final DateTime timestamp;
+
+  const LidarScan2D({
+    required this.ranges,
+    required this.angleMin,
+    required this.angleMax,
+    required this.angleIncrement,
+    required this.rangeMin,
+    required this.rangeMax,
+    required this.frameId,
+    required this.timestamp,
+  });
+
+  double get fovDegrees => (angleMax - angleMin) * 180 / math.pi;
+}
+
 class RosService {
   static final RosService _instance = RosService._internal();
   factory RosService() => _instance;
@@ -62,6 +98,9 @@ class RosService {
       StreamController<List<double>>.broadcast();
   final StreamController<Map<String, dynamic>> _lidarSummaryController =
       StreamController<Map<String, dynamic>>.broadcast();
+  // Full-resolution ~270° scan, dedicated to the "2D LiDAR" visualization.
+  final StreamController<LidarScan2D> _lidar2DController =
+      StreamController<LidarScan2D>.broadcast();
   final StreamController<Map<String, double>> _imuController =
       StreamController<Map<String, double>>.broadcast();
   final StreamController<bool> _connectionController =
@@ -115,6 +154,7 @@ class RosService {
   Stream<List<double>> get lidarStream => _lidarController.stream;
   Stream<Map<String, dynamic>> get lidarSummaryStream =>
       _lidarSummaryController.stream;
+  Stream<LidarScan2D> get lidar2DStream => _lidar2DController.stream;
   Stream<Map<String, double>> get imuStream => _imuController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
 
@@ -166,6 +206,7 @@ class RosService {
     'yaw': 0.0,
   };
   List<double> _currentLidarRanges = [];
+  LidarScan2D? _currentLidar2DScan;
 
   // Getters - simplified for /velocity topic
   double get currentSpeed => _currentSpeed; // km/h for dashboard
@@ -173,6 +214,7 @@ class RosService {
   Map<String, double> get currentGPS => Map.from(_currentGPS);
   Map<String, double> get currentImu => Map.from(_currentImu);
   List<double> get currentLidarRanges => List.from(_currentLidarRanges);
+  LidarScan2D? get currentLidar2DScan => _currentLidar2DScan;
   bool get isConnected => _isConnected;
 
   // Legacy speed getters - return 0 since we use /velocity topic
@@ -1292,6 +1334,52 @@ class RosService {
       'range_min': rangeMin,
       'range_max': rangeMax,
     });
+
+    // ---- Dedicated full-resolution feed for the "2D LiDAR" view ----
+    // The MEVI /scan topic carries two different FOV configurations from
+    // the same Hokuyo driver: a narrow ~60° front scan and a full ~270°
+    // surround scan. Only the ~270° ("full") scan is kept at full
+    // resolution (no downsampling) so the 2D top-down plot matches the
+    // real sensor geometry. The ~60° scan is ignored here (it still flows
+    // through the generic pipeline above for the other view modes).
+    final double fovDeg = (angleMax - angleMin) * 180 / math.pi;
+    if (fovDeg >= 200) {
+      final fullRanges = List<double>.generate(raw.length, (i) {
+        final v = raw[i];
+        if (v == null) return double.nan;
+        final d = (v as num).toDouble();
+        if (d.isNaN || d.isInfinite) return double.nan;
+        return d;
+      });
+
+      String frameId = 'laser';
+      final header = msg['header'];
+      if (header is Map<String, dynamic> && header['frame_id'] != null) {
+        frameId = header['frame_id'].toString();
+      }
+
+      _currentLidar2DScan = LidarScan2D(
+        ranges: fullRanges,
+        angleMin: angleMin,
+        angleMax: angleMax,
+        angleIncrement: angleInc,
+        rangeMin: rangeMin,
+        rangeMax: rangeMax,
+        frameId: frameId,
+        timestamp: DateTime.now(),
+      );
+      _safeAdd<LidarScan2D>(_lidar2DController, _currentLidar2DScan!);
+
+      if (kDebugMode) {
+        final validCount = fullRanges
+            .where((r) => !r.isNaN && r >= rangeMin && r <= rangeMax)
+            .length;
+        _log(
+          '🗺️ 2D LiDAR scan: ${fullRanges.length} pts (${fovDeg.toStringAsFixed(0)}° FOV), $validCount valid',
+          level: 'DEBUG',
+        );
+      }
+    }
   }
 
   /// Handle Velodyne PointCloud2 messages
@@ -1305,20 +1393,26 @@ class RosService {
       // - row_step: bytes per row
       // - fields: array describing each field (x, y, z, intensity, etc.)
       // - data: base64 encoded binary data
-      
+
       final int width = (msg['width'] as num?)?.toInt() ?? 0;
       final int height = (msg['height'] as num?)?.toInt() ?? 1;
       final int pointStep = (msg['point_step'] as num?)?.toInt() ?? 0;
       final List<dynamic>? fields = msg['fields'] as List<dynamic>?;
       final String? dataBase64 = msg['data'] as String?;
-      
-      if (width == 0 || pointStep == 0 || dataBase64 == null || dataBase64.isEmpty) {
+
+      if (width == 0 ||
+          pointStep == 0 ||
+          dataBase64 == null ||
+          dataBase64.isEmpty) {
         if (kDebugMode) {
-          _log('⚠️ /velodyne_points: Invalid PointCloud2 structure', level: 'WARNING');
+          _log(
+            '⚠️ /velodyne_points: Invalid PointCloud2 structure',
+            level: 'WARNING',
+          );
         }
         return;
       }
-      
+
       // Parse field offsets (find x, y, z offsets in point data)
       int xOffset = -1, yOffset = -1, zOffset = -1;
       if (fields != null) {
@@ -1330,59 +1424,63 @@ class RosService {
           if (name == 'z') zOffset = offset;
         }
       }
-      
+
       // Default Velodyne offsets if not specified
       if (xOffset < 0) xOffset = 0;
       if (yOffset < 0) yOffset = 4;
       if (zOffset < 0) zOffset = 8;
-      
+
       // Decode base64 data
       final bytes = base64Decode(dataBase64);
       final data = bytes.buffer.asByteData();
       final totalPoints = width * height;
-      
+
       // Configuration for 2D projection
-      const double minZ = 0.2;  // Minimum height from ground (meters)
-      const double maxZ = 1.5;  // Maximum height (meters)
+      const double minZ = 0.2; // Minimum height from ground (meters)
+      const double maxZ = 1.5; // Maximum height (meters)
       const double maxRange = 5.6; // Maximum range for Velodyne
-      const int numBins = 360;  // Angular resolution (360 bins = 1 degree each)
-      
+      const int numBins = 360; // Angular resolution (360 bins = 1 degree each)
+
       // Initialize range bins (360 degrees, -180 to +180)
       final ranges = List<double>.filled(numBins, maxRange);
-      
+
       // Process each point
-      for (int i = 0; i < totalPoints && (i * pointStep + zOffset + 4) <= bytes.length; i++) {
+      for (
+        int i = 0;
+        i < totalPoints && (i * pointStep + zOffset + 4) <= bytes.length;
+        i++
+      ) {
         final int offset = i * pointStep;
-        
+
         // Read x, y, z as floats (little endian)
         final double x = data.getFloat32(offset + xOffset, Endian.little);
         final double y = data.getFloat32(offset + yOffset, Endian.little);
         final double z = data.getFloat32(offset + zOffset, Endian.little);
-        
+
         // Skip invalid or NaN points
         if (x.isNaN || y.isNaN || z.isNaN) continue;
         if (x == 0.0 && y == 0.0) continue;
-        
+
         // Filter by height (project only points in relevant height range)
         if (z < minZ || z > maxZ) continue;
-        
+
         // Calculate 2D distance and angle
         final double distance = math.sqrt(x * x + y * y);
         if (distance < 0.1 || distance > maxRange) continue;
-        
+
         // Calculate angle in degrees (-180 to +180)
         // Velodyne: x=forward, y=left
         final double angleDeg = math.atan2(y, x) * 180.0 / math.pi;
-        
+
         // Convert angle to bin index (0-359)
         int binIndex = ((angleDeg + 180.0) * numBins / 360.0).round() % numBins;
-        
+
         // Keep minimum distance for each angle bin
         if (distance < ranges[binIndex]) {
           ranges[binIndex] = distance;
         }
       }
-      
+
       // Update lidar stream with projected ranges
       _currentLidarRanges = ranges;
       _safeAdd<List<double>>(_lidarController, List.from(ranges));
@@ -1395,10 +1493,13 @@ class RosService {
         'range_min': 0.1,
         'range_max': maxRange,
       });
-      
+
       if (kDebugMode) {
         final validCount = ranges.where((r) => r < maxRange).length;
-        _log('📡 Velodyne: $totalPoints pts → $validCount valid ranges', level: 'DEBUG');
+        _log(
+          '📡 Velodyne: $totalPoints pts → $validCount valid ranges',
+          level: 'DEBUG',
+        );
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1698,6 +1799,7 @@ class RosService {
     await _gpsController.close();
     await _lidarController.close();
     await _lidarSummaryController.close();
+    await _lidar2DController.close();
     await _imuController.close();
     await _connectionController.close();
     await _linearVelocityController.close();

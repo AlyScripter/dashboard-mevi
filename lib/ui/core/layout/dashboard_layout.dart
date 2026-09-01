@@ -8,10 +8,10 @@ import '../widgets/dashboard/weather_time_widget.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
 import '../../pages/settings/settings_index.dart';
-import '../panels/left_panel.dart';
+import '../../pages/bev/bev_page.dart';
+import '../widgets/navigation/side_nav_rail.dart';
 import '../../../services/navigation_distance_service.dart';
 import '../../../services/trip_service.dart';
-import '../../../services/ros_service.dart';
 import '../../../core/theme/glass_container.dart';
 import '../../../core/theme/colors.dart';
 
@@ -24,8 +24,11 @@ enum RouteState {
   completed,
 }
 
-// Menu items with better structure
-enum DashboardMenu { home, camera, data }
+// Menu items with better structure. `settings` is a normal DashboardMenu
+// value — like every other nav entry it swaps into the content area
+// directly (no slide/fade overlay), so the side nav rail stays visible
+// and selectable the whole time, same as Maps/Camera/Data/BEV.
+enum DashboardMenu { home, camera, data, bev, settings }
 
 class LayoutDashboard extends StatefulWidget {
   const LayoutDashboard({super.key});
@@ -40,15 +43,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   DashboardMenu _activeMenu = DashboardMenu.home;
   RouteState _routeState = RouteState.noDestination;
   Timer? _autoResetTimer;
-  bool _showSettings = false;
-  bool _isPanelExpanded = true;
 
   // Animation controllers
   late AnimationController _completionController;
-  late AnimationController _settingsAnimController;
-  late Animation<Offset> _settingsSlideAnimation;
-  late Animation<double> _settingsFadeAnimation;
-  late AnimationController _panelAnimController;
 
   // Navigation data
   final GlobalKey<NavigationWidgetState> navigationWidgetKey =
@@ -61,6 +58,59 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   String _routeName = '';
   String _destinationName = '';
 
+  // Items rendered by the new side nav rail — maps, camera, data, BEV,
+  // and settings (5 total, per the updated design). Each id maps 1:1 to
+  // a DashboardMenu value, so selecting any of them — including
+  // settings — is a plain content swap with the rail staying put.
+  static const List<SideNavItem> _navItems = [
+    SideNavItem(id: 'maps', icon: LucideIcons.map, label: 'Peta'),
+    SideNavItem(id: 'camera', icon: LucideIcons.camera, label: 'Kamera'),
+    SideNavItem(id: 'data', icon: LucideIcons.database, label: 'Data'),
+    SideNavItem(id: 'bev', icon: LucideIcons.layoutDashboard, label: 'BEV'),
+    SideNavItem(
+      id: 'settings',
+      icon: LucideIcons.settings,
+      label: 'Pengaturan',
+    ),
+  ];
+
+  String get _activeNavId {
+    switch (_activeMenu) {
+      case DashboardMenu.home:
+        return 'maps';
+      case DashboardMenu.camera:
+        return 'camera';
+      case DashboardMenu.data:
+        return 'data';
+      case DashboardMenu.bev:
+        return 'bev';
+      case DashboardMenu.settings:
+        return 'settings';
+    }
+  }
+
+  void _onNavSelect(String id) {
+    setState(() {
+      switch (id) {
+        case 'maps':
+          _activeMenu = DashboardMenu.home;
+          break;
+        case 'camera':
+          _activeMenu = DashboardMenu.camera;
+          break;
+        case 'data':
+          _activeMenu = DashboardMenu.data;
+          break;
+        case 'bev':
+          _activeMenu = DashboardMenu.bev;
+          break;
+        case 'settings':
+          _activeMenu = DashboardMenu.settings;
+          break;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,33 +122,6 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   void _initializeAnimations() {
     _completionController = AnimationController(
       duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    // Settings page slide animation (from right)
-    _settingsAnimController = AnimationController(
-      duration: const Duration(milliseconds: 250),
-      vsync: this,
-    );
-
-    _settingsSlideAnimation =
-        Tween<Offset>(
-          begin: const Offset(1.0, 0.0), // Start from right
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: _settingsAnimController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    _settingsFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _settingsAnimController, curve: Curves.easeOut),
-    );
-
-    // Panel animation controller (kept for future use)
-    _panelAnimController = AnimationController(
-      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
   }
@@ -393,142 +416,171 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     }
   }
 
-  // OPTIMIZED FOR 1920x1080 - Floating navbar version
+  // REVISI: "Tentukan destinasi" sekarang HANYA dipanggil dari halaman
+  // Maps (lihat _buildDefaultLayoutWithFloatingNavbar) — sudah tidak
+  // dipakai lagi di Camera, BEV, atau Data. Bar-nya juga dibikin
+  // minimalis: pill kecil menempel kiri-bawah (tidak lagi melebar
+  // sampai kanan layar), warnanya disamakan dengan aksen biru neon di
+  // referensi (search bar, nav rail, dsb) supaya senada satu tema.
+  // REVISI: pill "Tentukan destinasi" sekarang disejajarkan penuh dengan
+  // search bar "Cari tujuan perjalanan" di atasnya — inset kiri dan lebar
+  // maksimum disamakan persis dengan searchBarLeft/searchBarMaxWidth di
+  // navigation_widget.dart (48/720 di layar besar, 16/480 di layar kecil)
+  // supaya kedua widget kelihatan satu kolom yang rapi, bukan cuma
+  // "mendekati" sejajar seperti sebelumnya.
   Widget _buildBottomOverlay({bool dark = false}) {
     final isLargeScreen = _isLargeScreen(context);
 
-    // Responsive padding - same as fixed navbar
     final bottomPadding = isLargeScreen ? 40.0 : 24.0;
-    final horizontalPadding = isLargeScreen ? 40.0 : 24.0;
-    final containerSpacing = isLargeScreen ? 20.0 : 12.0;
+    final horizontalPadding = isLargeScreen ? 48.0 : 16.0;
 
     return Positioned(
       bottom: bottomPadding,
       left: horizontalPadding,
-      right: horizontalPadding,
-      child: Row(
-        children: [
-          _buildRouteInfoContainer(isLargeScreen, dark: dark),
-          SizedBox(width: containerSpacing),
-          _buildNavigationContainer(isLargeScreen, dark: dark),
-        ],
-      ),
+      child: _buildRouteInfoContainer(isLargeScreen, dark: dark),
     );
   }
 
-  // Floating route info — compact glass pill, same size wherever it's
-  // used (Home floating overlay, Data page fixed bar, Camera page) so the
-  // dashboard feels consistent when switching pages. Pass dark: true over
-  // dark backgrounds (the camera feed) so it doesn't wash out.
+  // Route-info card — shape changed from a full pill to a rounded
+  // rectangle matching the corner radius used by the other floating
+  // widgets (search bar / weather / heading HUD), and widened to sit
+  // more in line with the search bar above. Pass dark: true over dark
+  // backgrounds so it doesn't wash out.
   Widget _buildRouteInfoContainer(bool isLargeScreen, {bool dark = false}) {
-    final containerHeight = isLargeScreen ? 96.0 : 76.0;
-    final containerPadding = isLargeScreen ? 18.0 : 14.0;
+    // REVISI 2: lebar sebelumnya disamakan ke `searchBarMaxWidth`
+    // (720/480), TAPI itu cuma sebuah ConstrainedBox longgar yang tidak
+    // pernah dipakai penuh — SearchBarWidget sendiri (lihat
+    // search_bar_widget.dart) sudah punya `width` tetap sendiri
+    // (`barWidth = isFullHD ? 520.0 : 440.0`, berdasarkan resolusi
+    // layar, bukan `isLargeScreen`/diagonal seperti di sini), jadi
+    // hasilnya pill ini malah lebih lebar dari search bar aslinya.
+    // Sekarang dihitung ulang persis dengan rumus + angka yang sama
+    // dengan search_bar_widget.dart supaya lebarnya betul-betul sama,
+    // bukan cuma dikira-kira dari `isLargeScreen`.
+    final screenSize = MediaQuery.of(context).size;
+    final isFullHD = screenSize.width >= 1900 && screenSize.height >= 1000;
+
+    final containerHeight = isLargeScreen ? 110.0 : 94.0;
+    final horizontalPadding = isLargeScreen ? 20.0 : 17.0;
+    final verticalPadding = isLargeScreen ? 15.0 : 12.0;
+    final maxWidth = isFullHD ? 520.0 : 440.0;
+    final cardBorderRadius = isLargeScreen ? 22.0 : 18.0;
+    final iconSize = isLargeScreen ? 24.0 : 21.0;
     final textColor = dark ? Colors.white : Colors.black87;
     final subTextColor = dark ? Colors.white70 : Colors.grey.shade600;
 
-    return Expanded(
-      flex: 3,
-      child: GlassContainer(
-        height: containerHeight,
-        padding: EdgeInsets.symmetric(
-          horizontal: containerPadding,
-          vertical: containerPadding * 0.55,
-        ),
-        borderRadius: isLargeScreen ? 20 : 16,
-        // REVISI 2: bar destinasi (dark mode) sekarang flat hitam biasa +
-        // border biru neon, tanpa efek kaca/blur (blurSigma: 0). Varian
-        // light tetap glass seperti semula karena tidak dikomplain.
-        blurSigma: dark ? 0 : 18,
-        tint: dark ? AppColors.glassNavyTint : Colors.white,
-        tintOpacity: dark ? 1.0 : 0.55,
-        borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
-        borderOpacity: dark ? 0.85 : 0.6,
-        borderWidth: dark ? 1.4 : 1.0,
-        boxShadow: dark
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
+    return GlassContainer(
+      width: maxWidth,
+      height: containerHeight,
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
+      // Rounded rectangle (bukan pill lagi) — radius disamakan dengan
+      // widget kaca lain di dashboard supaya bentuknya senada.
+      borderRadius: cardBorderRadius,
+      blurSigma: dark ? 0 : 18,
+      tint: dark ? AppColors.glassNavyTint : Colors.white,
+      tintOpacity: dark ? 1.0 : 0.55,
+      borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
+      borderOpacity: dark ? 0.85 : 0.6,
+      borderWidth: dark ? 1.4 : 1.0,
+      boxShadow: dark
+          ? [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : null,
+      child: Row(
+        children: [
+          Container(
+            width: isLargeScreen ? 60 : 50,
+            height: isLargeScreen ? 60 : 50,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              // Blue gradient badge, same accent family used by the
+              // active item in the side nav rail — ties the pill back
+              // to the reference's blue-highlight style.
+              gradient: dark
+                  ? LinearGradient(
+                      colors: [
+                        _getRouteStatusColor().withValues(alpha: 0.9),
+                        _getRouteStatusColor().withValues(alpha: 0.5),
+                      ],
+                    )
+                  : null,
+              color: dark ? null : Colors.transparent,
+            ),
+            child: Icon(
+              _getRouteStatusIcon(),
+              // Same size as the car/clock metric icons below (was
+              // 30/25 — visibly larger than the rest of the icons in
+              // this pill).
+              size: iconSize,
+              color: dark ? Colors.white : _getRouteStatusColor(),
+            ),
+          ),
+          SizedBox(width: isLargeScreen ? 14 : 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _routeName,
+                  style: TextStyle(
+                    fontSize: isLargeScreen ? 16.0 : 14.0,
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                    letterSpacing: -0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-              ]
-            : null,
-        child: Row(
-          children: [
-            Container(
-              width: isLargeScreen ? 44 : 38,
-              height: isLargeScreen ? 44 : 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: dark
-                    ? _getRouteStatusColor().withValues(alpha: 0.16)
-                    : Colors.transparent,
-              ),
-              child: Icon(
-                _getRouteStatusIcon(),
-                size: isLargeScreen ? 23.0 : 20.0,
-                color: _getRouteStatusColor(),
-              ),
-            ),
-            SizedBox(width: isLargeScreen ? 12 : 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _routeName,
-                    style: TextStyle(
-                      fontSize: isLargeScreen ? 18.0 : 16.0,
-                      // REVISI: font destinasi dibikin lebih tipis (was
-                      // w600/semi-bold) sesuai permintaan.
-                      fontWeight: FontWeight.w300,
-                      color: textColor,
-                      letterSpacing: -0.3,
+                SizedBox(height: isLargeScreen ? 6 : 5),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMetricItem(
+                      icon: LucideIcons.car,
+                      value: _getDisplayDistance(),
+                      isLargeScreen: isLargeScreen,
+                      iconSize: iconSize,
+                      color: subTextColor,
+                      valueColor: textColor,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  SizedBox(height: isLargeScreen ? 5 : 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildMetricItem(
-                        icon: LucideIcons.car,
-                        value: _getDisplayDistance(),
-                        isLargeScreen: false,
-                        color: subTextColor,
-                        valueColor: textColor,
-                      ),
-                      SizedBox(width: isLargeScreen ? 20.0 : 14.0),
-                      _buildMetricItem(
-                        icon: LucideIcons.clock,
-                        value: _getDisplayEta(),
-                        isLargeScreen: false,
-                        color: subTextColor,
-                        valueColor: textColor,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    SizedBox(width: isLargeScreen ? 16.0 : 14.0),
+                    _buildMetricItem(
+                      icon: LucideIcons.clock,
+                      value: _getDisplayEta(),
+                      isLargeScreen: isLargeScreen,
+                      iconSize: iconSize,
+                      color: subTextColor,
+                      valueColor: textColor,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            if (_showCancelButton) ...[
-              SizedBox(width: isLargeScreen ? 14 : 10),
-              _buildCancelButton(isLargeScreen: false),
-            ],
+          ),
+          if (_showCancelButton) ...[
+            SizedBox(width: isLargeScreen ? 10 : 8),
+            _buildCancelButton(isLargeScreen: isLargeScreen),
           ],
-        ),
+        ],
       ),
     );
   }
 
   /// Build cancel button (Apple-style)
   Widget _buildCancelButton({required bool isLargeScreen}) {
-    final buttonSize = isLargeScreen ? 52.0 : 44.0;
-    final iconSize = isLargeScreen ? 24.0 : 22.0;
+    final buttonSize = isLargeScreen ? 46.0 : 40.0;
+    final iconSize = isLargeScreen ? 22.0 : 19.0;
 
     return GestureDetector(
       onTap: _cancelNavigation,
@@ -541,8 +593,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           boxShadow: [
             BoxShadow(
               color: const Color(0xFFFF3B30).withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -555,12 +607,16 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     required IconData icon,
     required String value,
     required bool isLargeScreen,
+    required double iconSize,
     Color? color,
     Color? valueColor,
   }) {
-    final iconSize = isLargeScreen ? 26.0 : 22.0;
-    final fontSize = isLargeScreen ? 22.0 : 18.0;
-    final spacing = isLargeScreen ? 12.0 : 10.0;
+    // REVISI: iconSize sekarang diterima dari pemanggil (disamakan
+    // dengan ukuran ikon badge status) alih-alih dihitung sendiri di
+    // sini, supaya semua ikon dalam pill "Tentukan destinasi Anda"
+    // konsisten satu ukuran.
+    final fontSize = isLargeScreen ? 16.0 : 14.0;
+    final spacing = isLargeScreen ? 7.0 : 6.0;
 
     return Row(
       children: [
@@ -583,109 +639,6 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     );
   }
 
-  // Minimalist glass icon strip — same size wherever it appears (Home,
-  // Data, Camera) so the dashboard feels consistent when switching pages.
-  Widget _buildNavigationContainer(bool isLargeScreen, {bool dark = false}) {
-    final containerHeight = isLargeScreen ? 96.0 : 76.0;
-
-    return Expanded(
-      flex: 2,
-      child: GlassContainer(
-        height: containerHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        borderRadius: isLargeScreen ? 20 : 16,
-        // REVISI 2: strip ikon (map/kamera/database) juga flat hitam
-        // biasa + border biru neon, tanpa efek blur — sama seperti bar
-        // destinasi di atas.
-        blurSigma: dark ? 0 : 18,
-        tint: dark ? AppColors.glassNavyTint : Colors.white,
-        tintOpacity: dark ? 1.0 : 0.55,
-        borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
-        borderOpacity: dark ? 0.85 : 0.6,
-        borderWidth: dark ? 1.4 : 1.0,
-        boxShadow: dark
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ...DashboardMenu.values.map((menu) {
-              return _buildNavButtonMinimal(menu: menu, dark: dark);
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Minimal nav button used by the shared floating/fixed navbar above —
-  /// a soft rounded "capsule" glow behind the active icon (Tesla/EV
-  /// cluster style) instead of a flat highlight box or a plain dot.
-  /// The original _buildNavButton is left untouched below since nothing
-  /// else references it anymore, kept only for reference/rollback.
-  Widget _buildNavButtonMinimal({
-    required DashboardMenu menu,
-    bool dark = false,
-  }) {
-    final isActive = _activeMenu == menu;
-    final config = _getMenuConfig(menu);
-    // Active state now glows blue on the dark cockpit glass instead of a
-    // flat white highlight, matching the blue-black theme.
-    final activeGlow = dark ? AppColors.glassBlueGlow : Colors.black87;
-    final activeIconColor = dark ? const Color(0xFF7DB4FF) : Colors.black87;
-    final inactiveColor = dark ? Colors.white38 : Colors.grey.shade400;
-
-    return GestureDetector(
-      onTap: () => _setActiveMenu(menu),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive
-              ? activeGlow.withValues(alpha: dark ? 0.20 : 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: activeGlow.withValues(alpha: dark ? 0.45 : 0.12),
-                    blurRadius: 14,
-                    spreadRadius: -2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Icon(
-          config.icon,
-          size: isActive ? 25 : 22,
-          color: isActive ? activeIconColor : inactiveColor,
-        ),
-      ),
-    );
-  }
-
-  void _setActiveMenu(DashboardMenu menu) {
-    setState(() => _activeMenu = menu);
-  }
-
-  MenuConfig _getMenuConfig(DashboardMenu menu) {
-    switch (menu) {
-      case DashboardMenu.home:
-        return MenuConfig(LucideIcons.map, 'Peta');
-      case DashboardMenu.camera:
-        return MenuConfig(LucideIcons.camera, 'Kamera');
-      case DashboardMenu.data:
-        return MenuConfig(LucideIcons.database, 'Data');
-    }
-  }
-
   // Helper to detect device type based on physical size
   bool _isLargeScreen(BuildContext context) {
     final data = MediaQuery.of(context);
@@ -704,7 +657,20 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     return diagonal >= 700; // Threshold: ~13 inches in logical pixels
   }
 
-  Widget _buildTopOverlay({bool compactMode = false}) {
+  Widget _buildTopOverlay({bool compactMode = false, bool bevMode = false}) {
+    // REVISI: on the BEV page the weather/time chip is shrunk down to
+    // roughly the same footprint as the battery/range readout in the
+    // opposite corner, and pinned to the exact same 24px inset the BEV
+    // page uses for that battery card — so the two line up precisely
+    // instead of the weather chip floating at its own larger offset.
+    if (bevMode) {
+      return const Positioned(
+        top: 24,
+        right: 24,
+        child: WeatherTimeWidget(compactMode: true),
+      );
+    }
+
     final isLargeScreen = _isLargeScreen(context);
     final data = MediaQuery.of(context);
     final screenWidth = data.size.width;
@@ -736,165 +702,46 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Main dashboard (always rendered)
-        Container(
-          // Blue-black glass theme: Data page now paints its own dark navy
-          // gradient (see DataPage), so the outer shell stays plain black
-          // for every menu instead of switching to a light grey for Data.
-          color: Colors.black,
-          child: Row(
-            children: [
-              // Animated Left Panel
-              AnimatedBuilder(
-                animation: _panelAnimController,
-                builder: (context, child) {
-                  // Widened from flex:2 to flex:3 so the front BEV
-                  // visualization has enough horizontal room to read
-                  // clearly (per updated design direction).
-                  return _isPanelExpanded
-                      ? Expanded(
-                          flex: 3,
-                          child: LeftPanel(
-                            onSettingsPressed: _openSettings,
-                            onTogglePanel: _togglePanel,
-                            isExpanded: true,
-                          ),
-                        )
-                      : _buildCollapsedPanel();
-                },
-              ),
-              Expanded(
-                flex: _isPanelExpanded ? 7 : 1,
-                child: _activeMenu == DashboardMenu.data
-                    ? _buildDataLayoutWithFixedNavbar()
-                    : _buildDefaultLayoutWithFloatingNavbar(),
-              ),
-            ],
-          ),
-        ),
-
-        // Settings page overlay with animation
-        if (_showSettings)
-          SlideTransition(
-            position: _settingsSlideAnimation,
-            child: FadeTransition(
-              opacity: _settingsFadeAnimation,
-              child: SettingsPage(onBack: _closeSettings),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildCollapsedPanel() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOutCubic,
-      width: 80,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
-        ),
-        border: Border(right: BorderSide(color: Color(0xFF1E2430), width: 1.0)),
-      ),
-      child: Column(
+    return Container(
+      // Blue-black glass theme: Data/Settings pages paint their own dark
+      // navy gradient (see DataPage / SettingsPage), so the outer shell
+      // stays plain black for every menu instead of switching background
+      // per page.
+      color: Colors.black,
+      child: Row(
         children: [
-          const SizedBox(height: 20),
-          // Expand button
-          _buildExpandButton(),
-          const Spacer(),
-          // Mini speed display
-          _buildMiniSpeedDisplay(),
-          const Spacer(),
-          const SizedBox(height: 20),
+          // Permanent slim icon rail — replaces the old expandable
+          // gauge/BEV left panel. All 5 navigation entries (maps,
+          // camera, data, BEV, settings) live here now, styled per
+          // the reference EV head-unit sidebar. It stays mounted and
+          // interactive no matter which page is active, including
+          // Settings — selecting any icon is a plain content swap in
+          // the Expanded next to it, with no slide/fade transition.
+          SideNavRail(
+            items: _navItems,
+            activeId: _activeNavId,
+            onSelect: _onNavSelect,
+          ),
+          Expanded(
+            child: switch (_activeMenu) {
+              DashboardMenu.data => _buildDataLayoutWithFixedNavbar(),
+              DashboardMenu.settings => SettingsPage(
+                onBack: () => setState(() => _activeMenu = DashboardMenu.home),
+              ),
+              _ => _buildDefaultLayoutWithFloatingNavbar(),
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildExpandButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _togglePanel,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            LucideIcons.panelLeftOpen,
-            size: 20,
-            color: Colors.white.withValues(alpha: 0.55),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMiniSpeedDisplay() {
-    return StreamBuilder<double>(
-      stream: RosService().speedometerRosStream,
-      builder: (context, snapshot) {
-        final speed = (snapshot.data ?? 0).toInt();
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          child: Column(
-            children: [
-              Text(
-                '$speed',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'km/h',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _togglePanel() {
-    setState(() {
-      _isPanelExpanded = !_isPanelExpanded;
-    });
-    if (_isPanelExpanded) {
-      _panelAnimController.reverse();
-    } else {
-      _panelAnimController.forward();
-    }
-  }
-
-  void _openSettings() {
-    setState(() => _showSettings = true);
-    _settingsAnimController.forward();
-  }
-
-  Future<void> _closeSettings() async {
-    await _settingsAnimController.reverse();
-    setState(() => _showSettings = false);
-  }
-
   Widget _buildDefaultLayoutWithFloatingNavbar() {
     final isCameraActive = _activeMenu == DashboardMenu.camera;
+    final isBevActive = _activeMenu == DashboardMenu.bev;
+    // REVISI: "Tentukan destinasi" sekarang eksklusif untuk halaman
+    // Maps — tidak relevan lagi ditampilkan di atas Camera/BEV.
+    final isMapsActive = _activeMenu == DashboardMenu.home;
     return Stack(
       children: [
         // Keep NavigationPage always active to preserve polyline
@@ -907,69 +754,29 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         // Overlay other pages on top when active
         if (isCameraActive)
           Container(color: Colors.black, child: const CameraPage()),
-        _buildTopOverlay(),
-        // Dark glass everywhere now (matches the new dark dashboard
-        // theme) — previously this was only dark on the Camera page and
-        // light glass elsewhere, which looked inconsistent against the
-        // new dark left panel.
-        _buildBottomOverlay(dark: true),
+        if (isBevActive) Container(color: Colors.black, child: const BevPage()),
+        _buildTopOverlay(bevMode: isBevActive),
+        if (isMapsActive) _buildBottomOverlay(dark: true),
       ],
     );
   }
 
   Widget _buildDataLayoutWithFixedNavbar() {
-    final isLargeScreen = _isLargeScreen(context);
-
-    return Column(
+    // REVISI: bar "Tentukan destinasi" dihapus dari halaman Data (dulu
+    // _buildFixedBottomNavbar) — sekarang cuma tampil di halaman Maps.
+    return Stack(
       children: [
-        Expanded(
-          child: Stack(
-            children: [
-              // Keep NavigationPage active to preserve polyline state
-              NavigationPage(
-                onRouteInfo: _handleRouteInfo,
-                onClearRouteInfo: _clearRouteInfo,
-                onRouteCompleted: _completeRoute,
-                navigationKey: navigationWidgetKey,
-              ),
-              // DataPage overlays the navigation
-              const DataPage(),
-              _buildTopOverlay(compactMode: true),
-            ],
-          ),
+        // Keep NavigationPage active to preserve polyline state
+        NavigationPage(
+          onRouteInfo: _handleRouteInfo,
+          onClearRouteInfo: _clearRouteInfo,
+          onRouteCompleted: _completeRoute,
+          navigationKey: navigationWidgetKey,
         ),
-        SizedBox(height: isLargeScreen ? 20 : 16),
-        _buildFixedBottomNavbar(),
+        // DataPage overlays the navigation
+        const DataPage(),
+        _buildTopOverlay(compactMode: true),
       ],
-    );
-  }
-
-  // CONSISTENT SIZING — now reuses the exact same _buildRouteInfoContainer
-  // / _buildNavigationContainer as the Home page's floating overlay
-  // (previously this had its own separate, larger implementation, which
-  // is why the two pages looked like different sizes when switching).
-  Widget _buildFixedBottomNavbar() {
-    final isLargeScreen = _isLargeScreen(context);
-    final marginSize = isLargeScreen ? 40.0 : 24.0;
-    final spacing = isLargeScreen ? 20.0 : 12.0;
-
-    // Sesuaikan nilai ketinggian ini jika ingin dinaikkan lebih tinggi lagi
-    final bottomMargin = isLargeScreen ? 32.0 : 24.0;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        left: marginSize,
-        right: marginSize,
-        bottom:
-            bottomMargin, // <-- Menambahkan batas bawah agar widget terangkat naik
-      ),
-      child: Row(
-        children: [
-          _buildRouteInfoContainer(isLargeScreen, dark: true),
-          SizedBox(width: spacing),
-          _buildNavigationContainer(isLargeScreen, dark: true),
-        ],
-      ),
     );
   }
 
@@ -977,16 +784,6 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   void dispose() {
     _cancelAutoReset();
     _completionController.dispose();
-    _settingsAnimController.dispose();
-    _panelAnimController.dispose();
     super.dispose();
   }
-}
-
-// Helper classes
-class MenuConfig {
-  final IconData icon;
-  final String label;
-
-  const MenuConfig(this.icon, this.label);
 }
