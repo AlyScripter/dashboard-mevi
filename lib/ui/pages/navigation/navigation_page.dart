@@ -26,8 +26,12 @@ class NavigationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => NavigationCubit(),
+    // REVISI: NavigationCubit sekarang disediakan satu level di atas
+    // (lihat LayoutDashboard) supaya BevPage bisa membaca state yang
+    // sama persis — di sini kita pakai `.value` untuk memakai ulang
+    // instance ancestor tsb, bukan membuat instance baru yang terpisah.
+    return BlocProvider.value(
+      value: context.read<NavigationCubit>(),
       child: NavigationWidget(
         key: navigationKey,
         destinationLat: -6.881377969504214,

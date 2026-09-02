@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../pages/navigation/navigation_page.dart';
 import '../../pages/navigation/navigation_widget.dart';
+import '../../pages/navigation/bloc/navigation_cubit.dart';
 import '../widgets/dashboard/weather_time_widget.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
@@ -702,36 +704,45 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // Blue-black glass theme: Data/Settings pages paint their own dark
-      // navy gradient (see DataPage / SettingsPage), so the outer shell
-      // stays plain black for every menu instead of switching background
-      // per page.
-      color: Colors.black,
-      child: Row(
-        children: [
-          // Permanent slim icon rail — replaces the old expandable
-          // gauge/BEV left panel. All 5 navigation entries (maps,
-          // camera, data, BEV, settings) live here now, styled per
-          // the reference EV head-unit sidebar. It stays mounted and
-          // interactive no matter which page is active, including
-          // Settings — selecting any icon is a plain content swap in
-          // the Expanded next to it, with no slide/fade transition.
-          SideNavRail(
-            items: _navItems,
-            activeId: _activeNavId,
-            onSelect: _onNavSelect,
-          ),
-          Expanded(
-            child: switch (_activeMenu) {
-              DashboardMenu.data => _buildDataLayoutWithFixedNavbar(),
-              DashboardMenu.settings => SettingsPage(
-                onBack: () => setState(() => _activeMenu = DashboardMenu.home),
-              ),
-              _ => _buildDefaultLayoutWithFloatingNavbar(),
-            },
-          ),
-        ],
+    // REVISI: NavigationCubit dipromosikan ke sini (ancestor bersama
+    // NavigationPage & BevPage) supaya BEV bisa membaca rute/posisi/
+    // heading navigasi yang sama persis dengan halaman Maps — dulu
+    // cubit ini hanya dibuat secara lokal di dalam NavigationPage,
+    // jadi BevPage (sibling-nya di Stack) tidak bisa mengaksesnya.
+    return BlocProvider(
+      create: (_) => NavigationCubit(),
+      child: Container(
+        // Blue-black glass theme: Data/Settings pages paint their own dark
+        // navy gradient (see DataPage / SettingsPage), so the outer shell
+        // stays plain black for every menu instead of switching background
+        // per page.
+        color: Colors.black,
+        child: Row(
+          children: [
+            // Permanent slim icon rail — replaces the old expandable
+            // gauge/BEV left panel. All 5 navigation entries (maps,
+            // camera, data, BEV, settings) live here now, styled per
+            // the reference EV head-unit sidebar. It stays mounted and
+            // interactive no matter which page is active, including
+            // Settings — selecting any icon is a plain content swap in
+            // the Expanded next to it, with no slide/fade transition.
+            SideNavRail(
+              items: _navItems,
+              activeId: _activeNavId,
+              onSelect: _onNavSelect,
+            ),
+            Expanded(
+              child: switch (_activeMenu) {
+                DashboardMenu.data => _buildDataLayoutWithFixedNavbar(),
+                DashboardMenu.settings => SettingsPage(
+                  onBack: () =>
+                      setState(() => _activeMenu = DashboardMenu.home),
+                ),
+                _ => _buildDefaultLayoutWithFloatingNavbar(),
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

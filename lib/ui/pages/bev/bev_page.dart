@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../services/ros_service.dart';
 import '../../core/panels/status_indicator_panel.dart';
@@ -6,18 +7,29 @@ import '../../core/widgets/dashboard/speed_display_widget.dart';
 import '../../core/widgets/dashboard/battery_indicator_widget.dart';
 import '../../core/widgets/dashboard/gear_selector_widget.dart';
 import '../../core/widgets/sensors/topdown_bev_widget.dart';
+import '../navigation/bloc/navigation_cubit.dart';
+import '../navigation/bloc/navigation_state.dart';
 
 /// BEV page — REVISI #4:
 ///  - The 3D car model + glow-road + raw per-point LIDAR rendering
 ///    (`VehicleStageWidget` / `FrontBevWidget`) is REMOVED from this
 ///    page — it was too heavy to paint every frame. Replaced with
 ///    [TopDownBevWidget]: a flat, lightweight 2D bird's-eye scene
-///    (parallel lane lines + a blue detection ring + MEVI as
-///    `assets/images/mevicar.png`), styled after the reference 360°
-///    sensor illustration. Nearby traffic (currently placeholder demo
-///    positions) uses `assets/images/car.png`. `VehicleStageWidget`
+///    (single-lane boundary lines + a blue detection ring hugging MEVI
+///    + MEVI as `assets/images/mevicar.png`), styled after the
+///    reference 360° sensor illustration. Nearby traffic (currently
+///    disabled) uses `assets/images/car.png`. `VehicleStageWidget`
 ///    itself is left untouched in the codebase in case it's needed
 ///    again — this page just no longer references it.
+///  - REVISI #5: the road now follows the real Maps route — this page
+///    reads the shared `NavigationCubit` (promoted to an app-wide
+///    ancestor in `LayoutDashboard`, same instance the Maps page
+///    itself uses) for `routePoints` + `current` position, and the
+///    same IMU-yaw-with-fallback heading source already used by the
+///    Maps page's heading HUD / car marker. A left turn on the map now
+///    draws as a left turn here too, matching Maps 1:1. With no active
+///    route yet, [TopDownBevWidget] falls back to its static straight
+///    single-lane road on its own — no extra handling needed here.
 ///  - Everything else (speedometer top-center, battery top-left, gear
 ///    rail left / status rail right, no boxes, vertically centered
 ///    side rails) is unchanged from the previous revision.
@@ -52,11 +64,32 @@ class _BevPageState extends State<BevPage> {
                 top: 100,
                 bottom: AppDimensions.spacingXL,
               ),
-              child: StreamBuilder<double>(
-                stream: RosService().steeringAngleStream,
-                builder: (context, steerSnap) {
-                  final steeringAngle = steerSnap.data ?? 0.0;
-                  return TopDownBevWidget(steeringAngle: steeringAngle);
+              child: BlocBuilder<NavigationCubit, NavigationState>(
+                builder: (context, navState) {
+                  return StreamBuilder<double>(
+                    stream: RosService().steeringAngleStream,
+                    builder: (context, steerSnap) {
+                      final steeringAngle = steerSnap.data ?? 0.0;
+                      return StreamBuilder<Map<String, double>>(
+                        stream: RosService().imuStream,
+                        builder: (context, imuSnap) {
+                          // Same heading source as the Maps page's
+                          // heading HUD / car marker: IMU yaw when
+                          // available, else the cubit's fallback.
+                          final imu = imuSnap.data;
+                          final heading = (imu != null && imu['yaw'] != null)
+                              ? imu['yaw']!
+                              : navState.fallbackHeadingDeg;
+                          return TopDownBevWidget(
+                            steeringAngle: steeringAngle,
+                            routePoints: navState.routePoints,
+                            currentPosition: navState.current,
+                            headingDeg: heading,
+                          );
+                        },
+                      );
+                    },
+                  );
                 },
               ),
             ),
