@@ -16,28 +16,37 @@ class HeadingHUD extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Optional: initialize IMU stream hookup from RosService into Cubit once.
     context.read<NavigationCubit>().ensureSensorsHooked();
+
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // --- THEME-AWARE COLORS ---
+    final bgColor = isLight ? Colors.white : AppColors.glassNavyTint;
+    final borderColor = isLight
+        ? AppColors.primary.withValues(alpha: 0.35)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.85);
+    final shadowColor = isLight
+        ? Colors.black.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.35);
+    final textPrimary = isLight
+        ? const Color(0xFF1A1A2E)
+        : AppColors.glassTextPrimary;
+    final textSecondary = isLight
+        ? const Color(0xFF555577)
+        : AppColors.glassTextSecondary;
+    final iconColor = isLight ? AppColors.primary : const Color(0xFF7DB4FF);
 
     final data = MediaQuery.of(context);
     final screenWidth = data.size.width;
     final screenHeight = data.size.height;
 
-    // Calculate diagonal to detect device type (laptop vs tablet)
-    // Tablet 11" Infinix XPAD: 1920x1200 @ 208 PPI = ~11.0 inches diagonal
-    // Laptop 15": 1920x1080 @ ~141 PPI = ~15.6 inches diagonal
     final diagonal =
         math.sqrt(screenWidth * screenWidth + screenHeight * screenHeight) /
         data.devicePixelRatio;
 
-    // Device type detection:
-    // - isLaptop: diagonal >= 700 logical pixels (~13+ inches, laptop/desktop)
-    // - isTablet: diagonal >= 500 && < 700 (~10-13 inches, tablets like Infinix XPAD)
-    // - isCompact: diagonal < 500 (smaller phones)
     final isLaptop = diagonal >= 700;
     final isTablet = diagonal >= 500 && diagonal < 700;
 
-    // Responsive values based on device type
     final double rightPos = isLaptop ? 55.0 : (isTablet ? 40.0 : 25.0);
     final double topPos = isLaptop ? 120.0 : (isTablet ? 105.0 : 110.0);
     final double iconSize = isLaptop ? 28.0 : (isTablet ? 24.0 : 18.0);
@@ -67,20 +76,14 @@ class HeadingHUD extends StatelessWidget {
               vertical: verticalPadding,
             ),
             width: containerWidth,
-            // REVISI: solid hitam + border biru neon, tanpa blur,
-            // disamakan dengan search bar / destination bar / panel kiri
-            // (sebelumnya kotak putih polos, beda sendiri dari widget
-            // lain di dashboard).
+            // THEME-AWARE: putih bersih di light mode, navy gelap di dark mode
             decoration: BoxDecoration(
-              color: AppColors.glassNavyTint,
+              color: bgColor,
               borderRadius: BorderRadius.circular(borderRadiusValue),
-              border: Border.all(
-                color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
-                width: 1.4,
-              ),
+              border: Border.all(color: borderColor, width: 1.4),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
+                  color: shadowColor,
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -94,7 +97,7 @@ class HeadingHUD extends StatelessWidget {
                   child: Icon(
                     Icons.navigation,
                     size: iconSize,
-                    color: const Color(0xFF7DB4FF),
+                    color: iconColor,
                   ),
                 ),
                 SizedBox(width: spacing),
@@ -106,14 +109,14 @@ class HeadingHUD extends StatelessWidget {
                       '${heading.toStringAsFixed(0)}°',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.glassTextPrimary,
+                        color: textPrimary,
                         fontSize: fontSizeHeading,
                       ),
                     ),
                     Text(
                       _headingToCardinal(heading),
                       style: TextStyle(
-                        color: AppColors.glassTextSecondary,
+                        color: textSecondary,
                         fontSize: fontSizeCardinal,
                       ),
                     ),

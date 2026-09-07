@@ -118,29 +118,65 @@ class _DataPageHeaderState extends State<DataPageHeader>
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // Warna nav rail: gradient 0xFF1565C0 → 0xFF1976D2, border 0xFF1E88E5
+    // Dipakai di kedua widget (Data Visualization & Record) saat light mode.
+    const navTop = Color(0xFF1565C0);
+    const navBottom = Color(0xFF1976D2);
+    const navBorder = Color(0xFF1E88E5);
+
+    final defaultGradient = isLight
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [navTop, navBottom],
+          )
+        : null;
+    final defaultBg = isLight ? null : AppColors.glassNavyTint;
+    final defaultBorder = isLight
+        ? navBorder
+        : AppColors.glassBlueBorder.withValues(alpha: 0.85);
+    final defaultShadow = isLight
+        ? navTop.withValues(alpha: 0.35)
+        : Colors.black.withValues(alpha: 0.35);
+    final iconClr = isLight ? Colors.white : AppColors.glassBlueBorder;
+    final textClr = isLight ? Colors.white : AppColors.glassTextPrimary;
+    final subTextClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
+
     return ListenableBuilder(
       listenable: _recorderService,
       builder: (context, _) {
         _updatePulseAnimation();
 
+        // Record widget: saat recording → merah; idle → biru nav / navy
+        final recBg = _recorderService.isRecording
+            ? (isLight ? null : const Color(0xFF2A0E10))
+            : defaultBg;
+        final recGradient = _recorderService.isRecording
+            ? null
+            : defaultGradient;
+        final recBorder = _recorderService.isRecording
+            ? Colors.redAccent.withValues(alpha: 0.85)
+            : defaultBorder;
+        final recShadow = _recorderService.isRecording
+            ? Colors.redAccent.withValues(alpha: 0.30)
+            : defaultShadow;
+
         return Row(
           children: [
-            // Title container — blue-black glass pill, matches the
-            // weather/time chip and left-panel buttons (solid navy fill +
-            // glowing blue neon border, no blur).
+            // ── Widget "Data Visualization" ────────────────────────────────
             Container(
               height: 55,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.glassNavyTint,
+                color: defaultBg,
+                gradient: defaultGradient,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
-                  width: 1.4,
-                ),
+                border: Border.all(color: defaultBorder, width: 1.4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: defaultShadow,
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -148,18 +184,14 @@ class _DataPageHeaderState extends State<DataPageHeader>
               ),
               child: Row(
                 children: [
-                  Icon(
-                    LucideIcons.chartBar,
-                    size: 24,
-                    color: AppColors.glassBlueBorder,
-                  ),
+                  Icon(LucideIcons.chartBar, size: 24, color: iconClr),
                   const SizedBox(width: 8),
                   Text(
                     'Data Visualization',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.glassTextPrimary,
+                      color: textClr,
                     ),
                   ),
                 ],
@@ -168,26 +200,18 @@ class _DataPageHeaderState extends State<DataPageHeader>
 
             const SizedBox(width: 12),
 
-            // Recording control container — same navy glass pill; turns
-            // red-tinted while actively recording, otherwise blue-black
-            // glass like every other cockpit widget.
+            // ── Widget "Record" ────────────────────────────────────────────
             Container(
               height: 55,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _recorderService.isRecording
-                    ? const Color(0xFF2A0E10)
-                    : AppColors.glassNavyTint,
+                color: recBg,
+                gradient: recGradient,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _recorderService.isRecording
-                      ? Colors.redAccent.withValues(alpha: 0.85)
-                      : AppColors.glassBlueBorder.withValues(alpha: 0.85),
-                  width: 1.4,
-                ),
+                border: Border.all(color: recBorder, width: 1.4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: recShadow,
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -208,14 +232,18 @@ class _DataPageHeaderState extends State<DataPageHeader>
                           decoration: BoxDecoration(
                             color: _recorderService.isRecording
                                 ? Colors.redAccent
+                                : isLight
+                                ? Colors.white.withValues(alpha: 0.20)
                                 : Colors.white.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
                             border: _recorderService.isRecording
                                 ? null
                                 : Border.all(
-                                    color: AppColors.glassBlueBorder.withValues(
-                                      alpha: 0.6,
-                                    ),
+                                    color: isLight
+                                        ? Colors.white.withValues(alpha: 0.60)
+                                        : AppColors.glassBlueBorder.withValues(
+                                            alpha: 0.6,
+                                          ),
                                     width: 1,
                                   ),
                             boxShadow: _recorderService.isRecording
@@ -258,7 +286,7 @@ class _DataPageHeaderState extends State<DataPageHeader>
                           fontWeight: FontWeight.w600,
                           color: _recorderService.isRecording
                               ? Colors.redAccent
-                              : AppColors.glassTextPrimary,
+                              : textClr,
                         ),
                       ),
                       if (_recorderService.isRecording)
@@ -266,10 +294,7 @@ class _DataPageHeaderState extends State<DataPageHeader>
                       else
                         Text(
                           _getModeLabel(_recorderService.mode),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppColors.glassTextSecondary,
-                          ),
+                          style: TextStyle(fontSize: 10, color: subTextClr),
                         ),
                     ],
                   ),
@@ -305,19 +330,25 @@ class _DataPageHeaderState extends State<DataPageHeader>
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
+                        color: isLight
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: AppColors.glassBlueBorder.withValues(
-                            alpha: 0.5,
-                          ),
+                          color: isLight
+                              ? Colors.white.withValues(alpha: 0.55)
+                              : AppColors.glassBlueBorder.withValues(
+                                  alpha: 0.5,
+                                ),
                           width: 1,
                         ),
                       ),
                       child: Icon(
                         LucideIcons.settings2,
                         size: 14,
-                        color: AppColors.glassTextSecondary,
+                        color: isLight
+                            ? Colors.white
+                            : AppColors.glassTextSecondary,
                       ),
                     ),
                   ),
@@ -419,29 +450,53 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // REVISI: light mode → dialog "Recording Settings" pakai style
+    // terang (putih, border abu-abu tipis, teks navy gelap) senada
+    // dengan komponen lain di light mode, bukan lagi navy glass gelap.
+    final dialogBg = isLight ? Colors.white : AppColors.glassSurface;
+    final dialogBorder = isLight
+        ? const Color(0xFFDDE3EC)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.5);
+    final accentClr = isLight
+        ? const Color(0xFF1565C0)
+        : AppColors.glassBlueBorder;
+    final titleTextClr = isLight
+        ? const Color(0xFF1A2331)
+        : AppColors.glassTextPrimary;
+    final secondaryTextClr = isLight
+        ? const Color(0xFF5B6472)
+        : AppColors.glassTextSecondary;
+    final dividerClr = isLight
+        ? const Color(0xFFE3E7EE)
+        : AppColors.glassDivider;
+    final unselectedOptionBg = isLight
+        ? const Color(0xFFF5F7FA)
+        : AppColors.glassSurfaceAlt;
+    final unselectedOptionBorder = isLight
+        ? const Color(0xFFE3E7EE)
+        : AppColors.glassDivider;
+    final unselectedIconBoxBg = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.06);
+
     // Blue-black glass dialog — dark navy surface + neon blue accents,
     // matching the rest of the cockpit theme instead of the old plain
     // white AlertDialog.
     return AlertDialog(
-      backgroundColor: AppColors.glassSurface,
+      backgroundColor: dialogBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: AppColors.glassBlueBorder.withValues(alpha: 0.5),
-          width: 1.2,
-        ),
+        side: BorderSide(color: dialogBorder, width: 1.2),
       ),
       title: Row(
         children: [
-          Icon(
-            LucideIcons.settings2,
-            size: 20,
-            color: AppColors.glassBlueBorder,
-          ),
+          Icon(LucideIcons.settings2, size: 20, color: accentClr),
           const SizedBox(width: 8),
           Text(
             'Recording Settings',
-            style: TextStyle(fontSize: 18, color: AppColors.glassTextPrimary),
+            style: TextStyle(fontSize: 18, color: titleTextClr),
           ),
         ],
       ),
@@ -456,7 +511,7 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.glassTextSecondary,
+                color: secondaryTextClr,
               ),
             ),
             const SizedBox(height: 8),
@@ -465,28 +520,49 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
               'Manual',
               'Start/Stop recording via button',
               LucideIcons.hand,
+              isLight: isLight,
+              accentClr: accentClr,
+              titleTextClr: titleTextClr,
+              secondaryTextClr: secondaryTextClr,
+              unselectedOptionBg: unselectedOptionBg,
+              unselectedOptionBorder: unselectedOptionBorder,
+              unselectedIconBoxBg: unselectedIconBoxBg,
             ),
             _buildModeOption(
               RecordingMode.auto,
               'Auto (Goal-based)',
               'Record when navigating to destination',
               LucideIcons.navigation,
+              isLight: isLight,
+              accentClr: accentClr,
+              titleTextClr: titleTextClr,
+              secondaryTextClr: secondaryTextClr,
+              unselectedOptionBg: unselectedOptionBg,
+              unselectedOptionBorder: unselectedOptionBorder,
+              unselectedIconBoxBg: unselectedIconBoxBg,
             ),
             _buildModeOption(
               RecordingMode.continuous,
               'Continuous',
               'Record while connected to vehicle',
               LucideIcons.infinity,
+              isLight: isLight,
+              accentClr: accentClr,
+              titleTextClr: titleTextClr,
+              secondaryTextClr: secondaryTextClr,
+              unselectedOptionBg: unselectedOptionBg,
+              unselectedOptionBorder: unselectedOptionBorder,
+              unselectedIconBoxBg: unselectedIconBoxBg,
             ),
             const SizedBox(height: 16),
-            Divider(color: AppColors.glassDivider),
+            Divider(color: dividerClr),
             const SizedBox(height: 12),
             Text(
               'Recording Rate',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.glassTextSecondary,
+                color: secondaryTextClr,
               ),
             ),
             const SizedBox(height: 8),
@@ -495,12 +571,10 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
                 Expanded(
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: AppColors.glassBlueBorder,
-                      inactiveTrackColor: AppColors.glassDivider,
-                      thumbColor: AppColors.glassBlueBorder,
-                      overlayColor: AppColors.glassBlueBorder.withValues(
-                        alpha: 0.2,
-                      ),
+                      activeTrackColor: accentClr,
+                      inactiveTrackColor: dividerClr,
+                      thumbColor: accentClr,
+                      overlayColor: accentClr.withValues(alpha: 0.2),
                     ),
                     child: Slider(
                       value: _selectedInterval.toDouble(),
@@ -522,7 +596,7 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.glassTextPrimary,
+                      color: titleTextClr,
                     ),
                   ),
                 ),
@@ -530,10 +604,7 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
             ),
             Text(
               'Higher rate = more data points, larger files',
-              style: TextStyle(
-                fontSize: 10,
-                color: AppColors.glassTextSecondary,
-              ),
+              style: TextStyle(fontSize: 10, color: secondaryTextClr),
             ),
           ],
         ),
@@ -541,10 +612,7 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: AppColors.glassTextSecondary),
-          ),
+          child: Text('Cancel', style: TextStyle(color: secondaryTextClr)),
         ),
         ElevatedButton(
           onPressed: () {
@@ -554,8 +622,8 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
             Navigator.of(context).pop();
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.glassBlueBorder,
-            foregroundColor: Colors.black,
+            backgroundColor: accentClr,
+            foregroundColor: isLight ? Colors.white : Colors.black,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -570,8 +638,15 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
     RecordingMode mode,
     String title,
     String description,
-    IconData icon,
-  ) {
+    IconData icon, {
+    required bool isLight,
+    required Color accentClr,
+    required Color titleTextClr,
+    required Color secondaryTextClr,
+    required Color unselectedOptionBg,
+    required Color unselectedOptionBorder,
+    required Color unselectedIconBoxBg,
+  }) {
     final isSelected = _selectedMode == mode;
 
     return GestureDetector(
@@ -581,13 +656,11 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.glassBlueBorder.withValues(alpha: 0.12)
-              : AppColors.glassSurfaceAlt,
+              ? accentClr.withValues(alpha: 0.12)
+              : unselectedOptionBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? AppColors.glassBlueBorder
-                : AppColors.glassDivider,
+            color: isSelected ? accentClr : unselectedOptionBorder,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -598,16 +671,14 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
               height: 36,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.glassBlueBorder.withValues(alpha: 0.18)
-                    : Colors.white.withValues(alpha: 0.06),
+                    ? accentClr.withValues(alpha: 0.18)
+                    : unselectedIconBoxBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
                 size: 18,
-                color: isSelected
-                    ? AppColors.glassBlueBorder
-                    : AppColors.glassTextSecondary,
+                color: isSelected ? accentClr : secondaryTextClr,
               ),
             ),
             const SizedBox(width: 12),
@@ -620,27 +691,18 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? AppColors.glassBlueBorder
-                          : AppColors.glassTextPrimary,
+                      color: isSelected ? accentClr : titleTextClr,
                     ),
                   ),
                   Text(
                     description,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.glassTextSecondary,
-                    ),
+                    style: TextStyle(fontSize: 11, color: secondaryTextClr),
                   ),
                 ],
               ),
             ),
             if (isSelected)
-              Icon(
-                LucideIcons.circleCheck,
-                size: 18,
-                color: AppColors.glassBlueBorder,
-              ),
+              Icon(LucideIcons.circleCheck, size: 18, color: accentClr),
           ],
         ),
       ),

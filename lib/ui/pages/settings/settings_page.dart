@@ -14,6 +14,11 @@ import '../../../core/theme/colors.dart';
 /// section diberi warna navy-biru yang jelas lebih terang supaya
 /// kontras dengan latar dan tidak menyatu — senada dengan referensi
 /// panel "CONTROL".
+///
+/// REVISI #2: judul teks "Settings" beserta jarak di atasnya dihapus
+/// total — kartu "Data Source" / "About" sekarang langsung menempel ke
+/// tepi atas halaman (hanya dibatasi SafeArea + padding halaman) supaya
+/// tidak perlu discroll untuk melihat bagian atas kartu.
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onBack;
 
@@ -34,16 +39,6 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.glassTextPrimary,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 18),
               // Two side-by-side panels instead of a single scrolling
               // column — Data Source on the left, About on the right —
               // so both are visible together without scrolling the page.

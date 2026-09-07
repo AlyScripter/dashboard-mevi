@@ -10,22 +10,46 @@ class MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Blue-black glass card — dark navy fill + neon blue border, replacing
-    // the old plain white Material Card so it matches the rest of the
-    // cockpit dashboard theme.
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // REVISI: light mode → gradient biru nav rail (0xFF1565C0 → 0xFF1976D2),
+    // border 0xFF1E88E5, icon & semua teks putih.
+    // Dark mode → navy gelap + neon blue border seperti semula.
+    final cardGradient = isLight
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
+          )
+        : null;
+    final cardColor = isLight ? null : AppColors.glassNavyTint;
+    final cardBorderColor = isLight
+        ? const Color(0xFF1E88E5)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.55);
+    final cardShadowColor = isLight
+        ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+        : Colors.black.withValues(alpha: 0.35);
+
+    // Icon & teks: putih di light mode, warna bawaan di dark mode
+    final iconBg = isLight
+        ? Colors.white.withValues(alpha: 0.18)
+        : metric.color.withValues(alpha: 0.16);
+    final iconClr = isLight ? Colors.white : metric.color;
+    final labelClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
+    final valueClr = isLight ? Colors.white : AppColors.glassTextPrimary;
+    final unitClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
+
     return Container(
       width: 140,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: AppColors.glassNavyTint,
+        color: cardColor,
+        gradient: cardGradient,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.glassBlueBorder.withValues(alpha: 0.55),
-          width: 1.1,
-        ),
+        border: Border.all(color: cardBorderColor, width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: cardShadowColor,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -41,12 +65,12 @@ class MetricCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: metric.color.withValues(alpha: 0.16),
+                  color: iconBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(metric.icon, color: metric.color, size: 16),
+                child: Icon(metric.icon, color: iconClr, size: 16),
               ),
-              _buildTrendIndicator(metric.trend),
+              _buildTrendIndicator(metric.trend, isLight),
             ],
           ),
           Column(
@@ -54,10 +78,7 @@ class MetricCard extends StatelessWidget {
             children: [
               Text(
                 metric.label,
-                style: TextStyle(
-                  color: AppColors.glassTextSecondary,
-                  fontSize: 10,
-                ),
+                style: TextStyle(color: labelClr, fontSize: 10),
               ),
               const SizedBox(height: 2),
               Row(
@@ -67,7 +88,7 @@ class MetricCard extends StatelessWidget {
                   Text(
                     metric.value,
                     style: TextStyle(
-                      color: AppColors.glassTextPrimary,
+                      color: valueClr,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -75,10 +96,7 @@ class MetricCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     metric.unit,
-                    style: TextStyle(
-                      color: AppColors.glassTextSecondary,
-                      fontSize: 10,
-                    ),
+                    style: TextStyle(color: unitClr, fontSize: 10),
                   ),
                 ],
               ),
@@ -89,29 +107,29 @@ class MetricCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTrendIndicator(TrendDirection trend) {
+  Widget _buildTrendIndicator(TrendDirection trend, bool isLight) {
     IconData icon;
     Color color;
 
     switch (trend) {
       case TrendDirection.up:
         icon = Icons.trending_up;
-        color = Colors.green;
+        color = isLight ? Colors.white : Colors.green;
         break;
       case TrendDirection.down:
         icon = Icons.trending_down;
-        color = Colors.red;
+        color = isLight ? Colors.white : Colors.red;
         break;
       case TrendDirection.stable:
         icon = Icons.remove;
-        color = Colors.grey;
+        color = isLight ? Colors.white70 : Colors.grey;
         break;
     }
 
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: isLight ? 0.20 : 0.12),
         borderRadius: BorderRadius.circular(3),
       ),
       child: Icon(icon, color: color, size: 14),

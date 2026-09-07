@@ -15,23 +15,39 @@ class ChartContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Blue-black glass theme: dark navy card + glowing blue border,
-    // replacing the old plain white card so chart panels (LiDAR,
-    // Steering, CTE, Speed, IMU...) match the rest of the dashboard.
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // REVISI: light mode → gradient biru nav rail (1565C0 → 1976D2),
+    // border 1E88E5, icon & title putih. Dark mode tetap navy.
+    final cardGradient = isLight
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
+          )
+        : null;
+    final cardColor = isLight ? null : AppColors.glassSurface;
+    final cardBorder = isLight
+        ? const Color(0xFF1E88E5)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.4);
+    final cardShadow = isLight
+        ? const Color(0xFF1565C0).withValues(alpha: 0.30)
+        : Colors.black.withValues(alpha: 0.35);
+    final iconClr = isLight ? Colors.white : AppColors.glassBlueBorder;
+    final titleClr = isLight ? Colors.white : AppColors.glassTextPrimary;
+
     return Container(
       width: double.infinity,
       height: double.infinity,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: AppColors.glassSurface,
+        color: cardColor,
+        gradient: cardGradient,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.glassBlueBorder.withValues(alpha: 0.4),
-          width: 1,
-        ),
+        border: Border.all(color: cardBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: cardShadow,
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -42,12 +58,12 @@ class ChartContainer extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: AppColors.glassBlueBorder),
+              Icon(icon, size: 16, color: iconClr),
               const SizedBox(width: 6),
               Text(
                 title,
                 style: TextStyle(
-                  color: AppColors.glassTextPrimary,
+                  color: titleClr,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),

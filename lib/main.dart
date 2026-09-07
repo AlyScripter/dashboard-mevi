@@ -9,11 +9,12 @@ import 'services/notification_service.dart';
 import 'services/logging_service.dart';
 import 'ui/pages/home/home_page.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 
 Future<void> main() async {
   // Initialize Flutter bindings
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Register fvp for video_player on Linux/Windows desktop
   fvp.registerWith();
 
@@ -22,27 +23,20 @@ Future<void> main() async {
 
   try {
     // Load environment variables
-    // Load environment variables
     LoggingService.info('Loading environment variables', component: 'Main');
     await dotenv.load(fileName: ".env");
 
     // Get ROS WebSocket URL from environment or use default
-    // For Jetson AGX Xavier connection, set ROS_WEBSOCKET_URL in .env file
-    // Example: ROS_WEBSOCKET_URL=ws://192.168.1.100:9090
     final rosWebSocketUrl =
         dotenv.env['ROS_WEBSOCKET_URL'] ?? 'ws://localhost:9090';
     LoggingService.info('ROS Bridge URL: $rosWebSocketUrl', component: 'Main');
 
-    // TODO: Initialize map tile caching later
-    // For now using simple NetworkTileProvider to avoid database issues
-
     // Initialize ROS service with configurable ROS bridge URL
-    // Connect to Jetson AGX Xavier via rosbridge_websocket
     LoggingService.info('Initializing ROS service', component: 'Main');
     final rosService = RosService();
     await rosService.initialize(
       rosBridgeUrl: rosWebSocketUrl,
-      enableImuOnlyMode: true, // Enable IMU-only mode for testing speedometer
+      enableImuOnlyMode: true,
     );
 
     // Initialize Rosbag Player Service
@@ -96,7 +90,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.detached ||
         state == AppLifecycleState.paused) {
-      // App is closing or going to background - cleanup rosbag
       LoggingService.info(
         'App lifecycle: $state - cleaning up rosbag',
         component: 'Main',
@@ -107,13 +100,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MEVI Dashboard',
-      // Use light theme only
-      theme: AppTheme.lightTheme,
-      scaffoldMessengerKey: NotificationService.scaffoldKey,
-      home: const HomePage(title: 'MEVI'),
+    // ValueListenableBuilder merespons perubahan appThemeMode secara
+    // reaktif — saat tombol di nav rail diketuk, ThemeMode berubah dan
+    // MaterialApp di-rebuild otomatis dengan tema yang baru.
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'MEVI Dashboard',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          scaffoldMessengerKey: NotificationService.scaffoldKey,
+          home: const HomePage(title: 'MEVI'),
+        );
+      },
     );
   }
 }

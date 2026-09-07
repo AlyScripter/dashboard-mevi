@@ -16,6 +16,7 @@ import '../../../services/navigation_distance_service.dart';
 import '../../../services/trip_service.dart';
 import '../../../core/theme/glass_container.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/theme_controller.dart';
 
 // Enhanced Route State Management
 enum RouteState {
@@ -430,16 +431,22 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   // navigation_widget.dart (48/720 di layar besar, 16/480 di layar kecil)
   // supaya kedua widget kelihatan satu kolom yang rapi, bukan cuma
   // "mendekati" sejajar seperti sebelumnya.
-  Widget _buildBottomOverlay({bool dark = false}) {
+  Widget _buildBottomOverlay() {
     final isLargeScreen = _isLargeScreen(context);
-
     final bottomPadding = isLargeScreen ? 40.0 : 24.0;
     final horizontalPadding = isLargeScreen ? 48.0 : 16.0;
 
-    return Positioned(
-      bottom: bottomPadding,
-      left: horizontalPadding,
-      child: _buildRouteInfoContainer(isLargeScreen, dark: dark),
+    // Ikuti tema aktif — dark mode pakai navy glass, light mode pakai putih
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, themeMode, _) {
+        final isDark = themeMode == ThemeMode.dark;
+        return Positioned(
+          bottom: bottomPadding,
+          left: horizontalPadding,
+          child: _buildRouteInfoContainer(isLargeScreen, dark: isDark),
+        );
+      },
     );
   }
 
@@ -468,8 +475,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     final maxWidth = isFullHD ? 520.0 : 440.0;
     final cardBorderRadius = isLargeScreen ? 22.0 : 18.0;
     final iconSize = isLargeScreen ? 24.0 : 21.0;
-    final textColor = dark ? Colors.white : Colors.black87;
-    final subTextColor = dark ? Colors.white70 : Colors.grey.shade600;
+    // Light mode: teks biru tua senada dengan nav rail & search bar terang
+    final textColor = dark ? Colors.white : const Color(0xFF1A237E);
+    final subTextColor = dark ? Colors.white70 : const Color(0xFF546E7A);
 
     return GlassContainer(
       width: maxWidth,
@@ -481,21 +489,20 @@ class _LayoutDashboardState extends State<LayoutDashboard>
       // Rounded rectangle (bukan pill lagi) — radius disamakan dengan
       // widget kaca lain di dashboard supaya bentuknya senada.
       borderRadius: cardBorderRadius,
-      blurSigma: dark ? 0 : 18,
+      blurSigma: 0,
+      // Light mode: putih solid + border biru, senada dengan search bar & dropdown
       tint: dark ? AppColors.glassNavyTint : Colors.white,
-      tintOpacity: dark ? 1.0 : 0.55,
-      borderColor: dark ? AppColors.glassBlueBorder : Colors.white,
-      borderOpacity: dark ? 0.85 : 0.6,
-      borderWidth: dark ? 1.4 : 1.0,
-      boxShadow: dark
-          ? [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ]
-          : null,
+      tintOpacity: 1.0,
+      borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFF1976D2),
+      borderOpacity: 0.85,
+      borderWidth: 1.4,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: dark ? 0.35 : 0.15),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
       child: Row(
         children: [
           Container(
@@ -515,15 +522,14 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                       ],
                     )
                   : null,
-              color: dark ? null : Colors.transparent,
+              color: dark
+                  ? null
+                  : _getRouteStatusColor().withValues(alpha: 0.12),
             ),
             child: Icon(
               _getRouteStatusIcon(),
-              // Same size as the car/clock metric icons below (was
-              // 30/25 — visibly larger than the rest of the icons in
-              // this pill).
               size: iconSize,
-              color: dark ? Colors.white : _getRouteStatusColor(),
+              color: _getRouteStatusColor(),
             ),
           ),
           SizedBox(width: isLargeScreen ? 14 : 12),
@@ -659,7 +665,11 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     return diagonal >= 700; // Threshold: ~13 inches in logical pixels
   }
 
-  Widget _buildTopOverlay({bool compactMode = false, bool bevMode = false}) {
+  Widget _buildTopOverlay({
+    bool compactMode = false,
+    bool bevMode = false,
+    bool cameraMode = false,
+  }) {
     // REVISI: on the BEV page the weather/time chip is shrunk down to
     // roughly the same footprint as the battery/range readout in the
     // opposite corner, and pinned to the exact same 24px inset the BEV
@@ -686,7 +696,14 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     final double topPadding;
     final double rightPadding;
 
-    if (compactMode) {
+    if (cameraMode) {
+      // REVISI: disejajarkan dengan top bar kamera.
+      // CameraPage outer padding = 6px → weather mulai dari top=6.
+      // Height weather = 38px (sama dengan dropdown) → keduanya setara.
+      // right = 10px agar tidak mepet tepi frame.
+      topPadding = 6.0;
+      rightPadding = 10.0;
+    } else if (compactMode) {
       // For DataPage - position higher to avoid collision with DataPageHeader
       topPadding = isLargeScreen ? 18.0 : (isTablet ? 12.0 : 10.0);
       rightPadding = isLargeScreen ? 24.0 : (isTablet ? 16.0 : 12.0);
@@ -698,7 +715,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     return Positioned(
       top: topPadding,
       right: rightPadding,
-      child: WeatherTimeWidget(compactMode: compactMode),
+      child: WeatherTimeWidget(compactMode: cameraMode ? true : compactMode),
     );
   }
 
@@ -750,41 +767,53 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   Widget _buildDefaultLayoutWithFloatingNavbar() {
     final isCameraActive = _activeMenu == DashboardMenu.camera;
     final isBevActive = _activeMenu == DashboardMenu.bev;
-    // REVISI: "Tentukan destinasi" sekarang eksklusif untuk halaman
-    // Maps — tidak relevan lagi ditampilkan di atas Camera/BEV.
     final isMapsActive = _activeMenu == DashboardMenu.home;
     return Stack(
       children: [
-        // Keep NavigationPage always active to preserve polyline
+        // NavigationPage selalu aktif untuk mempertahankan polyline.
+        // showSearchBar: hanya true saat halaman Maps aktif — mencegah
+        // search bar & overlay dropdown muncul di Camera/BEV.
         NavigationPage(
           onRouteInfo: _handleRouteInfo,
           onClearRouteInfo: _clearRouteInfo,
           onRouteCompleted: _completeRoute,
           navigationKey: navigationWidgetKey,
+          showSearchBar: isMapsActive,
         ),
-        // Overlay other pages on top when active
+        // REVISI: Background halaman kamera theme-aware — biru (senada
+        // warna nav rail) di light mode, hitam seperti sebelumnya di dark mode.
         if (isCameraActive)
-          Container(color: Colors.black, child: const CameraPage()),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: appThemeMode,
+            builder: (context, themeMode, _) {
+              final isDark = themeMode == ThemeMode.dark;
+              return Container(
+                // REVISI: Light: putih bersih, Dark: hitam
+                color: isDark ? Colors.black : Colors.white,
+                child: const CameraPage(),
+              );
+            },
+          ),
         if (isBevActive) Container(color: Colors.black, child: const BevPage()),
-        _buildTopOverlay(bevMode: isBevActive),
-        if (isMapsActive) _buildBottomOverlay(dark: true),
+        _buildTopOverlay(bevMode: isBevActive, cameraMode: isCameraActive),
+        // _buildBottomOverlay sekarang theme-aware (tidak perlu arg dark)
+        if (isMapsActive) _buildBottomOverlay(),
       ],
     );
   }
 
   Widget _buildDataLayoutWithFixedNavbar() {
-    // REVISI: bar "Tentukan destinasi" dihapus dari halaman Data (dulu
-    // _buildFixedBottomNavbar) — sekarang cuma tampil di halaman Maps.
     return Stack(
       children: [
-        // Keep NavigationPage active to preserve polyline state
+        // showSearchBar: false — DataPage menimpa NavigationPage, jangan
+        // biarkan search bar & dropdown tembus ke halaman Data.
         NavigationPage(
           onRouteInfo: _handleRouteInfo,
           onClearRouteInfo: _clearRouteInfo,
           onRouteCompleted: _completeRoute,
           navigationKey: navigationWidgetKey,
+          showSearchBar: false,
         ),
-        // DataPage overlays the navigation
         const DataPage(),
         _buildTopOverlay(compactMode: true),
       ],

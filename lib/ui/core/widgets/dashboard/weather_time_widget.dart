@@ -134,9 +134,53 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // --- THEME-AWARE COLORS ---
+    // REVISI: compactMode + light → gradient persis nav rail
+    // (0xFF1565C0 top → 0xFF1976D2 bottom), border 0xFF1E88E5, teks/icon putih.
+    final useNavStyle = isLight && widget.compactMode;
+
+    final bgColor = useNavStyle
+        ? null
+        : isLight
+        ? Colors.white
+        : AppColors.glassNavyTint;
+    final bgGradient = useNavStyle
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
+          )
+        : null;
+    final borderColor = useNavStyle
+        ? const Color(0xFF1E88E5)
+        : isLight
+        ? AppColors.primary.withValues(alpha: 0.35)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.85);
+    final shadowColor = useNavStyle
+        ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+        : isLight
+        ? Colors.black.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.35);
+    final textPrimary = useNavStyle
+        ? Colors.white
+        : isLight
+        ? const Color(0xFF1A1A2E)
+        : AppColors.glassTextPrimary;
+    final textSecondary = useNavStyle
+        ? Colors.white70
+        : isLight
+        ? const Color(0xFF555577)
+        : AppColors.glassTextSecondary;
+    final iconColor = useNavStyle
+        ? Colors.white
+        : isLight
+        ? AppColors.primary
+        : const Color(0xFF7DB4FF);
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Determine available width and device type
         final data = MediaQuery.of(context);
         final screenW = data.size.width;
         final screenH = data.size.height;
@@ -145,15 +189,12 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
             ? constraints.maxWidth
             : screenW;
 
-        // Calculate diagonal to detect device type (laptop vs tablet)
         final diagonal =
             sqrt(screenW * screenW + screenH * screenH) / data.devicePixelRatio;
-        final isLargeScreen = diagonal >= 700; // ~13 inches threshold
-        final isTablet =
-            diagonal >= 500 && diagonal < 700; // ~10-13 inches (Infinix XPAD)
+        final isLargeScreen = diagonal >= 700;
+        final isTablet = diagonal >= 500 && diagonal < 700;
         final compact = widget.compactMode || availW < 380 || screenW < 420;
 
-        // Use smaller sizes when in compactMode (for DataPage)
         final timeFont = widget.embedded
             ? 20.0
             : widget.compactMode
@@ -200,25 +241,19 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                   : compact
                   ? 8.0
                   : 12.0);
+        // REVISI: containerHeight compactMode difix ke 38px (= tinggi dropdown)
         final containerHeight = widget.embedded
             ? null
             : widget.compactMode
-            ? (isLargeScreen
-                  ? 48.0
-                  : isTablet
-                  ? 42.0
-                  : 36.0)
+            ? 38.0
             : (isLargeScreen
                   ? 70.0
                   : compact
                   ? 38.0
                   : 58.0);
+        // REVISI: horizontalPadding compactMode = 12px (sama dengan dropdown)
         final horizontalPadding = widget.compactMode
-            ? (isLargeScreen
-                  ? 14.0
-                  : isTablet
-                  ? 12.0
-                  : 10.0)
+            ? 12.0
             : (isLargeScreen
                   ? 20.0
                   : compact
@@ -233,7 +268,7 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
               style: TextStyle(
                 fontSize: timeFont,
                 fontWeight: FontWeight.w900,
-                color: AppColors.glassTextPrimary,
+                color: textPrimary,
               ),
             ),
             if (widget.showWeather) ...[
@@ -242,9 +277,9 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                 SizedBox(
                   width: iconSize,
                   height: iconSize,
-                  child: const CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF7DB4FF),
+                    color: iconColor,
                   ),
                 )
               else if (_hasError)
@@ -257,13 +292,8 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
               else if (_weatherCondition != null &&
                   _temperature != null &&
                   _weatherIcon != null) ...[
-                Icon(
-                  _weatherIcon,
-                  size: iconSize,
-                  color: const Color(0xFF7DB4FF),
-                ),
+                Icon(_weatherIcon, size: iconSize, color: iconColor),
                 SizedBox(width: gap / 1.2),
-                // Make weather text flexible so it wraps or truncates based on space
                 ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: availW * 0.45),
                   child: Text(
@@ -271,7 +301,7 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                     style: TextStyle(
                       fontSize: weatherFont,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.glassTextPrimary,
+                      color: textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -282,31 +312,33 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
           ],
         );
 
-        // REVISI: box cuaca/waktu sekarang solid hitam + border biru neon,
-        // tanpa blur, disamakan dengan search bar / destination bar /
-        // panel kiri (sebelumnya kotak putih polos, beda sendiri).
+        // THEME-AWARE box: gradient nav rail di compactMode+light,
+        // putih bersih di light non-compact, navy di dark.
         final box = Container(
           height: containerHeight,
           padding: EdgeInsets.symmetric(
             horizontal: horizontalPadding,
-            vertical: 12,
+            // vertical 0 di compactMode — height sudah fix 38px
+            vertical: widget.compactMode ? 0 : 12,
           ),
           decoration: BoxDecoration(
-            color: AppColors.glassNavyTint,
+            color: bgColor,
+            gradient: bgGradient,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: AppColors.glassBlueBorder.withValues(alpha: 0.85),
-              width: 1.4,
-            ),
+            border: Border.all(color: borderColor, width: 1.0),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
+                color: shadowColor,
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [content]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [content],
+          ),
         );
 
         if (widget.embedded) {
@@ -319,7 +351,7 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                 ? 520
                 : compact
                 ? 260
-                : 480, // Match search bar width for tablet
+                : 480,
           ),
           child: SizedBox(height: containerHeight ?? 56, child: box),
         );

@@ -29,6 +29,8 @@ class Lidar2DScanPainter extends CustomPainter {
   /// stay zoomed to a fixed, readable window (e.g. the reference video's
   /// 20x20m) even when the sensor itself is rated for a longer range.
   final double viewRangeMeters;
+  // REVISI: tambah isLight agar painter menyesuaikan warna di light mode
+  final bool isLight;
 
   Lidar2DScanPainter({
     required this.ranges,
@@ -38,17 +40,25 @@ class Lidar2DScanPainter extends CustomPainter {
     required this.rangeMax,
     this.viewRangeMeters = 20.0,
     this.title = 'MEVI - Single LiDAR Scan',
+    this.isLight = false,
   });
 
-  // Dark cockpit theme (matches the rest of the dashboard's blue-black
-  // glass look) instead of the original white matplotlib figure.
-  static const Color _bgColor = Color(0xFF0A0D13);
-  static const Color _gridColor = Color(0xFF1E2633);
-  static const Color _axisColor = Color(0xFF3A4558);
-  static const Color _tickTextColor = Color(0xFF9AA7BD);
-  static const Color _titleColor = Color(0xFFF3F6FC);
-  static const Color _pointColor = Color(0xFFF3F6FC); // white scan points
-  static const Color _carColor = Color(0xFF22B2FF); // neon HUD blue
+  // Dark-mode colors (tetap sama di dark mode)
+  static const Color _bgColorDark = Color(0xFF0A0D13);
+  static const Color _gridColorDark = Color(0xFF1E2633);
+  static const Color _axisColorDark = Color(0xFF3A4558);
+  static const Color _tickTextColorDark = Color(0xFF9AA7BD);
+  static const Color _titleColorDark = Color(0xFFF3F6FC);
+  static const Color _pointColorDark = Color(0xFFF3F6FC);
+  static const Color _carColor = Color(0xFF22B2FF);
+
+  // Light-mode colors: background putih, elemen gelap agar terbaca
+  static const Color _bgColorLight = Colors.white;
+  static const Color _gridColorLight = Color(0xFFDDE3EC);
+  static const Color _axisColorLight = Color(0xFF90A4AE);
+  static const Color _tickTextColorLight = Color(0xFF455A64);
+  static const Color _titleColorLight = Color(0xFF1A237E);
+  static const Color _pointColorLight = Color(0xFF1565C0); // biru nav agar kontras
 
   List<Offset> _computePoints() {
     final points = <Offset>[];
@@ -88,8 +98,16 @@ class Lidar2DScanPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // REVISI: pilih warna sesuai tema
+    final bgColor = isLight ? _bgColorLight : _bgColorDark;
+    final gridColor = isLight ? _gridColorLight : _gridColorDark;
+    final axisColor = isLight ? _axisColorLight : _axisColorDark;
+    final tickTextColor = isLight ? _tickTextColorLight : _tickTextColorDark;
+    final titleColor = isLight ? _titleColorLight : _titleColorDark;
+    final pointColor = isLight ? _pointColorLight : _pointColorDark;
+
     // Background
-    canvas.drawRect(Offset.zero & size, Paint()..color = _bgColor);
+    canvas.drawRect(Offset.zero & size, Paint()..color = bgColor);
 
     final points = _computePoints();
 
@@ -129,10 +147,10 @@ class Lidar2DScanPainter extends CustomPainter {
 
     // ---- Grid + ticks ----
     final gridPaint = Paint()
-      ..color = _gridColor
+      ..color = gridColor
       ..strokeWidth = 1;
     final axisPaint = Paint()
-      ..color = _axisColor
+      ..color = axisColor
       ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
 
@@ -153,7 +171,7 @@ class Lidar2DScanPainter extends CustomPainter {
         _fmtTick(xTick),
         Offset(px, plotRect.bottom + 6),
         anchor: Alignment.topCenter,
-        color: _tickTextColor,
+        color: tickTextColor,
         fontSize: 11,
       );
     }
@@ -172,7 +190,7 @@ class Lidar2DScanPainter extends CustomPainter {
         _fmtTick(yTick),
         Offset(plotRect.left - 8, py),
         anchor: Alignment.centerRight,
-        color: _tickTextColor,
+        color: tickTextColor,
         fontSize: 11,
       );
     }
@@ -185,7 +203,7 @@ class Lidar2DScanPainter extends CustomPainter {
     canvas.clipRect(plotRect);
 
     // ---- Scatter points ----
-    final pointPaint = Paint()..color = _pointColor.withValues(alpha: 0.85);
+    final pointPaint = Paint()..color = pointColor.withValues(alpha: 0.85);
     for (final p in points) {
       canvas.drawCircle(
         Offset(dataToPx(p.dx), dataToPy(p.dy)),
@@ -207,7 +225,7 @@ class Lidar2DScanPainter extends CustomPainter {
       title,
       Offset(size.width / 2, 6),
       anchor: Alignment.topCenter,
-      color: _titleColor,
+      color: titleColor,
       fontSize: 14,
       fontWeight: FontWeight.w600,
     );
@@ -218,7 +236,7 @@ class Lidar2DScanPainter extends CustomPainter {
       'X (meter)',
       Offset(plotRect.center.dx, size.height - 8),
       anchor: Alignment.bottomCenter,
-      color: _tickTextColor,
+      color: tickTextColor,
       fontSize: 12,
     );
 
@@ -230,7 +248,7 @@ class Lidar2DScanPainter extends CustomPainter {
       'Y (meter)',
       Offset.zero,
       anchor: Alignment.center,
-      color: _tickTextColor,
+      color: tickTextColor,
       fontSize: 12,
     );
     canvas.restore();

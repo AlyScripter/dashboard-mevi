@@ -40,6 +40,18 @@ class GearSelectorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // REVISI: light mode → pill non-aktif jadi abu-abu terang dengan
+    // teks gelap (bukan putih transparan) supaya kebaca di atas
+    // background putih halaman BEV. Pill aktif (biru solid) tidak perlu
+    // diubah, sudah kontras di kedua mode.
+    final inactiveFill = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
+    final inactiveTextClr = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.55)
+        : Colors.white.withValues(alpha: 0.45);
+
     return Flex(
       direction: direction,
       mainAxisSize: MainAxisSize.min,
@@ -59,9 +71,7 @@ class GearSelectorWidget extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isActive
-                    ? const Color(0xFF2196F3)
-                    : Colors.white.withValues(alpha: 0.06),
+                color: isActive ? const Color(0xFF2196F3) : inactiveFill,
                 boxShadow: isActive
                     ? [
                         BoxShadow(
@@ -80,9 +90,7 @@ class GearSelectorWidget extends StatelessWidget {
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: fontWeight,
-                  color: isActive
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.45),
+                  color: isActive ? Colors.white : inactiveTextClr,
                   letterSpacing: -0.5,
                 ),
                 child: Text(gear),

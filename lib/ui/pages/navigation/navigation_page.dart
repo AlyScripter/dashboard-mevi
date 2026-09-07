@@ -15,6 +15,8 @@ class NavigationPage extends StatelessWidget {
   final VoidCallback? onClearRouteInfo;
   final VoidCallback? onRouteCompleted;
   final GlobalKey? navigationKey;
+  // Teruskan ke NavigationWidget — false menyembunyikan search bar & dropdown.
+  final bool showSearchBar;
 
   const NavigationPage({
     super.key,
@@ -22,6 +24,7 @@ class NavigationPage extends StatelessWidget {
     this.onClearRouteInfo,
     this.onRouteCompleted,
     this.navigationKey,
+    this.showSearchBar = true,
   });
 
   @override
@@ -40,7 +43,8 @@ class NavigationPage extends StatelessWidget {
         onRouteInfo: onRouteInfo,
         onClearRouteInfo: onClearRouteInfo,
         onRouteCompleted: onRouteCompleted,
-        simulateGps: false, // Set to false to use static placeholder
+        simulateGps: false,
+        showSearchBar: showSearchBar,
       ),
     );
   }

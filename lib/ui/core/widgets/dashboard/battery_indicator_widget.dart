@@ -18,6 +18,7 @@ class BatteryIndicatorWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final remainKm = (batteryPercent * 5).clamp(0.0, 999.0);
     final remainKmText = '${remainKm.toStringAsFixed(1)} km';
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return GestureDetector(
       onTap: onTap,
@@ -32,6 +33,7 @@ class BatteryIndicatorWidget extends StatelessWidget {
                   '${(batteryPercent * 100).clamp(0, 100).toStringAsFixed(0)}%',
               percent: batteryPercent,
               barColor: _green,
+              isLight: isLight,
             ),
           ),
           const SizedBox(width: 12),
@@ -42,6 +44,7 @@ class BatteryIndicatorWidget extends StatelessWidget {
               valueText: remainKmText,
               percent: batteryPercent,
               barColor: _green,
+              isLight: isLight,
             ),
           ),
         ],
@@ -56,6 +59,7 @@ class _StatBar extends StatelessWidget {
   final String valueText;
   final double percent;
   final Color barColor;
+  final bool isLight;
 
   const _StatBar({
     required this.icon,
@@ -63,16 +67,27 @@ class _StatBar extends StatelessWidget {
     required this.valueText,
     required this.percent,
     required this.barColor,
+    required this.isLight,
   });
 
   @override
   Widget build(BuildContext context) {
+    // REVISI: light mode → teks/ikon jadi gelap dan track progress bar
+    // jadi abu-abu terang, supaya kontras di atas background putih.
+    final textClr = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.85)
+        : Colors.white.withValues(alpha: 0.85);
+    final valueClr = isLight ? const Color(0xFF1A2331) : Colors.white;
+    final trackClr = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.10)
+        : Colors.white.withValues(alpha: 0.15);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: 15, color: Colors.white.withValues(alpha: 0.85)),
+            Icon(icon, size: 15, color: textClr),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -80,7 +95,7 @@ class _StatBar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: textClr,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -88,10 +103,10 @@ class _StatBar extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               valueText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: valueClr,
               ),
             ),
           ],
@@ -102,11 +117,7 @@ class _StatBar extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, c) => Stack(
               children: [
-                Container(
-                  height: 6,
-                  width: c.maxWidth,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
+                Container(height: 6, width: c.maxWidth, color: trackClr),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 400),
                   curve: Curves.easeOut,

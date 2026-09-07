@@ -32,6 +32,9 @@ class NavigationWidget extends StatefulWidget {
   final VoidCallback? onClearRouteInfo;
   final VoidCallback? onRouteCompleted;
   final bool simulateGps;
+  // Kontrol visibilitas search bar — false saat halaman lain (Camera/BEV/Data)
+  // menimpa NavigationPage, supaya overlay dropdown tidak bocor ke halaman lain.
+  final bool showSearchBar;
 
   const NavigationWidget({
     super.key,
@@ -42,6 +45,7 @@ class NavigationWidget extends StatefulWidget {
     this.onClearRouteInfo,
     this.onRouteCompleted,
     this.simulateGps = false,
+    this.showSearchBar = true,
   });
 
   @override
@@ -867,24 +871,27 @@ class NavigationWidgetState extends State<NavigationWidget> {
             // Heading HUD (kept as-is; assumed responsive internally)
             const HeadingHUD(),
 
-            // Search bar with results — with larger padding and width on Full HD
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    top: searchBarTop,
-                    left: searchBarLeft,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: searchBarMaxWidth),
-                    child: SearchBarWidget(
-                      onLocationSelected: _onLocationSelected,
+            // Search bar — hanya tampil di halaman Maps (showSearchBar: true).
+            // Saat false, widget tidak dirender sama sekali sehingga overlay
+            // dropdown tidak bisa muncul di halaman Camera/BEV/Data.
+            if (widget.showSearchBar)
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: searchBarTop,
+                      left: searchBarLeft,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: searchBarMaxWidth),
+                      child: SearchBarWidget(
+                        onLocationSelected: _onLocationSelected,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
             // Loading indicator
             LoadingIndicator(isLoading: _isLoading),

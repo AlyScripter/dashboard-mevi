@@ -14,6 +14,8 @@ class LidarPolarPainter extends CustomPainter {
   final bool showIntensity;
   final double zoomLevel;
   final Offset panOffset;
+  // REVISI: tambah isLight untuk menyesuaikan warna canvas di light mode
+  final bool isLight;
 
   LidarPolarPainter({
     required this.ranges,
@@ -26,6 +28,7 @@ class LidarPolarPainter extends CustomPainter {
     required this.showIntensity,
     required this.zoomLevel,
     required this.panOffset,
+    this.isLight = false,
   });
 
   // Convert lidar angle to canvas angle (0° = straight up)
@@ -37,9 +40,19 @@ class LidarPolarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // REVISI: fill background sesuai tema
+    // Light: putih bersih agar titik lidar terbaca; Dark: transparan (bg dari container)
+    if (isLight) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Paint()..color = Colors.white,
+      );
+    }
+
     // Vehicle at bottom center, arc extends upward
     final center = Offset(size.width / 2, size.height * 0.9) + panOffset;
-    final radius = (math.min(size.width, size.height * 0.85) / 2 - 10) * zoomLevel;
+    final radius =
+        (math.min(size.width, size.height * 0.85) / 2 - 10) * zoomLevel;
 
     // Draw grid arcs
     if (showGrid) {
@@ -63,9 +76,12 @@ class LidarPolarPainter extends CustomPainter {
   }
 
   void _drawArcGrid(Canvas canvas, Offset center, double radius) {
+    // REVISI: light → abu gelap cukup kontras di putih; dark → grey transparan
     final gridPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.2)
-      ..strokeWidth = 0.5
+      ..color = isLight
+          ? const Color(0xFF90A4AE).withValues(alpha: 0.50)
+          : Colors.grey.withValues(alpha: 0.2)
+      ..strokeWidth = isLight ? 0.8 : 0.5
       ..style = PaintingStyle.stroke;
 
     final startAngle = _lidarToCanvasAngle(angleMin);
@@ -85,9 +101,12 @@ class LidarPolarPainter extends CustomPainter {
   }
 
   void _drawRangeArcs(Canvas canvas, Offset center, double radius) {
+    // REVISI: light → hijau lebih solid agar terbaca di background putih
     final rangePaint = Paint()
-      ..color = Colors.green.withValues(alpha: 0.4)
-      ..strokeWidth = 1.5
+      ..color = isLight
+          ? Colors.green.withValues(alpha: 0.75)
+          : Colors.green.withValues(alpha: 0.4)
+      ..strokeWidth = isLight ? 2.0 : 1.5
       ..style = PaintingStyle.stroke;
 
     final startAngle = _lidarToCanvasAngle(angleMin);
@@ -106,28 +125,33 @@ class LidarPolarPainter extends CustomPainter {
   void _drawSegmentLines(Canvas canvas, Offset center, double radius) {
     // Draw segment lines matching lidarnode_w.py: [40, 30, 20, 0, -20, -30, -40]
     final segmentAngles = [40.0, 30.0, 20.0, 0.0, -20.0, -30.0, -40.0];
-    
+
+    // REVISI: light → greenAccent lebih opak agar kelihatan di atas putih
     final linePaint = Paint()
-      ..color = Colors.greenAccent.withValues(alpha: 0.3)
+      ..color = isLight
+          ? Colors.greenAccent.withValues(alpha: 0.65)
+          : Colors.greenAccent.withValues(alpha: 0.3)
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
 
     for (final angleDeg in segmentAngles) {
       final angleRad = angleDeg * math.pi / 180;
       final canvasAngle = _lidarToCanvasAngle(angleRad);
-      
+
       final endPoint = Offset(
         center.dx + radius * math.cos(canvasAngle),
         center.dy + radius * math.sin(canvasAngle),
       );
-      
+
       canvas.drawLine(center, endPoint, linePaint);
     }
 
     // Draw center line (0°) with different style
     final centerLinePaint = Paint()
-      ..color = Colors.green.withValues(alpha: 0.6)
-      ..strokeWidth = 1.5
+      ..color = isLight
+          ? Colors.green.withValues(alpha: 0.90)
+          : Colors.green.withValues(alpha: 0.6)
+      ..strokeWidth = isLight ? 2.0 : 1.5
       ..style = PaintingStyle.stroke;
 
     final centerAngle = _lidarToCanvasAngle(0);
@@ -159,6 +183,7 @@ class LidarPolarPainter extends CustomPainter {
       );
 
       // Color based on distance (closer = red, farther = green)
+      // Warna titik TIDAK berubah karena membawa makna sensor
       Color pointColor;
       if (showIntensity && i < intensities.length) {
         pointColor = _getIntensityColor(intensities[i]);
@@ -173,9 +198,9 @@ class LidarPolarPainter extends CustomPainter {
         }
       }
 
-      // Draw glow effect
+      // Draw glow effect — sedikit lebih opak di light agar tetap menonjol
       final glowPaint = Paint()
-        ..color = pointColor.withValues(alpha: 0.4)
+        ..color = pointColor.withValues(alpha: isLight ? 0.55 : 0.4)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(pointPosition, 4, glowPaint);
 
@@ -188,7 +213,7 @@ class LidarPolarPainter extends CustomPainter {
   }
 
   void _drawVehiclePosition(Canvas canvas, Offset center) {
-    // Draw vehicle as arrow pointing up (forward)
+    // REVISI: vehicle icon tetap cyan; outline hitam di light agar kontras
     final vehiclePaint = Paint()
       ..color = Colors.cyan
       ..style = PaintingStyle.fill;
@@ -204,15 +229,21 @@ class LidarPolarPainter extends CustomPainter {
 
     canvas.drawPath(path, vehiclePaint);
 
-    // Draw outline
+    // REVISI: outline hitam di light mode (putih di dark)
     final outlinePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.8)
+      ..color = isLight
+          ? Colors.black.withValues(alpha: 0.7)
+          : Colors.white.withValues(alpha: 0.8)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, outlinePaint);
 
-    // Draw center dot
-    canvas.drawCircle(center, 2, Paint()..color = Colors.white);
+    // Center dot
+    canvas.drawCircle(
+      center,
+      2,
+      Paint()..color = isLight ? Colors.black : Colors.white,
+    );
   }
 
   void _drawRangeLabels(Canvas canvas, Offset center, double radius) {
@@ -226,7 +257,10 @@ class LidarPolarPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: '${rangeValue}m',
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.7),
+          // REVISI: hitam di light mode agar label terbaca di atas putih
+          color: isLight
+              ? Colors.black.withValues(alpha: 0.75)
+              : Colors.white.withValues(alpha: 0.7),
           fontSize: 10,
           fontWeight: FontWeight.w500,
         ),
@@ -253,6 +287,9 @@ class LidarPolarPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+// ── Semua method (paint, _draw*, _getIntensityColor, shouldRepaint)
+// sudah didefinisikan di atas bersama constructor yang baru.
+
 class LidarHeatmapPainter extends CustomPainter {
   final List<double> ranges;
   final List<double> intensities;
@@ -278,7 +315,8 @@ class LidarHeatmapPainter extends CustomPainter {
     final radius = math.min(size.width, size.height) / 2 - 20;
 
     // Draw background
-    final backgroundPaint = Paint()..color = Colors.black.withValues(alpha: 0.8);
+    final backgroundPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.8);
     canvas.drawCircle(center, radius, backgroundPaint);
 
     // Draw heatmap

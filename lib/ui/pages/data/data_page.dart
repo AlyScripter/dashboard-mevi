@@ -158,7 +158,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildDotIndicator() {
+  Widget _buildDotIndicator(bool isLight) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -169,6 +169,17 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
             builder: (context, child) {
               final isActive = _currentPageIndex == index;
               final animationValue = isActive ? _dotAnimation.value : 0.0;
+
+              // REVISI: light → dot aktif biru nav, inaktif abu tua; dark → neon
+              final activeDotColor = isLight
+                  ? const Color(0xFF1565C0)
+                  : AppColors.glassBlueBorder;
+              final inactiveDotColor = isLight
+                  ? Colors.black38
+                  : Colors.white.withValues(alpha: 0.25);
+              final glowColor = isLight
+                  ? const Color(0xFF1565C0).withValues(alpha: 0.50)
+                  : AppColors.glassBlueGlow.withValues(alpha: 0.7);
 
               return GestureDetector(
                 onTap: () {
@@ -190,16 +201,12 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                         width: isActive ? 10 : 10,
                         height: isActive ? 10 : 10,
                         decoration: BoxDecoration(
-                          color: isActive
-                              ? AppColors.glassBlueBorder
-                              : Colors.white.withValues(alpha: 0.25),
+                          color: isActive ? activeDotColor : inactiveDotColor,
                           borderRadius: BorderRadius.circular(6),
                           boxShadow: isActive
                               ? [
                                   BoxShadow(
-                                    color: AppColors.glassBlueGlow.withValues(
-                                      alpha: 0.7,
-                                    ),
+                                    color: glowColor,
                                     blurRadius: 6,
                                     spreadRadius: 1,
                                   ),
@@ -207,7 +214,6 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                               : null,
                         ),
                       ),
-                      // Animated overlay for active dot
                       if (isActive)
                         Transform.scale(
                           scale: 1.0 + (animationValue * 0.3),
@@ -218,7 +224,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                               color: Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: AppColors.glassBlueBorder.withValues(
+                                color: activeDotColor.withValues(
                                   alpha: 0.3 + (animationValue * 0.4),
                                 ),
                                 width: 2,
@@ -363,17 +369,19 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
         final nearestObstacle =
             DataUtils.findNearestObstacle(lidarRanges) ?? 0.0;
 
+        final isLight = Theme.of(context).brightness == Brightness.light;
+
         return Container(
-          // Blue-black glass theme: same dark navy gradient used by the
-          // left panel (0xFF12161F -> 0xFF0A0D13) instead of the old flat
-          // light-grey (0xFFF2F2F2) background, so the Data page reads as
-          // part of the same dark cockpit dashboard.
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
-            ),
+          // REVISI: light mode → putih bersih; dark mode → navy gelap seperti semula.
+          decoration: BoxDecoration(
+            gradient: isLight
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
+                  ),
+            color: isLight ? Colors.white : null,
           ),
           padding: const EdgeInsets.only(left: 8, right: 8, top: 10, bottom: 0),
           child: Column(
@@ -388,39 +396,37 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                 imuYaw: imuYaw,
                 batterySoc: batterySoc,
               ),
-              const SizedBox(height: 2),
-              // Page indicator with slide titles
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _getPageTitle(_currentPageIndex),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.glassTextPrimary,
-                      ),
+              const SizedBox(height: 4),
+              // REVISI: judul slide & dot indicator digabung dalam 1 Row
+              // agar sejajar — judul di kiri, dot di tengah, counter di kanan.
+              // Font judul diperbesar dari 12 → 14.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    _getPageTitle(_currentPageIndex),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isLight
+                          ? Colors.black87
+                          : AppColors.glassTextPrimary,
                     ),
-                    Row(
-                      children: [
-                        Text(
-                          '${_currentPageIndex + 1} / $_totalPages',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.glassTextSecondary,
-                          ),
-                        ),
-                      ],
+                  ),
+                  _buildDotIndicator(isLight),
+                  Text(
+                    '${_currentPageIndex + 1} / $_totalPages',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isLight
+                          ? Colors.black54
+                          : AppColors.glassTextSecondary,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              // Dot indicator
-              _buildDotIndicator(),
 
               // PageView with visualizations
               Expanded(

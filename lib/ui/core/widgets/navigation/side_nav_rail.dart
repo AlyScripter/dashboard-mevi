@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../core/theme/theme_controller.dart';
 
 /// Single icon entry rendered by [SideNavRail].
 class SideNavItem {
@@ -16,12 +17,10 @@ class SideNavItem {
 
 /// Slim vertical icon rail docked on the far left of the dashboard.
 ///
-/// Replaces the old floating bottom navbar (map/camera/data icons) and
-/// the separate settings gear that used to live inside the BEV panel —
-/// every navigation entry (Maps, Camera, Data, Settings, BEV) now lives
-/// here instead. Styled after the reference EV head-unit sidebar: a
-/// flat dark column, the active item gets a blue gradient "pill" behind
-/// its icon plus a thin blue accent bar on the rail's left edge.
+/// Berisi item navigasi reguler (Maps, Camera, Data, BEV, Settings) plus
+/// satu tombol khusus di bagian bawah untuk toggle Light/Dark mode.
+/// Default mode = Light (biru + putih); saat Dark aktif rail tetap gelap
+/// dengan aksen biru yang sama.
 class SideNavRail extends StatelessWidget {
   final List<SideNavItem> items;
   final String activeId;
@@ -38,38 +37,137 @@ class SideNavRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      decoration: const BoxDecoration(
-        // Same flat black-navy gradient already used elsewhere on the
-        // dashboard (left panel / collapsed panel) so the new rail
-        // reads as part of the same cockpit shell rather than a
-        // bolted-on strip.
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
-        ),
-        border: Border(right: BorderSide(color: Color(0xFF1E2430), width: 1.0)),
-      ),
-      child: SafeArea(
-        // REVISI: sebelumnya item numpuk di tengah dengan gap tetap
-        // (22px) — sekarang di-spread rata dari atas sampai bawah rail
-        // (spaceEvenly) dengan sedikit padding vertikal, supaya rail
-        // terasa "terisi" penuh dari atas ke bawah, bukan cuma nongkrong
-        // di tengah.
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              for (final item in items)
-                _RailButton(
-                  item: item,
-                  isActive: item.id == activeId,
-                  onTap: () => onSelect(item.id),
+    // ValueListenableBuilder memastikan rail rebuild setiap kali theme berubah,
+    // sehingga warna rail ikut menyesuaikan mode terang/gelap.
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, themeMode, _) {
+        final isDark = themeMode == ThemeMode.dark;
+
+        // Warna rail: gelap (hitam-navy) saat dark mode,
+        // biru tua + putih saat light mode.
+        final railTopColor = isDark
+            ? const Color(0xFF12161F)
+            : const Color(0xFF1565C0);
+        final railBottomColor = isDark
+            ? const Color(0xFF0A0D13)
+            : const Color(0xFF1976D2);
+        final railBorderColor = isDark
+            ? const Color(0xFF1E2430)
+            : const Color(0xFF1E88E5);
+
+        return Container(
+          width: width,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [railTopColor, railBottomColor],
+            ),
+            border: Border(
+              right: BorderSide(color: railBorderColor, width: 1.0),
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Item navigasi reguler
+                  for (final item in items)
+                    _RailButton(
+                      item: item,
+                      isActive: item.id == activeId,
+                      isDarkRail: isDark,
+                      onTap: () => onSelect(item.id),
+                    ),
+
+                  // Divider tipis sebelum tombol theme toggle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Divider(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.white.withValues(alpha: 0.3),
+                      thickness: 1,
+                    ),
+                  ),
+
+                  // Tombol toggle tema (Light ↔ Dark)
+                  _ThemeToggleButton(isDark: isDark),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Tombol toggle tema di bagian bawah rail.
+/// Ikon berubah: sun (terang → gelap) | moon (gelap → terang).
+class _ThemeToggleButton extends StatelessWidget {
+  final bool isDark;
+
+  const _ThemeToggleButton({required this.isDark});
+
+  void _toggle() {
+    appThemeMode.value = isDark ? ThemeMode.light : ThemeMode.dark;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded;
+    final label = isDark ? 'Mode Terang' : 'Mode Gelap';
+
+    // Warna aksen tombol disesuaikan dengan state saat ini:
+    // - di dark rail: ikon oranye-kuning (sun) dengan glow hangat
+    // - di light rail: ikon putih (moon) dengan glow biru muda
+    final iconColor = isDark ? const Color(0xFFFFC107) : Colors.white;
+    final glowColor = isDark
+        ? const Color(0xFFFFC107)
+        : AppColors.glassBlueGlow;
+    final bgColor = isDark
+        ? const Color(0xFFFFC107).withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.15);
+
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _toggle,
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: bgColor,
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  spreadRadius: -2,
                 ),
-            ],
+              ],
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, anim) =>
+                  RotationTransition(turns: anim, child: child),
+              child: Icon(
+                icon,
+                key: ValueKey(isDark),
+                size: 22,
+                color: iconColor,
+              ),
+            ),
           ),
         ),
       ),
@@ -80,33 +178,42 @@ class SideNavRail extends StatelessWidget {
 class _RailButton extends StatelessWidget {
   final SideNavItem item;
   final bool isActive;
+  final bool isDarkRail;
   final VoidCallback onTap;
 
   const _RailButton({
     required this.item,
     required this.isActive,
+    required this.isDarkRail,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Di light rail, ikon inaktif memakai putih agak transparan (senada
+    // dengan background biru tua rail), aktif pakai pill putih + ikon biru.
+    // Di dark rail, perilaku sama seperti sebelumnya (pill biru, ikon putih).
+    final inactiveIconColor = isDarkRail
+        ? Colors.white38
+        : Colors.white.withValues(alpha: 0.7);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Thin blue accent bar on the rail edge — only visible for the
-        // active item, mirroring the small selection indicator next to
-        // the highlighted icon in the reference sidebar.
+        // Thin accent bar on rail edge — visible only for active item.
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: 3,
           height: isActive ? 26 : 0,
           decoration: BoxDecoration(
-            color: AppColors.glassBlueBorder,
+            color: isDarkRail ? AppColors.glassBlueBorder : Colors.white,
             borderRadius: BorderRadius.circular(4),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: AppColors.glassBlueGlow.withValues(alpha: 0.7),
+                      color: isDarkRail
+                          ? AppColors.glassBlueGlow.withValues(alpha: 0.7)
+                          : Colors.white.withValues(alpha: 0.5),
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),
@@ -130,23 +237,33 @@ class _RailButton extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  // Active pill uses the app's blue accent as a gradient
-                  // (same family as AppColors.primary/glassBlueBorder),
-                  // matching the highlighted-tab look from the reference.
                   gradient: isActive
-                      ? const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF2BB0FF), Color(0xFF1565C0)],
-                        )
+                      ? (isDarkRail
+                            // Dark rail: pill biru seperti semula
+                            ? const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF2BB0FF), Color(0xFF1565C0)],
+                              )
+                            // Light rail: pill putih semi-transparan
+                            : LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.95),
+                                  Colors.white.withValues(alpha: 0.75),
+                                ],
+                              ))
                       : null,
                   color: isActive ? null : Colors.white.withValues(alpha: 0.05),
                   boxShadow: isActive
                       ? [
                           BoxShadow(
-                            color: AppColors.glassBlueGlow.withValues(
-                              alpha: 0.35,
-                            ),
+                            color: isDarkRail
+                                ? AppColors.glassBlueGlow.withValues(
+                                    alpha: 0.35,
+                                  )
+                                : Colors.black.withValues(alpha: 0.15),
                             blurRadius: 16,
                             spreadRadius: -2,
                           ),
@@ -156,7 +273,12 @@ class _RailButton extends StatelessWidget {
                 child: Icon(
                   item.icon,
                   size: 22,
-                  color: isActive ? Colors.white : Colors.white38,
+                  // Aktif di light rail: ikon biru (kontras dengan pill putih)
+                  // Aktif di dark rail: ikon putih (kontras dengan pill biru)
+                  // Inaktif: transparan sesuai masing-masing mode
+                  color: isActive
+                      ? (isDarkRail ? Colors.white : const Color(0xFF1565C0))
+                      : inactiveIconColor,
                 ),
               ),
             ),

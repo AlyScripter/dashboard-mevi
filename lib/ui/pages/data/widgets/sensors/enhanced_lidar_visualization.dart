@@ -71,19 +71,20 @@ class _EnhancedLidarVisualizationState
   double _zoomLevel = 1.0;
   Offset _panOffset = Offset.zero;
 
-  // Blue-black glass theme colors — swapped from the old light theme so
-  // the LiDAR card matches the rest of the cockpit dashboard. The point
-  // colors inside the radar itself (green/orange/red = safe/caution/near,
-  // and the intensity gradient) are left untouched in lidar_painters.dart
-  // since those carry actual sensor meaning and shouldn't be reskinned.
-  static const Color _primaryColor = AppColors.glassBlueBorder; // Neon blue
-  static const Color _accentColor = Color(0xFF34D399); // Emerald (scanning)
-  static const Color _surfaceColor = AppColors.glassSurfaceAlt; // Inner panel
-  static const Color _cardColor = AppColors.glassSurface; // Card/menu bg
+  // Dark-mode static colors (tetap dipakai di dark mode dan di dalam canvas)
+  static const Color _primaryColor = AppColors.glassBlueBorder;
+  static const Color _accentColor = Color(0xFF34D399);
+  static const Color _surfaceColor = AppColors.glassSurfaceAlt;
+  static const Color _cardColor = AppColors.glassSurface;
   static const Color _textPrimary = AppColors.glassTextPrimary;
   static const Color _textSecondary = AppColors.glassTextSecondary;
-  static const Color _borderColor = AppColors.glassBlueBorder; // Neon edge
-  static const Color _gridColor = Color(0xFF1E2633); // Subtle dark grid
+  static const Color _borderColor = AppColors.glassBlueBorder;
+  static const Color _gridColor = Color(0xFF1E2633);
+
+  // Light-mode nav rail colors
+  static const Color _navTop = Color(0xFF1565C0);
+  static const Color _navBottom = Color(0xFF1976D2);
+  static const Color _navBorder = Color(0xFF1E88E5);
 
   @override
   void initState() {
@@ -93,17 +94,34 @@ class _EnhancedLidarVisualizationState
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // REVISI: light mode → outer card biru nav, canvas polar tetap gelap
+    // agar warna sensor (hijau/oranye/merah) tetap terbaca. Dark → navy.
+    final outerGradient = isLight
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_navTop, _navBottom],
+          )
+        : null;
+    final outerColor = isLight ? null : _cardColor;
+    final outerBorder = isLight
+        ? _navBorder.withValues(alpha: 0.70)
+        : _borderColor.withValues(alpha: 0.35);
+    final outerShadow = isLight
+        ? _navTop.withValues(alpha: 0.30)
+        : Colors.black.withValues(alpha: 0.35);
+
     return Container(
       decoration: BoxDecoration(
-        color: _cardColor,
+        color: outerColor,
+        gradient: outerGradient,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _borderColor.withValues(alpha: 0.35),
-          width: 1,
-        ),
+        border: Border.all(color: outerBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: outerShadow,
             blurRadius: 20,
             offset: const Offset(0, 4),
             spreadRadius: 0,
@@ -115,33 +133,39 @@ class _EnhancedLidarVisualizationState
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: _buildVisualization(),
+              child: _buildVisualization(isLight),
             ),
           ),
-          _buildFooter(),
+          _buildFooter(isLight),
         ],
       ),
     );
   }
 
-  Widget _buildVisualization() {
+  Widget _buildVisualization(bool isLight) {
+    // REVISI: light mode → canvas putih agar titik lidar terlihat jelas;
+    // dark mode → gelap seperti sebelumnya.
     return Container(
       decoration: BoxDecoration(
-        color: _surfaceColor.withValues(alpha: 0.5),
+        color: isLight ? Colors.white : const Color(0xFF0D1117),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderColor.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: isLight
+              ? Colors.white.withValues(alpha: 0.20)
+              : _borderColor.withValues(alpha: 0.2),
+        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: _getVisualizationWidget(),
+        child: _getVisualizationWidget(isLight),
       ),
     );
   }
 
-  Widget _getVisualizationWidget() {
+  Widget _getVisualizationWidget(bool isLight) {
     switch (_currentMode) {
       case LidarVisualizationMode.polar:
-        return _buildPolarView();
+        return _buildPolarView(isLight);
       case LidarVisualizationMode.cartesian:
         return _buildCartesianView();
       case LidarVisualizationMode.range:
@@ -151,11 +175,11 @@ class _EnhancedLidarVisualizationState
       case LidarVisualizationMode.birdEye:
         return _buildBirdEyeView();
       case LidarVisualizationMode.lidar2D:
-        return _buildLidar2DView();
+        return _buildLidar2DView(isLight);
     }
   }
 
-  Widget _buildPolarView() {
+  Widget _buildPolarView(bool isLight) {
     return GestureDetector(
       onScaleStart: (details) {
         // Initialize scale/pan gesture
@@ -183,6 +207,8 @@ class _EnhancedLidarVisualizationState
           showIntensity: _showIntensity,
           zoomLevel: _zoomLevel,
           panOffset: _panOffset,
+          // REVISI: pass isLight ke painter untuk penyesuaian warna canvas
+          isLight: isLight,
         ),
         size: Size.infinite,
       ),
@@ -403,13 +429,10 @@ class _EnhancedLidarVisualizationState
     );
   }
 
-  Widget _buildLidar2DView() {
-    // Near-black chart background, matching the reference Python
-    // single-scan radar plot and the rest of the dark cockpit dashboard
-    // (Lidar2DScanPainter also paints this same tone as its canvas
-    // background, this just avoids a flash before the first paint).
+  Widget _buildLidar2DView(bool isLight) {
+    // REVISI: light mode → canvas putih agar titik & grid terbaca; dark → hitam
     return Container(
-      color: const Color(0xFF0A0D13),
+      color: isLight ? Colors.white : const Color(0xFF0A0D13),
       padding: const EdgeInsets.all(4),
       child: CustomPaint(
         painter: Lidar2DScanPainter(
@@ -418,29 +441,34 @@ class _EnhancedLidarVisualizationState
           angleIncrement: widget.lidar2DAngleIncrement,
           rangeMin: widget.lidar2DRangeMin,
           rangeMax: widget.lidar2DRangeMax,
-          // Zoomed display window, independent of the sensor's actual
-          // rangeMax (which can be 30m from the real Hokuyo/rosbag data
-          // — see widget.lidar2DRangeMax) — keeps the plot at a fixed,
-          // readable 20x20m like the reference video regardless of what
-          // the live scan reports as its physical spec.
           viewRangeMeters: 20.0,
           title: 'MEVI - Single LiDAR Scan',
+          isLight: isLight,
         ),
         size: Size.infinite,
       ),
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(bool isLight) {
+    // REVISI: footer light mode → biru sedikit lebih gelap dari outer card
+    // agar ada pemisah visual antara canvas dan footer. Teks & icon putih.
+    final footerColor = isLight ? const Color(0xFF1254A8) : _surfaceColor;
+    final footerBorderTop = isLight
+        ? Colors.white.withValues(alpha: 0.20)
+        : _gridColor;
+    final statTextPrimary = isLight ? Colors.white : _textPrimary;
+    final statTextSecondary = isLight ? Colors.white70 : _textSecondary;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: _surfaceColor,
+        color: footerColor,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
-        border: Border(top: BorderSide(color: _gridColor, width: 1)),
+        border: Border(top: BorderSide(color: footerBorderTop, width: 1)),
       ),
       child: Row(
         children: [
@@ -452,25 +480,32 @@ class _EnhancedLidarVisualizationState
                   '${_currentMode == LidarVisualizationMode.lidar2D ? widget.lidar2DRanges.length : widget.ranges.length}',
                   _accentColor,
                   Icons.scatter_plot_rounded,
+                  statTextPrimary,
+                  statTextSecondary,
                 ),
                 const SizedBox(width: 12),
                 _buildStatItem(
                   'Max Range',
                   '${(_currentMode == LidarVisualizationMode.lidar2D ? widget.lidar2DRangeMax : widget.rangeMax).toStringAsFixed(1)}m',
-                  _primaryColor,
+                  isLight ? Colors.white : _primaryColor,
                   Icons.straighten_rounded,
+                  statTextPrimary,
+                  statTextSecondary,
                 ),
               ],
             ),
           ),
-          _buildModeSelector(),
+          _buildModeSelector(isLight),
           const SizedBox(width: 12),
+          // SCANNING badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _accentColor.withValues(alpha: 0.1),
+              color: _accentColor.withValues(alpha: isLight ? 0.20 : 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _accentColor.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: _accentColor.withValues(alpha: isLight ? 0.40 : 0.2),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -506,13 +541,15 @@ class _EnhancedLidarVisualizationState
     String value,
     Color color,
     IconData icon,
+    Color textPrimary,
+    Color textSecondary,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -525,7 +562,7 @@ class _EnhancedLidarVisualizationState
               Text(
                 value,
                 style: TextStyle(
-                  color: _textPrimary,
+                  color: textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -533,7 +570,7 @@ class _EnhancedLidarVisualizationState
               Text(
                 label,
                 style: TextStyle(
-                  color: _textSecondary,
+                  color: textSecondary,
                   fontSize: 10,
                   fontWeight: FontWeight.w400,
                 ),
@@ -576,27 +613,40 @@ class _EnhancedLidarVisualizationState
         _primaryColor;
   }
 
-  Widget _buildModeSelector() {
+  Widget _buildModeSelector(bool isLight) {
+    // REVISI: light mode → selector pill putih transparan (contrast on blue),
+    // popup menu biru nav. Dark mode → navy gelap.
+    final selectorBg = isLight
+        ? Colors.white.withValues(alpha: 0.18)
+        : _primaryColor.withValues(alpha: 0.1);
+    final selectorBorder = isLight
+        ? Colors.white.withValues(alpha: 0.40)
+        : _primaryColor.withValues(alpha: 0.2);
+    final selectorTextClr = isLight ? Colors.white : _primaryColor;
+    final popupBg = isLight ? const Color(0xFF1565C0) : _cardColor;
+    final popupTextSelected = isLight ? Colors.white : _primaryColor;
+    final popupTextNormal = isLight ? Colors.white70 : _textPrimary;
+
     return PopupMenuButton<LidarVisualizationMode>(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: _cardColor,
+      color: popupBg,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: _primaryColor.withValues(alpha: 0.1),
+          color: selectorBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+          border: Border.all(color: selectorBorder),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_getModeIcon(_currentMode), color: _primaryColor, size: 14),
+            Icon(_getModeIcon(_currentMode), color: selectorTextClr, size: 14),
             const SizedBox(width: 6),
             Text(
               _getModeDisplayName(_currentMode),
               style: TextStyle(
-                color: _primaryColor,
+                color: selectorTextClr,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -604,7 +654,7 @@ class _EnhancedLidarVisualizationState
             const SizedBox(width: 4),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: _primaryColor,
+              color: selectorTextClr,
               size: 16,
             ),
           ],
@@ -620,31 +670,49 @@ class _EnhancedLidarVisualizationState
           LidarVisualizationMode.polar,
           Icons.radio_button_checked_rounded,
           'Polar View',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
         _buildMenuItem(
           LidarVisualizationMode.cartesian,
           Icons.grid_on_rounded,
           'Cartesian',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
         _buildMenuItem(
           LidarVisualizationMode.range,
           Icons.show_chart_rounded,
           'Range Chart',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
         _buildMenuItem(
           LidarVisualizationMode.heatmap,
           Icons.gradient_rounded,
           'Heatmap',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
         _buildMenuItem(
           LidarVisualizationMode.birdEye,
           Icons.visibility_rounded,
           'Bird\'s Eye',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
         _buildMenuItem(
           LidarVisualizationMode.lidar2D,
           Icons.explore_rounded,
           '2D LiDAR',
+          isLight,
+          popupTextSelected,
+          popupTextNormal,
         ),
       ],
     );
@@ -688,8 +756,21 @@ class _EnhancedLidarVisualizationState
     LidarVisualizationMode mode,
     IconData icon,
     String label,
+    bool isLight,
+    Color textSelected,
+    Color textNormal,
   ) {
     final isSelected = _currentMode == mode;
+    // icon accent: tetap neon blue di dark, putih di light saat selected
+    final iconAccent = isLight
+        ? (isSelected ? Colors.white : Colors.white60)
+        : (isSelected ? _primaryColor : _textSecondary);
+    final iconBg = isSelected
+        ? (isLight
+              ? Colors.white.withValues(alpha: 0.20)
+              : _primaryColor.withValues(alpha: 0.10))
+        : Colors.transparent;
+
     return PopupMenuItem(
       value: mode,
       child: Container(
@@ -699,22 +780,16 @@ class _EnhancedLidarVisualizationState
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? _primaryColor.withValues(alpha: 0.1)
-                    : Colors.transparent,
+                color: iconBg,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                size: 16,
-                color: isSelected ? _primaryColor : _textSecondary,
-              ),
+              child: Icon(icon, size: 16, color: iconAccent),
             ),
             const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? _primaryColor : _textPrimary,
+                color: isSelected ? textSelected : textNormal,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 fontSize: 13,
               ),
@@ -724,10 +799,14 @@ class _EnhancedLidarVisualizationState
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: _primaryColor,
+                  color: isLight ? Colors.white : _primaryColor,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, size: 10, color: Colors.white),
+                child: Icon(
+                  Icons.check,
+                  size: 10,
+                  color: isLight ? const Color(0xFF1565C0) : Colors.white,
+                ),
               ),
             ],
           ],

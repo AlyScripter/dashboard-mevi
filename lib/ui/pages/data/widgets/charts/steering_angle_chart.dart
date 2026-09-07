@@ -37,19 +37,51 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    // REVISI: light mode → kartu putih bersih dengan border/shadow tipis,
+    // garis chart & label dibuat lebih gelap/pekat supaya tetap kontras
+    // di atas background putih. Dark mode tetap navy glass seperti semula.
+    final cardBg = isLight ? Colors.white : AppColors.glassSurface;
+    final cardBorderClr = isLight
+        ? const Color(0xFFDDE3EC)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.35);
+    final cardShadowClr = isLight
+        ? Colors.black.withValues(alpha: 0.06)
+        : AppColors.glassBlueGlow.withValues(alpha: 0.08);
+    final headerIconClr = isLight
+        ? const Color(0xFF1565C0)
+        : AppColors.glassBlueBorder;
+    final titleClr = isLight
+        ? const Color(0xFF1A2331)
+        : AppColors.glassTextPrimary;
+    final gridLineClr = isLight
+        ? const Color(0xFFE3E7EE)
+        : AppColors.glassDivider;
+    final axisTextClr = isLight
+        ? const Color(0xFF5B6472)
+        : AppColors.glassTextSecondary;
+    final lineClr = isLight
+        ? const Color(0xFF1565C0)
+        : AppColors.glassBlueBorder;
+    final tooltipBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
+    final tooltipTextClr = isLight
+        ? const Color(0xFF1A2331)
+        : AppColors.glassTextPrimary;
+    final waitingTextClr = isLight
+        ? const Color(0xFF5B6472)
+        : AppColors.glassTextSecondary;
+
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.glassSurface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.glassBlueBorder.withValues(alpha: 0.35),
-          width: 1,
-        ),
+        border: Border.all(color: cardBorderClr, width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.glassBlueGlow.withValues(alpha: 0.08),
+            color: cardShadowClr,
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -60,18 +92,14 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.turn_right,
-                color: AppColors.glassBlueBorder,
-                size: 20,
-              ),
+              Icon(Icons.turn_right, color: headerIconClr, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Steering Angle',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.glassTextPrimary,
+                  color: titleClr,
                 ),
               ),
               const Spacer(),
@@ -117,10 +145,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                         drawVerticalLine: false,
                         horizontalInterval: 10,
                         getDrawingHorizontalLine: (value) {
-                          return FlLine(
-                            color: AppColors.glassDivider,
-                            strokeWidth: 1,
-                          );
+                          return FlLine(color: gridLineClr, strokeWidth: 1);
                         },
                       ),
                       titlesData: FlTitlesData(
@@ -134,7 +159,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                                 '${value.toInt()}°',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: AppColors.glassTextSecondary,
+                                  color: axisTextClr,
                                 ),
                               );
                             },
@@ -152,10 +177,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                       ),
                       borderData: FlBorderData(
                         show: true,
-                        border: Border.all(
-                          color: AppColors.glassDivider,
-                          width: 1,
-                        ),
+                        border: Border.all(color: gridLineClr, width: 1),
                       ),
                       minX: 0,
                       maxX: (_maxDataPoints - 1).toDouble(),
@@ -174,29 +196,26 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                               )
                               .toList(),
                           isCurved: true,
-                          color: AppColors.glassBlueBorder,
+                          color: lineClr,
                           barWidth: 3,
                           isStrokeCapRound: true,
                           dotData: FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: AppColors.glassBlueBorder.withValues(
-                              alpha: 0.12,
-                            ),
+                            color: lineClr.withValues(alpha: 0.12),
                           ),
                         ),
                       ],
                       lineTouchData: LineTouchData(
                         enabled: true,
                         touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (touchedSpot) =>
-                              AppColors.glassSurfaceAlt,
+                          getTooltipColor: (touchedSpot) => tooltipBg,
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((LineBarSpot touchedSpot) {
                               return LineTooltipItem(
                                 '${touchedSpot.y.toStringAsFixed(1)}°',
                                 TextStyle(
-                                  color: AppColors.glassTextPrimary,
+                                  color: tooltipTextClr,
                                   fontWeight: FontWeight.bold,
                                 ),
                               );
@@ -209,10 +228,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
                 : Center(
                     child: Text(
                       'Waiting for steering data...',
-                      style: TextStyle(
-                        color: AppColors.glassTextSecondary,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: waitingTextClr, fontSize: 14),
                     ),
                   ),
           ),

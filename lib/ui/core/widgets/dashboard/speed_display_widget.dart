@@ -11,6 +11,14 @@ class SpeedDisplayWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // REVISI: light mode → angka & label speedometer jadi gelap (bukan
+    // putih) supaya kebaca di atas background putih halaman BEV.
+    final numberClr = isLight ? const Color(0xFF1A2331) : Colors.white;
+    final labelClr = isLight
+        ? const Color(0xFF1A2331).withValues(alpha: 0.55)
+        : Colors.white.withValues(alpha: 0.55);
+
     return StreamBuilder<double>(
       stream: RosService().speedometerRosStream,
       builder: (context, snapshot) {
@@ -26,7 +34,10 @@ class SpeedDisplayWidget extends StatelessWidget {
                 width: 150,
                 height: 92,
                 child: CustomPaint(
-                  painter: _ArcGaugePainter(progress: progress),
+                  painter: _ArcGaugePainter(
+                    progress: progress,
+                    isLight: isLight,
+                  ),
                 ),
               ),
               Padding(
@@ -36,10 +47,10 @@ class SpeedDisplayWidget extends StatelessWidget {
                   children: [
                     Text(
                       speed.toInt().toString(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: numberClr,
                         height: 1,
                       ),
                     ),
@@ -49,7 +60,7 @@ class SpeedDisplayWidget extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.55),
+                        color: labelClr,
                         letterSpacing: 0.4,
                       ),
                     ),
@@ -66,7 +77,8 @@ class SpeedDisplayWidget extends StatelessWidget {
 
 class _ArcGaugePainter extends CustomPainter {
   final double progress;
-  const _ArcGaugePainter({required this.progress});
+  final bool isLight;
+  const _ArcGaugePainter({required this.progress, required this.isLight});
 
   static const double _startAngle = 3.4; // ~195deg, in radians
   static const double _sweepAngle = 2.6; // ~150deg
@@ -81,7 +93,9 @@ class _ArcGaugePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.10);
+      ..color = isLight
+          ? const Color(0xFF1A2331).withValues(alpha: 0.08)
+          : Colors.white.withValues(alpha: 0.10);
     canvas.drawArc(arcRect, _startAngle, _sweepAngle, false, trackPaint);
 
     final progressPaint = Paint()
@@ -120,5 +134,5 @@ class _ArcGaugePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArcGaugePainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress || oldDelegate.isLight != isLight;
 }

@@ -82,6 +82,7 @@ class TopDownBevWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tilt = (steeringAngle / 35.0).clamp(-1.0, 1.0);
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -115,6 +116,7 @@ class TopDownBevWidget extends StatelessWidget {
                   laneHalfWidthPx: laneHalfWidthPx,
                   carHeight: carHeight,
                   road: roadGeometry,
+                  isLight: isLight,
                 ),
               ),
             ),
@@ -278,11 +280,13 @@ class _TopDownRoadPainter extends CustomPainter {
   final double laneHalfWidthPx;
   final double carHeight;
   final _RoadGeometry? road;
+  final bool isLight;
 
   const _TopDownRoadPainter({
     required this.laneHalfWidthPx,
     required this.carHeight,
     required this.road,
+    required this.isLight,
   });
 
   @override
@@ -298,7 +302,7 @@ class _TopDownRoadPainter extends CustomPainter {
       ..shader =
           RadialGradient(
             colors: [
-              const Color(0xFF2196F3).withValues(alpha: 0.28),
+              const Color(0xFF2196F3).withValues(alpha: isLight ? 0.16 : 0.28),
               const Color(0xFF2196F3).withValues(alpha: 0.0),
             ],
           ).createShader(
@@ -310,13 +314,17 @@ class _TopDownRoadPainter extends CustomPainter {
     final ringPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
-      ..color = const Color(0xFF64B5F6).withValues(alpha: 0.55);
+      ..color = const Color(0xFF1E88E5).withValues(alpha: isLight ? 0.6 : 0.55);
     canvas.drawCircle(center, ringRadius, ringPaint);
 
+    // REVISI: light mode → garis batas lane pakai warna gelap (bukan
+    // putih transparan) supaya tetap terlihat di atas background putih.
     final solidPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
-      ..color = Colors.white.withValues(alpha: 0.22)
+      ..color = isLight
+          ? const Color(0xFF1A2331).withValues(alpha: 0.28)
+          : Colors.white.withValues(alpha: 0.22)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 

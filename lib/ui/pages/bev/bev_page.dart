@@ -52,8 +52,15 @@ class _BevPageState extends State<BevPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // REVISI: light mode → background halaman jadi putih (bukan hitam
+    // pekat), dan widget speedometer/baterai/gear di dalamnya
+    // menyesuaikan warna teks & elemen supaya tetap kontras di atas
+    // putih. Dark mode tidak berubah.
+    final pageBg = isLight ? Colors.white : Colors.black;
+
     return Container(
-      color: Colors.black,
+      color: pageBg,
       child: Stack(
         children: [
           // 1. Full-bleed 2D top-down BEV scene (lanes + detection ring
