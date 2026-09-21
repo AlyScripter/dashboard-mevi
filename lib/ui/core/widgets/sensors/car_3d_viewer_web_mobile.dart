@@ -21,30 +21,9 @@ import 'car_3d_constants.dart';
 /// car_3d_viewer_desktop.dart instead, which uses flutter_cube (pure
 /// Dart, no WebView) on the OBJ export of the same model.
 ///
-/// Even if you register `webview_flutter_windows` yourself, this still
-/// won't work: WebView2 is Chromium-based, and Chromium's `fetch()` (which
-/// <model-viewer> uses internally to download the .glb) refuses to load
-/// `file://` URLs — "Fetch API cannot load file:///...: URL scheme 'file'
-/// is not supported." That's a browser-level restriction, not something
-/// this app can configure around. It's *why* the desktop build was
-/// spinning forever instead of erroring: the WebView had nothing to
-/// legitimately fail on since the request never went anywhere.
-///
-/// SETUP STEP (do this once, outside this file), inside <head> of
-/// web/index.html:
-///
-///   <script type="module"
-///     src="./assets/packages/model_viewer_plus/assets/model-viewer.min.js"
-///     defer></script>
-///
-/// Why two different `src` strategies below:
-/// - Web: Flutter serves the asset bundle over its own HTTP server, so a
-///   relative "assets/assets/3d/car_model.glb" URL just works.
-/// - Mobile (Android/iOS): there is no such HTTP server either, so we copy
-///   the bundled .glb out to a real temp file once and point ModelViewer
-///   at it via a file:// URI — this works fine on Android/iOS because
-///   webview_flutter_android / webview_flutter_wkwebview both special-case
-///   local file access for their WebView, unlike WebView2 on Windows.
+/// REVISI (BEV/SDC top-down car overlay): added optional [cameraOrbit],
+/// forwarded directly to `ModelViewer.cameraOrbit` (the package already
+/// supports this natively). Null = unchanged previous behavior.
 class Car3DViewerWebMobile extends StatefulWidget {
   final double speed;
   final double steeringAngle;
@@ -54,12 +33,17 @@ class Car3DViewerWebMobile extends StatefulWidget {
   final double? height;
   final double? width;
 
+  /// model-viewer camera-orbit string, e.g. `"0deg 15deg 105%"`. Null =
+  /// model-viewer's own default auto-framed view (previous behavior).
+  final String? cameraOrbit;
+
   const Car3DViewerWebMobile({
     super.key,
     required this.speed,
     required this.steeringAngle,
     this.height,
     this.width,
+    this.cameraOrbit,
   });
 
   @override
@@ -158,6 +142,7 @@ class _Car3DViewerWebMobileState extends State<Car3DViewerWebMobile> {
         cameraControls: false,
         disableZoom: true,
         orientation: orientation,
+        cameraOrbit: widget.cameraOrbit,
         backgroundColor: Colors.transparent,
       ),
     );

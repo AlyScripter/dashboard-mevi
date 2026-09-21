@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:webview_windows/webview_windows.dart';
@@ -10,6 +12,22 @@ import 'car_3d_constants.dart';
 /// the full explanation of the file:// and same-origin/CORS problems this
 /// works around — both are solved on the server side; this file just
 /// drives the WebView2 controller.
+///
+/// REVISI (BEV/SDC top-down car overlay): added optional [cameraOrbit],
+/// passed through to the served viewer page as a new `?orbit=` query
+/// param (alongside the existing `?glb=`/`?ori=`) — see
+/// `local_asset_server_service.dart`'s `buildViewerHtml()` for where it's
+/// read and applied as `<model-viewer camera-orbit="...">`. Left null
+/// (every existing call site), the URL simply omits `orbit` and the page
+/// behaves exactly as before (model-viewer's own auto-framed default
+/// view) — this is a pure addition, nothing existing changes behavior.
+///
+/// REVISI ke-2 (BEV/SDC — hemat memori): added optional
+/// [captureSnapshot] / [onSnapshot]. Kalau [captureSnapshot] true, halaman
+/// viewer memotret model 3D-nya sekali (PNG transparan) dan hasilnya
+/// dikirim balik lewat [onSnapshot]; pemanggil boleh lalu membuang widget
+/// ini (=> WebView2 dibebaskan) dan menampilkan gambarnya saja. Default
+/// false -> perilaku lama, tidak ada yang berubah untuk call site lain.
 class Car3DViewerWindows extends StatefulWidget {
   final double speed;
   final double steeringAngle;
@@ -19,12 +37,28 @@ class Car3DViewerWindows extends StatefulWidget {
   final double? height;
   final double? width;
 
+  /// model-viewer camera-orbit string, e.g. `"0deg 15deg 105%"`
+  /// (azimuth, polar angle from top, radius). Null = model-viewer's own
+  /// default auto-framed view (previous behavior).
+  final String? cameraOrbit;
+
+  /// Minta viewer memotret modelnya sekali dan mengirim PNG-nya ke
+  /// [onSnapshot]. Lihat catatan class di atas.
+  final bool captureSnapshot;
+
+  /// Dipanggil paling banyak sekali dengan bytes PNG (latar transparan).
+  /// TIDAK dipanggil kalau snapshot gagal / latarnya ternyata opak.
+  final ValueChanged<Uint8List>? onSnapshot;
+
   const Car3DViewerWindows({
     super.key,
     required this.speed,
     required this.steeringAngle,
     this.height,
     this.width,
+    this.cameraOrbit,
+    this.captureSnapshot = false,
+    this.onSnapshot,
   });
 
   @override
@@ -49,6 +83,7 @@ class _Car3DViewerWindowsState extends State<Car3DViewerWindows> {
   StreamSubscription<dynamic>? _webMessageSub;
 
   bool _ready = false;
+  bool _snapshotDelivered = false;
   String? _error;
   String _stage = 'starting';
 
@@ -95,14 +130,17 @@ class _Car3DViewerWindowsState extends State<Car3DViewerWindows> {
       await _controller.setBackgroundColor(Colors.transparent);
 
       _setStage('listening for in-page diagnostics');
-      _webMessageSub = _controller.webMessage.listen((event) {
-        debugPrint('Car3DViewerWindows: webMessage: $event');
-      });
+      _webMessageSub = _controller.webMessage.listen(_onWebMessage);
 
       _setStage('loading viewer page');
       final url = Uri.parse('$baseUrl${LocalAssetServerService.viewerPath}')
           .replace(
-            queryParameters: {'glb': '/$_glbAssetPath', 'ori': _orientation},
+            queryParameters: {
+              'glb': '/$_glbAssetPath',
+              'ori': _orientation,
+              if (widget.cameraOrbit != null) 'orbit': widget.cameraOrbit!,
+              if (widget.captureSnapshot) 'snap': '1',
+            },
           )
           .toString();
       debugPrint('Car3DViewerWindows: loading $url');
@@ -117,6 +155,45 @@ class _Car3DViewerWindowsState extends State<Car3DViewerWindows> {
       if (!mounted) return;
       setState(() => _error = '[$_stage] $e');
     }
+  }
+
+  /// Pesan dari halaman viewer. Bisa datang sebagai Map atau sebagai String
+  /// JSON (bergantung versi webview_windows), jadi di-decode defensif.
+  void _onWebMessage(dynamic event) {
+    Map<String, dynamic>? msg;
+    dynamic v = event;
+    for (int i = 0; i < 3 && v is String; i++) {
+      try {
+        v = jsonDecode(v);
+      } catch (_) {
+        break;
+      }
+    }
+    if (v is Map) msg = Map<String, dynamic>.from(v);
+
+    if (msg != null && msg['type'] == 'snapshot') {
+      final b64 = msg['png'];
+      if (b64 is String && !_snapshotDelivered && widget.onSnapshot != null) {
+        try {
+          final bytes = base64Decode(b64);
+          _snapshotDelivered = true;
+          debugPrint(
+            'Car3DViewerWindows: snapshot diterima (${bytes.length} bytes)',
+          );
+          widget.onSnapshot!(bytes);
+        } catch (e) {
+          debugPrint('Car3DViewerWindows: snapshot rusak: $e');
+        }
+      }
+      return;
+    }
+
+    // Jangan cetak payload penuh (PNG base64 bisa ratusan KB).
+    final text = '$event';
+    debugPrint(
+      'Car3DViewerWindows: webMessage: '
+      '${text.length > 240 ? '${text.substring(0, 240)}…' : text}',
+    );
   }
 
   @override
@@ -158,22 +235,46 @@ class _Car3DViewerWindowsState extends State<Car3DViewerWindows> {
     }
 
     if (!_ready) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+      // REVISI: sebelumnya Column ini (spinner + label status) dipasang
+      // fix, tanpa peduli seberapa kecil widget ini di-render -- di
+      // overlay BEV (bisa sekecil ~28px, lihat clamp() di
+      // bev_point_cloud_view.dart) Column 24px-spinner + 8px-jarak +
+      // teks jelas kepanjangan, muncul sebagai pita kuning-hitam
+      // "BOTTOM OVERFLOWED BY N PIXELS" milik Flutter sendiri (bukan
+      // error kita, itu cuma peringatan layout mode debug). Sekarang pakai
+      // LayoutBuilder: kalau tingginya cukup, tampilkan spinner + label
+      // seperti biasa; kalau terlalu sempit, cuma spinner kecil tanpa
+      // label sama sekali -- gak ada lagi yang bisa overflow.
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxHeight < 64;
+          if (compact) {
+            return Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          }
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _stage,
+                  style: const TextStyle(color: Colors.white54, fontSize: 10),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              _stage,
-              style: const TextStyle(color: Colors.white54, fontSize: 10),
-            ),
-          ],
-        ),
+          );
+        },
       );
     }
 

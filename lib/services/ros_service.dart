@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:math' as math;
+import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
@@ -146,6 +147,21 @@ class RosService {
   final StreamController<Map<String, dynamic>> _tripStatusController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // BEV payload stream (Fase 5 — node Python republish ke /bev/frame).
+  // Tahap 6a: proof-of-concept, cuma decode JSON + hitung titik & objek.
+  final StreamController<Map<String, dynamic>> _bevFrameController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  // Peta warna kelas (Fase 6 — node Python publish SEKALI ke
+  // /bev/class_color_map, isinya class_id -> {name, color}). Dicache di
+  // sini (bukan cuma di-stream) supaya widget yang baru mount SETELAH
+  // pesan itu lewat tetap bisa langsung dapat warnanya lewat getter
+  // [bevClassColorMap], gak perlu nunggu publish berikutnya (yang memang
+  // cuma dikirim sekali oleh node streaming-nya).
+  final StreamController<Map<int, Color>> _bevClassColorMapController =
+      StreamController<Map<int, Color>>.broadcast();
+  Map<int, Color>? _bevClassColorMapCache;
+
   // Public streams
   Stream<double> get speedometerStream => _speedometerController.stream;
   Stream<double> get speedometerRosStream => _speedometerRosController.stream;
@@ -185,6 +201,17 @@ class RosService {
       _navigationStatusController.stream;
   Stream<Map<String, dynamic>> get tripStatusStream =>
       _tripStatusController.stream;
+
+  // BEV payload stream — Tahap 6a proof-of-concept (Camera page > BEV/SDC)
+  Stream<Map<String, dynamic>> get bevFrameStream => _bevFrameController.stream;
+
+  // BEV class color map — Fase 6 (Camera page > BEV/SDC, render titik).
+  // Stream buat yang mau reaktif kalau map-nya berubah (jarang, cuma
+  // sekali per koneksi), dan getter sync buat widget yang butuh nilai
+  // TERAKHIR yang sudah diterima saat ini juga (mis. pas build pertama).
+  Stream<Map<int, Color>> get bevClassColorMapStream =>
+      _bevClassColorMapController.stream;
+  Map<int, Color>? get bevClassColorMap => _bevClassColorMapCache;
 
   // Get number of subscribed topics
   int get subscribedTopicsCount {
@@ -836,6 +863,18 @@ class RosService {
 
       // Velodyne 3D Lidar (PointCloud2)
       {'topic': '/velodyne_points', 'type': 'sensor_msgs/PointCloud2'},
+
+      // BEV payload dari node Python (Fase 5) — proof-of-concept Tahap 6a.
+      // Asumsi: dipublish sebagai std_msgs/String berisi JSON (sama pola
+      // dengan /waypoints_array, /trip_data, /navigation_status di bawah).
+      // Sesuaikan 'type' di sini kalau node Python-nya pakai msg type lain.
+      {'topic': '/bev/frame', 'type': 'std_msgs/String'},
+      // Peta warna kelas (Fase 6) — dipublish SEKALI oleh node streaming
+      // pas dia nyala, bukan per-frame. Tetap disubscribe terus (bukan
+      // sekali fetch) karena kalau Flutter start duluan sebelum node
+      // Python jalan, publish pertama itu akan lewat kalau kita belum
+      // subscribe dari awal.
+      {'topic': '/bev/class_color_map', 'type': 'std_msgs/String'},
     ];
 
     for (final t in topics) {
@@ -1041,6 +1080,12 @@ class RosService {
       case '/trip_status':
         _handleTripStatusData(msg);
         break;
+      case '/bev/frame':
+        _handleBevFrameData(msg);
+        break;
+      case '/bev/class_color_map':
+        _handleBevClassColorMapData(msg);
+        break;
       default:
         if (kDebugMode) _log('🔍 Unknown topic: $topic', level: 'DEBUG');
     }
@@ -1082,6 +1127,93 @@ class RosService {
     } catch (e) {
       _log('❌ Error parsing trip status: $e', level: 'ERROR');
     }
+  }
+
+  // BEV frame handler dari node Python payload builder (Fase 5/6).
+  // Skema payload Fase 5: points = {x:[], y:[], z:[], class_id:[]} (4
+  // array sejajar, BUKAN lagi 1 array "points_xyz" berisi list [x,y,z]
+  // per titik), plus meta.num_points/num_objects. Widget rendering
+  // (BevPointCloudView, Tahap 6b) baca langsung dari 'raw' di bawah;
+  // di sini cuma perlu hitung ringkasannya dengan benar.
+  void _handleBevFrameData(Map<String, dynamic> msg) {
+    try {
+      final dataStr = msg['data'] as String?;
+      if (dataStr == null || dataStr.isEmpty) return;
+
+      final frame = jsonDecode(dataStr) as Map<String, dynamic>;
+
+      final frameIdx =
+          frame['idx'] ??
+          frame['frame_idx'] ??
+          frame['frameIdx'] ??
+          frame['index'];
+      final t = frame['t'] ?? frame['timestamp'] ?? frame['stamp'];
+
+      final pts =
+          frame['pts']; // [[x,y,z,class_id], ...] -- skema Fase 5 yang benar
+      final obj = frame['obj']; // BUKAN "objects"
+      final wp = frame['wp']; // waypoint ego-frame -- BARU, dari Fase 1b
+
+      final pointCount = pts is List ? pts.length : 0;
+      final objectCount = obj is List ? obj.length : 0;
+      final waypointCount = wp is List ? wp.length : 0;
+
+      if (kDebugMode) {
+        _log(
+          '📦 [BEV] idx=$frameIdx t=$t titik=$pointCount objek=$objectCount wp=$waypointCount',
+          level: 'INFO',
+        );
+      }
+
+      _safeAdd<Map<String, dynamic>>(_bevFrameController, {
+        'frame_idx': frameIdx,
+        't': t,
+        'point_count': pointCount,
+        'object_count': objectCount,
+        'raw': frame,
+      });
+    } catch (e) {
+      _log('❌ Error parsing /bev/frame: $e', level: 'ERROR');
+    }
+  }
+
+  // Handler class_color_map (Fase 6) — dipublish SEKALI oleh node
+  // streaming Python, isinya {"0": {"name": "...", "color": "#rrggbb"},
+  // ...}. Dicache ke _bevClassColorMapCache + disiarkan lewat stream,
+  // supaya BevPointCloudView bisa mewarnai titik SESUAI class_id-nya,
+  // bukan pakai warna hasil tebak-tebakan di sisi Dart.
+  void _handleBevClassColorMapData(Map<String, dynamic> msg) {
+    try {
+      final dataStr = msg['data'] as String?;
+      if (dataStr == null || dataStr.isEmpty) return;
+
+      final decoded = jsonDecode(dataStr) as Map<String, dynamic>;
+      final colorMap = <int, Color>{};
+      decoded.forEach((key, value) {
+        final classId = int.tryParse(key);
+        final hex = (value as Map<String, dynamic>)['color'] as String?;
+        if (classId != null && hex != null) {
+          colorMap[classId] = _hexToColor(hex);
+        }
+      });
+
+      _bevClassColorMapCache = colorMap;
+      _safeAdd<Map<int, Color>>(_bevClassColorMapController, colorMap);
+
+      if (kDebugMode) {
+        _log('🎨 [BEV] class_color_map diterima: $colorMap', level: 'INFO');
+      }
+    } catch (e) {
+      _log('❌ Error parsing /bev/class_color_map: $e', level: 'ERROR');
+    }
+  }
+
+  // "#rrggbb" atau "#aarrggbb" -> Color. Dipisah jadi helper kecil karena
+  // dipakai cuma di sini, gak perlu package tambahan (mis. hex_color).
+  Color _hexToColor(String hex) {
+    var value = hex.replaceFirst('#', '');
+    if (value.length == 6) value = 'FF$value'; // tanpa alpha -> anggap opaque
+    return Color(int.parse(value, radix: 16));
   }
 
   // Enhanced GPS handler - simplified since we use /velocity for speed
@@ -1817,6 +1949,8 @@ class RosService {
     await _witmotionYawController.close();
     await _witmotionAccelerationController.close();
     await _witmotionAngularVelocityController.close();
+    await _bevFrameController.close();
+    await _bevClassColorMapController.close();
 
     _isConnected = false;
     _log('🛑 RosService disposed', level: 'INFO');

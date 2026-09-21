@@ -44,6 +44,36 @@ class _DataSourceSectionState extends State<DataSourceSection> {
   // Connection status - listen to ROS service directly
   bool _isConnected = false;
 
+  // REVISI: style light mode untuk halaman Settings — background biru,
+  // kartu putih, teks/elemen di dalamnya menyesuaikan supaya tetap
+  // kontras. `_isLight` di-set ulang tiap `build()`, getter-getter di
+  // bawah dipakai menggantikan `AppColors.glass*` di seluruh file ini
+  // supaya tidak perlu mengubah setiap widget satu per satu.
+  bool _isLight = false;
+
+  Color get _textPrimary =>
+      _isLight ? const Color(0xFF1A2331) : AppColors.glassTextPrimary;
+  Color get _textSecondary =>
+      _isLight ? const Color(0xFF5B6472) : AppColors.glassTextSecondary;
+  Color get _surfaceAlt =>
+      _isLight ? const Color(0xFFF5F7FA) : AppColors.glassSurfaceAlt;
+  Color get _dividerClr =>
+      _isLight ? const Color(0xFFE3E7EE) : AppColors.glassDivider;
+  Color get _accentBlue =>
+      _isLight ? const Color(0xFF1565C0) : AppColors.glassBlueBorder;
+  Color get _inputBg =>
+      _isLight ? const Color(0xFFF5F7FA) : AppColors.glassSurface;
+  Color get _cardBg => _isLight ? Colors.white : AppColors.settingsCardBg;
+  Color get _subtleBg => _isLight
+      ? const Color(0xFF1A2331).withValues(alpha: 0.05)
+      : Colors.white.withValues(alpha: 0.06);
+  Color get _cardShadow => _isLight
+      ? Colors.black.withValues(alpha: 0.10)
+      : Colors.black.withValues(alpha: 0.35);
+  Color get _cardBorder => _isLight
+      ? const Color(0xFFDDE3EC)
+      : AppColors.glassBlueBorder.withValues(alpha: 0.45);
+
   @override
   void initState() {
     super.initState();
@@ -149,21 +179,19 @@ class _DataSourceSectionState extends State<DataSourceSection> {
 
   @override
   Widget build(BuildContext context) {
+    _isLight = Theme.of(context).brightness == Brightness.light;
     return ListenableBuilder(
       listenable: _dataSourceService,
       builder: (context, _) {
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.settingsCardBg,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppColors.glassBlueBorder.withValues(alpha: 0.45),
-              width: 1,
-            ),
+            border: Border.all(color: _cardBorder, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
+                color: _cardShadow,
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -204,22 +232,18 @@ class _DataSourceSectionState extends State<DataSourceSection> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.glassBlueBorder.withValues(alpha: 0.12),
+            color: _accentBlue.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            LucideIcons.database,
-            size: 18,
-            color: AppColors.glassBlueBorder,
-          ),
+          child: Icon(LucideIcons.database, size: 18, color: _accentBlue),
         ),
         const SizedBox(width: 12),
-        const Text(
+        Text(
           'Data Source',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: AppColors.glassTextPrimary,
+            color: _textPrimary,
             letterSpacing: -0.2,
           ),
         ),
@@ -238,24 +262,20 @@ class _DataSourceSectionState extends State<DataSourceSection> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: _subtleBg,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                LucideIcons.refreshCw,
-                size: 14,
-                color: AppColors.glassTextSecondary,
-              ),
+              Icon(LucideIcons.refreshCw, size: 14, color: _textSecondary),
               const SizedBox(width: 6),
               Text(
                 'Reconnect',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.glassTextSecondary,
+                  color: _textSecondary,
                 ),
               ),
             ],
@@ -361,7 +381,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w600,
-        color: AppColors.glassTextSecondary,
+        color: _textSecondary,
         letterSpacing: 0.8,
       ),
     );
@@ -376,7 +396,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
             icon: LucideIcons.car,
             title: 'Live',
             subtitle: 'Vehicle Stream',
-            color: AppColors.glassBlueBorder,
+            color: _accentBlue,
           ),
         ),
         const SizedBox(width: 10),
@@ -411,24 +431,16 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected
-                ? color.withValues(alpha: 0.16)
-                : AppColors.glassSurfaceAlt,
+            color: isSelected ? color.withValues(alpha: 0.16) : _surfaceAlt,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected
-                  ? color.withValues(alpha: 0.5)
-                  : AppColors.glassDivider,
+              color: isSelected ? color.withValues(alpha: 0.5) : _dividerClr,
               width: isSelected ? 1.5 : 1,
             ),
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isSelected ? color : AppColors.glassTextSecondary,
-              ),
+              Icon(icon, size: 20, color: isSelected ? color : _textSecondary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -439,9 +451,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? color
-                            : AppColors.glassTextSecondary,
+                        color: isSelected ? color : _textSecondary,
                       ),
                     ),
                     Text(
@@ -450,7 +460,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                         fontSize: 10,
                         color: isSelected
                             ? color.withValues(alpha: 0.7)
-                            : AppColors.glassTextSecondary,
+                            : _textSecondary,
                       ),
                     ),
                   ],
@@ -499,7 +509,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
 
         _buildTipCard(
           'Jetson IP untuk ROS Bridge (data sensor, navigasi). Camera IP untuk web_video_server (ZED 2i). Bisa dari device berbeda!',
-          AppColors.glassBlueBorder,
+          _accentBlue,
         ),
         const SizedBox(height: 14),
 
@@ -517,27 +527,23 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.glassSurfaceAlt,
+        color: _surfaceAlt,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.glassDivider),
+        border: Border.all(color: _dividerClr),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                LucideIcons.info,
-                size: 14,
-                color: AppColors.glassTextSecondary,
-              ),
+              Icon(LucideIcons.info, size: 14, color: _textSecondary),
               const SizedBox(width: 6),
               Text(
                 'Generated URLs',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.glassTextSecondary,
+                  color: _textSecondary,
                 ),
               ),
             ],
@@ -564,13 +570,13 @@ class _DataSourceSectionState extends State<DataSourceSection> {
   Widget _buildUrlRow(String label, String url, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 12, color: AppColors.glassTextSecondary),
+        Icon(icon, size: 12, color: _textSecondary),
         const SizedBox(width: 6),
         Text(
           '$label:',
           style: TextStyle(
             fontSize: 10,
-            color: AppColors.glassTextSecondary,
+            color: _textSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -580,7 +586,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
             url,
             style: TextStyle(
               fontSize: 10,
-              color: AppColors.glassBlueBorder,
+              color: _accentBlue,
               fontFamily: 'monospace',
             ),
             overflow: TextOverflow.ellipsis,
@@ -594,25 +600,23 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.glassBlueBorder.withValues(alpha: 0.12),
+        color: _accentBlue.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.glassBlueBorder.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: _accentBlue.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(LucideIcons.zap, size: 12, color: AppColors.glassBlueBorder),
+              Icon(LucideIcons.zap, size: 12, color: _accentBlue),
               const SizedBox(width: 6),
               Text(
                 'Quick Presets',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.glassBlueBorder,
+                  color: _accentBlue,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -647,27 +651,21 @@ class _DataSourceSectionState extends State<DataSourceSection> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.glassSurface,
+            color: _inputBg,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: AppColors.glassBlueBorder.withValues(alpha: 0.6),
-            ),
+            border: Border.all(color: _accentBlue.withValues(alpha: 0.6)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                LucideIcons.wifi,
-                size: 10,
-                color: AppColors.glassBlueBorder,
-              ),
+              Icon(LucideIcons.wifi, size: 10, color: _accentBlue),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.glassBlueBorder,
+                  color: _accentBlue,
                 ),
               ),
             ],
@@ -689,7 +687,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           label: 'Local ROS Bridge',
           hint: 'ws://localhost:9090',
           icon: LucideIcons.globe,
-          hintColor: AppColors.glassTextSecondary,
+          hintColor: _textSecondary,
         ),
         const SizedBox(height: 10),
 
@@ -727,7 +725,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: AppColors.glassTextSecondary,
+                color: _textSecondary,
               ),
             ),
             const Spacer(),
@@ -742,18 +740,14 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        LucideIcons.upload,
-                        size: 14,
-                        color: AppColors.glassBlueBorder,
-                      ),
+                      Icon(LucideIcons.upload, size: 14, color: _accentBlue),
                       const SizedBox(width: 4),
                       Text(
                         'Upload',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.glassBlueBorder,
+                          color: _accentBlue,
                         ),
                       ),
                     ],
@@ -776,13 +770,13 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppColors.glassTextSecondary,
+                            color: _textSecondary,
                           ),
                         )
                       : Icon(
                           LucideIcons.refreshCw,
                           size: 14,
-                          color: AppColors.glassTextSecondary,
+                          color: _textSecondary,
                         ),
                 ),
               ),
@@ -794,17 +788,13 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: AppColors.glassSurfaceAlt,
+            color: _surfaceAlt,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.glassDivider),
+            border: Border.all(color: _dividerClr),
           ),
           child: Row(
             children: [
-              Icon(
-                LucideIcons.file,
-                size: 16,
-                color: AppColors.glassTextSecondary,
-              ),
+              Icon(LucideIcons.file, size: 16, color: _textSecondary),
               const SizedBox(width: 8),
               Expanded(
                 child: _availableRosbags.isEmpty
@@ -812,10 +802,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                         _loadingRosbags
                             ? 'Loading...'
                             : 'No rosbags found (is Docker running?)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.glassTextSecondary,
-                        ),
+                        style: TextStyle(fontSize: 12, color: _textSecondary),
                       )
                     : DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -827,22 +814,19 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                             'Select rosbag file...',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.glassTextSecondary,
+                              color: _textSecondary,
                             ),
                           ),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.glassTextPrimary,
-                          ),
-                          dropdownColor: AppColors.glassSurface,
+                          style: TextStyle(fontSize: 12, color: _textPrimary),
+                          dropdownColor: _inputBg,
                           items: _availableRosbags.map((file) {
                             return DropdownMenuItem(
                               value: file,
                               child: Text(
                                 file,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.glassTextPrimary,
+                                  color: _textPrimary,
                                 ),
                               ),
                             );
@@ -869,9 +853,9 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.glassSurfaceAlt,
+        color: _surfaceAlt,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.glassDivider),
+        border: Border.all(color: _dividerClr),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,7 +865,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.glassTextSecondary,
+              color: _textSecondary,
               letterSpacing: 0.8,
             ),
           ),
@@ -901,12 +885,12 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                     decoration: BoxDecoration(
                       color: _loopPlayback
                           ? kPurpleAccent.withValues(alpha: 0.16)
-                          : AppColors.glassSurface,
+                          : _inputBg,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: _loopPlayback
                             ? kPurpleAccent.withValues(alpha: 0.55)
-                            : AppColors.glassDivider,
+                            : _dividerClr,
                       ),
                     ),
                     child: Row(
@@ -916,9 +900,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                               ? LucideIcons.squareCheck
                               : LucideIcons.square,
                           size: 16,
-                          color: _loopPlayback
-                              ? kPurpleAccent
-                              : AppColors.glassTextSecondary,
+                          color: _loopPlayback ? kPurpleAccent : _textSecondary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -928,7 +910,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                             fontWeight: FontWeight.w500,
                             color: _loopPlayback
                                 ? kPurpleAccent
-                                : AppColors.glassTextSecondary,
+                                : _textSecondary,
                           ),
                         ),
                       ],
@@ -945,24 +927,17 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.glassSurface,
+                    color: _inputBg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.glassDivider),
+                    border: Border.all(color: _dividerClr),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        LucideIcons.gauge,
-                        size: 16,
-                        color: AppColors.glassTextSecondary,
-                      ),
+                      Icon(LucideIcons.gauge, size: 16, color: _textSecondary),
                       const SizedBox(width: 8),
                       Text(
                         'Speed:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.glassTextSecondary,
-                        ),
+                        style: TextStyle(fontSize: 12, color: _textSecondary),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -970,55 +945,42 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                           child: DropdownButton<double>(
                             isExpanded: true,
                             value: _playbackRate,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.glassTextPrimary,
-                            ),
-                            dropdownColor: AppColors.glassSurface,
-                            items: const [
+                            style: TextStyle(fontSize: 12, color: _textPrimary),
+                            dropdownColor: _inputBg,
+                            items: [
                               DropdownMenuItem(
                                 value: 0.25,
                                 child: Text(
                                   '0.25x',
-                                  style: TextStyle(
-                                    color: AppColors.glassTextPrimary,
-                                  ),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                               DropdownMenuItem(
                                 value: 0.5,
                                 child: Text(
                                   '0.5x',
-                                  style: TextStyle(
-                                    color: AppColors.glassTextPrimary,
-                                  ),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                               DropdownMenuItem(
                                 value: 1.0,
                                 child: Text(
                                   '1.0x',
-                                  style: TextStyle(
-                                    color: AppColors.glassTextPrimary,
-                                  ),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                               DropdownMenuItem(
                                 value: 1.5,
                                 child: Text(
                                   '1.5x',
-                                  style: TextStyle(
-                                    color: AppColors.glassTextPrimary,
-                                  ),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                               DropdownMenuItem(
                                 value: 2.0,
                                 child: Text(
                                   '2.0x',
-                                  style: TextStyle(
-                                    color: AppColors.glassTextPrimary,
-                                  ),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                             ],
@@ -1056,12 +1018,12 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           decoration: BoxDecoration(
             color: isPlaying
                 ? Colors.greenAccent.shade400.withValues(alpha: 0.08)
-                : AppColors.glassSurfaceAlt,
+                : _surfaceAlt,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isPlaying
                   ? Colors.greenAccent.shade400.withValues(alpha: 0.35)
-                  : AppColors.glassDivider,
+                  : _dividerClr,
             ),
           ),
           child: Column(
@@ -1097,7 +1059,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                             fontWeight: FontWeight.w600,
                             color: isPlaying
                                 ? Colors.greenAccent.shade400
-                                : AppColors.glassTextPrimary,
+                                : _textPrimary,
                           ),
                         ),
                         if (statusMessage.isNotEmpty)
@@ -1105,7 +1067,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                             statusMessage,
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.glassTextSecondary,
+                              color: _textSecondary,
                             ),
                           ),
                       ],
@@ -1164,6 +1126,10 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     VoidCallback? onTap,
   }) {
     final isEnabled = onTap != null;
+    // REVISI: light mode → tombol disabled pakai bg abu-abu terang +
+    // teks/ikon abu-abu gelap (bukan putih di atas abu-abu terang yang
+    // nyaris tak terlihat).
+    final fgClr = isEnabled ? Colors.white : _textSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -1175,20 +1141,20 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isEnabled ? color : AppColors.glassDivider,
+              color: isEnabled ? color : _dividerClr,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: Colors.white),
+                Icon(icon, size: 16, color: fgClr),
                 const SizedBox(width: 6),
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: fgClr,
                   ),
                 ),
               ],
@@ -1242,7 +1208,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: AppColors.glassTextSecondary,
+            color: _textSecondary,
           ),
         ),
         const SizedBox(height: 6),
@@ -1250,41 +1216,31 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           height: 40,
           child: TextField(
             controller: controller,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.glassTextPrimary,
-            ),
+            style: TextStyle(fontSize: 12, color: _textPrimary),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(
                 fontSize: 12,
-                color: hintColor ?? AppColors.glassTextSecondary,
+                color: hintColor ?? _textSecondary,
               ),
               prefixIcon: Padding(
                 padding: const EdgeInsets.only(left: 12, right: 8),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: AppColors.glassTextSecondary,
-                ),
+                child: Icon(icon, size: 16, color: _textSecondary),
               ),
               prefixIconConstraints: const BoxConstraints(minWidth: 0),
               filled: true,
-              fillColor: AppColors.glassSurfaceAlt,
+              fillColor: _surfaceAlt,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: AppColors.glassDivider),
+                borderSide: BorderSide(color: _dividerClr),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: AppColors.glassDivider),
+                borderSide: BorderSide(color: _dividerClr),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: AppColors.glassBlueBorder,
-                  width: 1.5,
-                ),
+                borderSide: BorderSide(color: _accentBlue, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
@@ -1315,7 +1271,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: AppColors.glassTextSecondary,
+            color: _textSecondary,
           ),
         ),
         const SizedBox(height: 6),
@@ -1332,41 +1288,28 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                       onPicked(text);
                     }
                   },
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.glassTextPrimary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: _textPrimary),
                   decoration: InputDecoration(
                     hintText: hasValue ? fileName : '/path/to/file...',
-                    hintStyle: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.glassTextSecondary,
-                    ),
+                    hintStyle: TextStyle(fontSize: 12, color: _textSecondary),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 12, right: 8),
-                      child: Icon(
-                        icon,
-                        size: 16,
-                        color: AppColors.glassTextSecondary,
-                      ),
+                      child: Icon(icon, size: 16, color: _textSecondary),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
                     filled: true,
-                    fillColor: AppColors.glassSurfaceAlt,
+                    fillColor: _surfaceAlt,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.glassDivider),
+                      borderSide: BorderSide(color: _dividerClr),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.glassDivider),
+                      borderSide: BorderSide(color: _dividerClr),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: AppColors.glassBlueBorder,
-                        width: 1.5,
-                      ),
+                      borderSide: BorderSide(color: _accentBlue, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -1387,10 +1330,10 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                   height: 40,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: AppColors.glassBlueBorder.withValues(alpha: 0.12),
+                    color: _accentBlue.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: AppColors.glassBlueBorder.withValues(alpha: 0.4),
+                      color: _accentBlue.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -1398,7 +1341,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                       Icon(
                         LucideIcons.folderOpen,
                         size: 14,
-                        color: AppColors.glassBlueBorder,
+                        color: _accentBlue,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -1406,7 +1349,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.glassBlueBorder,
+                          color: _accentBlue,
                         ),
                       ),
                     ],
@@ -1442,7 +1385,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
               content,
               style: TextStyle(
                 fontSize: 11,
-                color: AppColors.glassTextSecondary,
+                color: _textSecondary,
                 height: 1.4,
               ),
             ),
@@ -1459,7 +1402,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       child: ElevatedButton(
         onPressed: onSave,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.glassBlueBorder,
+          backgroundColor: _accentBlue,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

@@ -7,34 +7,49 @@ import 'package:flutter/material.dart';
 // `undefined_method` errors on `Path()`, `.moveTo()`, `.lineTo()`.
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:dashboardmevi/ui/pages/navigation/utils/navigation_utils.dart';
+import 'pedestrian_marker.dart';
 
 /// Full top-down (bird's-eye) 2D visualization of MEVI on the road.
 ///
-/// REVISI 3: the road is no longer a fixed straight lane — when a live
-/// navigation route + GPS position are available (passed in from the
-/// Maps page's `NavigationCubit`, now shared app-wide — see
-/// `LayoutDashboard`), the single-lane boundary lines actually FOLLOW
-/// the real route geometry: a left turn on the map draws as a left
-/// turn here, a right turn as a right turn, matching the Maps page 1:1.
-/// MEVI itself always stays centered and pointing "up" — the standard
-/// "heading-up" convention every turn-by-turn nav view uses: it's the
-/// road that sweeps/curves underneath the car as the vehicle's heading
-/// and position change, not the other way around.
+/// REVISI 6 — matched against the reference BEV mock-up (gambar 1):
+///  - The single dividing line down the middle of the lane is now a
+///    dashed centerline (previously the lane only had its two solid
+///    outer boundary lines, no center marking at all).
+///  - The detection zone around MEVI is now a layered "radar" look —
+///    an outer soft glow plus TWO concentric rings (faint outer / more
+///    solid inner) instead of one single thin ring — closer to the
+///    multi-ring sonar-style circle in the reference image.
+///  - Nearby detections (`nearbyVehicles`) are drawn with a thin blue
+///    detection box around each sprite, same as the boxed car/pedestrian
+///    in the reference. A `DetectedObjectKind` now distinguishes cars
+///    (rendered with `assets/images/car.png`, unchanged) from
+///    pedestrians (rendered with the new vector [PedestrianMarker] —
+///    see that file's doc comment for why a vector marker is used
+///    instead of a raster asset).
+///  - Light/dark colors re-tuned: dashed centerline, both detection
+///    rings, and detection boxes all pick a light-mode-safe color the
+///    same way the existing lane boundary lines already did, so the
+///    scene stays readable on both the black (dark) and white (light)
+///    page background.
 ///
-/// If no route/position is available yet (e.g. destination not set),
-/// this falls back to the previous static straight single-lane road so
-/// the page never looks broken while waiting for navigation data.
+/// REVISI 5 (kept): the road follows the real Maps route — this page
+/// reads the shared `NavigationCubit` (promoted to an app-wide ancestor
+/// in `LayoutDashboard`, same instance the Maps page itself uses) for
+/// `routePoints` + `current` position, and the same IMU-yaw-with-fallback
+/// heading source already used by the Maps page's heading HUD / car
+/// marker. With no active route yet, this falls back to its static
+/// straight single-lane road on its own — no extra handling needed.
 ///
 /// Renders, back to front:
 ///   1. The single-lane road — curved route-following boundary lines
 ///      when live nav data is available, straight parallel lines
-///      otherwise.
-///   2. A soft blue "detection zone": radial glow + thin ring hugging
-///      close around MEVI.
-///   3. Nearby traffic using `assets/images/car.png` — disabled for
-///      now ([nearbyVehicles] defaults to an empty list). Pass a real
-///      list in once a live surrounding-vehicle detection source
-///      exists; the rendering code below already supports it as-is.
+///      otherwise — plus a dashed centerline down the middle.
+///   2. A layered blue "detection zone": radial glow + two concentric
+///      rings hugging close around MEVI.
+///   3. Nearby traffic / pedestrians, each inside a thin detection box —
+///      cars use `assets/images/car.png`, pedestrians use the vector
+///      [PedestrianMarker]. Empty by default; pass real detections in
+///      once a live surrounding-object detection source exists.
 ///   4. MEVI itself, always centered, using `assets/images/mevicar.png`.
 class TopDownBevWidget extends StatelessWidget {
   final double steeringAngle;
@@ -59,9 +74,6 @@ class TopDownBevWidget extends StatelessWidget {
   const TopDownBevWidget({
     super.key,
     this.steeringAngle = 0.0,
-    // Other traffic hidden for now — see class docs above. Pass a real
-    // detection list in once that data source exists; no other change
-    // is needed for it to render again.
     this.nearbyVehicles = const [],
     this.routePoints = const [],
     this.currentPosition,
@@ -102,6 +114,10 @@ class TopDownBevWidget extends StatelessWidget {
         final carHeight = carWidth / 0.52;
         final otherCarHeight = (size.height * 0.16).clamp(70.0, 130.0) * 0.82;
         final otherCarWidth = otherCarHeight * 0.52;
+        // Pedestrians read as a narrower, slightly shorter box than
+        // the nearby-car sprite in the reference image.
+        final pedestrianHeight = otherCarHeight * 0.82;
+        final pedestrianWidth = pedestrianHeight * 0.42;
 
         final roadGeometry = _buildRoadGeometry(center, laneHalfWidthPx);
 
@@ -109,7 +125,8 @@ class TopDownBevWidget extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             // 1 + 2. Single-lane road (curved when live nav data is
-            // available) and the blue detection-zone glow/ring.
+            // available) with dashed centerline, and the layered blue
+            // detection-zone glow/rings.
             Positioned.fill(
               child: CustomPaint(
                 painter: _TopDownRoadPainter(
@@ -121,17 +138,19 @@ class TopDownBevWidget extends StatelessWidget {
               ),
             ),
 
-            // 3. Nearby traffic, drawn under MEVI (empty by default — see docs).
+            // 3. Nearby detections, drawn under MEVI — each boxed like
+            // the reference's blue detection outline around cars /
+            // pedestrians.
             for (final v in nearbyVehicles)
-              Positioned(
-                left: center.dx + v.dx * size.width / 2 - otherCarWidth / 2,
-                top: center.dy + v.dy * size.height / 2 - otherCarHeight / 2,
-                child: Image.asset(
-                  'assets/images/car.png',
-                  width: otherCarWidth,
-                  height: otherCarHeight,
-                  fit: BoxFit.contain,
-                ),
+              _buildDetectionSprite(
+                v: v,
+                center: center,
+                size: size,
+                carWidth: otherCarWidth,
+                carHeight: otherCarHeight,
+                pedestrianWidth: pedestrianWidth,
+                pedestrianHeight: pedestrianHeight,
+                isLight: isLight,
               ),
 
             // 4. MEVI — always centered. When following a live route,
@@ -152,6 +171,57 @@ class TopDownBevWidget extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  /// Builds one nearby detection (car or pedestrian), boxed in a thin
+  /// blue detection outline, positioned via [NearbyVehicle.dx]/[dy]
+  /// exactly like before.
+  Widget _buildDetectionSprite({
+    required NearbyVehicle v,
+    required Offset center,
+    required Size size,
+    required double carWidth,
+    required double carHeight,
+    required double pedestrianWidth,
+    required double pedestrianHeight,
+    required bool isLight,
+  }) {
+    final isPedestrian = v.kind == DetectedObjectKind.pedestrian;
+    final boxWidth = isPedestrian ? pedestrianWidth : carWidth;
+    final boxHeight = isPedestrian ? pedestrianHeight : carHeight;
+    // A little breathing room between the sprite and its detection box,
+    // matching the reference's boxes (they hug the sprite, not the
+    // pixel-tight bounds).
+    const boxPadding = 6.0;
+
+    final boxColor = isLight
+        ? const Color(0xFF1976D2)
+        : const Color(0xFF29B6F6);
+
+    return Positioned(
+      left: center.dx + v.dx * size.width / 2 - boxWidth / 2 - boxPadding,
+      top: center.dy + v.dy * size.height / 2 - boxHeight / 2 - boxPadding,
+      child: Container(
+        width: boxWidth + boxPadding * 2,
+        height: boxHeight + boxPadding * 2,
+        padding: const EdgeInsets.all(boxPadding),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: boxColor.withValues(alpha: isLight ? 0.85 : 0.9),
+            width: 1.4,
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: isPedestrian
+            ? PedestrianMarker(width: boxWidth, height: boxHeight)
+            : Image.asset(
+                'assets/images/car.png',
+                width: boxWidth,
+                height: boxHeight,
+                fit: BoxFit.contain,
+              ),
+      ),
     );
   }
 
@@ -250,32 +320,51 @@ class TopDownBevWidget extends StatelessWidget {
       right.add(centerlinePx[i] + perp * laneHalfWidthPxLocal);
     }
 
-    return _RoadGeometry(left: left, right: right);
+    return _RoadGeometry(left: left, right: right, center: centerlinePx);
   }
 }
 
-/// Relative position of a nearby vehicle, expressed as a fraction
-/// (-1..1) of the widget's half-width/half-height rather than raw
-/// pixels, so placement scales automatically with the widget's size.
-/// (0, 0) is MEVI; negative `dy` is ahead of MEVI, negative `dx` is to
-/// MEVI's left.
+/// What kind of nearby object [NearbyVehicle] represents — controls
+/// which sprite is drawn inside its detection box.
+enum DetectedObjectKind { car, pedestrian }
+
+/// Relative position of a nearby detected object, expressed as a
+/// fraction (-1..1) of the widget's half-width/half-height rather than
+/// raw pixels, so placement scales automatically with the widget's
+/// size. (0, 0) is MEVI; negative `dy` is ahead of MEVI, negative `dx`
+/// is to MEVI's left.
 class NearbyVehicle {
   final double dx;
   final double dy;
-  const NearbyVehicle({required this.dx, required this.dy});
+
+  /// Defaults to [DetectedObjectKind.car] so existing call sites that
+  /// only pass `dx`/`dy` keep rendering exactly as before.
+  final DetectedObjectKind kind;
+
+  const NearbyVehicle({
+    required this.dx,
+    required this.dy,
+    this.kind = DetectedObjectKind.car,
+  });
 }
 
-/// The single lane's two boundary lines, already projected into local
-/// pixel space (centered on MEVI, heading-up) by
+/// The single lane's two boundary lines plus its centerline, already
+/// projected into local pixel space (centered on MEVI, heading-up) by
 /// [TopDownBevWidget._buildRoadGeometry].
 class _RoadGeometry {
   final List<Offset> left;
   final List<Offset> right;
-  const _RoadGeometry({required this.left, required this.right});
+  final List<Offset> center;
+  const _RoadGeometry({
+    required this.left,
+    required this.right,
+    required this.center,
+  });
 }
 
-/// Paints the single-lane road (curved route or straight fallback) and
-/// the soft blue circular detection zone hugging MEVI.
+/// Paints the single-lane road (curved route or straight fallback),
+/// its dashed centerline, and the layered blue circular detection zone
+/// hugging MEVI.
 class _TopDownRoadPainter extends CustomPainter {
   final double laneHalfWidthPx;
   final double carHeight;
@@ -297,7 +386,8 @@ class _TopDownRoadPainter extends CustomPainter {
     // Ring sized to hug closely around MEVI rather than the whole scene.
     final ringRadius = carHeight / 2 * 1.25;
 
-    // Soft outer glow behind the ring.
+    // --- Layered "radar" detection zone -----------------------------
+    // Soft outer glow behind the rings.
     final glowPaint = Paint()
       ..shader =
           RadialGradient(
@@ -310,13 +400,23 @@ class _TopDownRoadPainter extends CustomPainter {
           );
     canvas.drawCircle(center, ringRadius * 1.35, glowPaint);
 
-    // Thin detection-range ring, styled after the reference "360°" ring.
-    final ringPaint = Paint()
+    // Outer ring — faint, sits further out, styled after the fainter
+    // outer sonar ring in the reference image.
+    final outerRingPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = const Color(0xFF1E88E5).withValues(alpha: isLight ? 0.28 : 0.3);
+    canvas.drawCircle(center, ringRadius * 1.18, outerRingPaint);
+
+    // Inner ring — the main detection-range ring, styled after the
+    // reference "360°" ring, hugging closest to MEVI.
+    final innerRingPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
       ..color = const Color(0xFF1E88E5).withValues(alpha: isLight ? 0.6 : 0.55);
-    canvas.drawCircle(center, ringRadius, ringPaint);
+    canvas.drawCircle(center, ringRadius, innerRingPaint);
 
+    // --- Lane boundary lines -----------------------------------------
     // REVISI: light mode → garis batas lane pakai warna gelap (bukan
     // putih transparan) supaya tetap terlihat di atas background putih.
     final solidPaint = Paint()
@@ -328,6 +428,17 @@ class _TopDownRoadPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    // Dashed centerline paint — same family of color as the boundary
+    // lines but a little more visible, matching the reference's
+    // clearly-dashed center divider.
+    final dashPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = isLight
+          ? const Color(0xFF1A2331).withValues(alpha: 0.35)
+          : Colors.white.withValues(alpha: 0.45)
+      ..strokeCap = StrokeCap.round;
+
     final liveRoad = road;
     if (liveRoad != null) {
       // Route-following road: draw each boundary as a connected
@@ -335,6 +446,7 @@ class _TopDownRoadPainter extends CustomPainter {
       // curves left/right in sync with the real map route.
       canvas.drawPath(_pathThrough(liveRoad.left), solidPaint);
       canvas.drawPath(_pathThrough(liveRoad.right), solidPaint);
+      _drawDashedPolyline(canvas, liveRoad.center, dashPaint);
     } else {
       // Static fallback: perfectly vertical/parallel lines — used
       // whenever there's no live route/position yet, so the page
@@ -347,6 +459,12 @@ class _TopDownRoadPainter extends CustomPainter {
         Offset(rightX, size.height),
         solidPaint,
       );
+      _drawDashedLine(
+        canvas,
+        Offset(center.dx, 0),
+        Offset(center.dx, size.height),
+        dashPaint,
+      );
     }
   }
 
@@ -358,6 +476,61 @@ class _TopDownRoadPainter extends CustomPainter {
       path.lineTo(p.dx, p.dy);
     }
     return path;
+  }
+
+  /// Draws a dashed straight line between [start] and [end] — used for
+  /// the static-fallback centerline.
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    const dashLength = 16.0;
+    const gapLength = 14.0;
+    final totalLength = (end - start).distance;
+    if (totalLength == 0) return;
+    final direction = (end - start) / totalLength;
+
+    var drawn = 0.0;
+    while (drawn < totalLength) {
+      final segStart = start + direction * drawn;
+      final segEndLen = math.min(drawn + dashLength, totalLength);
+      final segEnd = start + direction * segEndLen;
+      canvas.drawLine(segStart, segEnd, paint);
+      drawn += dashLength + gapLength;
+    }
+  }
+
+  /// Draws a dashed line following a connected polyline — used for the
+  /// route-following centerline so the dashes bend through curves the
+  /// same way the solid boundary lines do.
+  void _drawDashedPolyline(Canvas canvas, List<Offset> points, Paint paint) {
+    if (points.length < 2) return;
+    const dashLength = 16.0;
+    const gapLength = 14.0;
+
+    var remainingInPhase = dashLength;
+    var drawing = true;
+
+    for (var i = 0; i < points.length - 1; i++) {
+      var segStart = points[i];
+      final segEnd = points[i + 1];
+      var segRemaining = (segEnd - segStart).distance;
+      if (segRemaining == 0) continue;
+      final dir = (segEnd - segStart) / segRemaining;
+
+      while (segRemaining > 0) {
+        final step = math.min(remainingInPhase, segRemaining);
+        final next = segStart + dir * step;
+        if (drawing) {
+          canvas.drawLine(segStart, next, paint);
+        }
+        segStart = next;
+        segRemaining -= step;
+        remainingInPhase -= step;
+
+        if (remainingInPhase <= 0) {
+          drawing = !drawing;
+          remainingInPhase = drawing ? dashLength : gapLength;
+        }
+      }
+    }
   }
 
   @override

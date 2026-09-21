@@ -21,6 +21,14 @@ import '../navigation/bloc/navigation_state.dart';
 ///    disabled) uses `assets/images/car.png`. `VehicleStageWidget`
 ///    itself is left untouched in the codebase in case it's needed
 ///    again — this page just no longer references it.
+///  - REVISI #6: nearby-object detections are turned back on with two
+///    sample entries positioned like the reference mock-up — a car
+///    ahead on MEVI's left and a pedestrian ahead on MEVI's right — so
+///    the boxed-detection look (see `TopDownBevWidget`'s
+///    `_buildDetectionSprite`) is visible by default instead of an
+///    empty scene. Swap `_demoNearbyDetections` for a real detection
+///    stream once one exists; nothing else needs to change since
+///    `TopDownBevWidget` already accepts any `List<NearbyVehicle>`.
 ///  - REVISI #5: the road now follows the real Maps route — this page
 ///    reads the shared `NavigationCubit` (promoted to an app-wide
 ///    ancestor in `LayoutDashboard`, same instance the Maps page
@@ -49,6 +57,15 @@ class _BevPageState extends State<BevPage> {
   bool _hazardOn = false;
   double _batteryPercent = 0.6;
   String _gear = 'P';
+
+  // Sample nearby detections matching the reference mock-up's layout —
+  // a car ahead-left of MEVI, a pedestrian ahead-right and a bit
+  // closer. See the class doc (REVISI #6) for why these are static
+  // placeholders for now.
+  static const List<NearbyVehicle> _demoNearbyDetections = [
+    NearbyVehicle(dx: -0.34, dy: -0.62, kind: DetectedObjectKind.car),
+    NearbyVehicle(dx: 0.30, dy: -0.38, kind: DetectedObjectKind.pedestrian),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +109,7 @@ class _BevPageState extends State<BevPage> {
                             routePoints: navState.routePoints,
                             currentPosition: navState.current,
                             headingDeg: heading,
+                            nearbyVehicles: _demoNearbyDetections,
                           );
                         },
                       );

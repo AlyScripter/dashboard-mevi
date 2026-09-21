@@ -19,6 +19,13 @@ import '../../../core/theme/colors.dart';
 /// total — kartu "Data Source" / "About" sekarang langsung menempel ke
 /// tepi atas halaman (hanya dibatasi SafeArea + padding halaman) supaya
 /// tidak perlu discroll untuk melihat bagian atas kartu.
+///
+/// REVISI #3: light mode sekarang punya style sendiri — background
+/// halaman berubah jadi biru solid (bukan lagi navy gelap), sementara
+/// kartu "Data Source" / "About" berubah jadi putih bersih. Semua
+/// konten di dalam kedua kartu (`DataSourceSection` / `AboutSection`)
+/// menyesuaikan warna teks/ikon/border masing-masing. Dark mode tidak
+/// berubah sama sekali.
 class SettingsPage extends StatefulWidget {
   final VoidCallback? onBack;
 
@@ -31,8 +38,10 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
     return Container(
-      color: AppColors.settingsPageBg,
+      color: isLight ? AppColors.settingsPageBgLight : AppColors.settingsPageBg,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),

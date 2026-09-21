@@ -71,4 +71,11 @@ class AppColors {
   static const Color settingsPageBg = Color(0xFF0E1116);
   static const Color settingsCardBg = Color(0xFF16273F);
   static const Color settingsCardBgAlt = Color(0xFF1C3252);
+
+  // Settings page — LIGHT MODE variants. Background jadi biru solid,
+  // kartu section (Data Source / About) jadi putih bersih, supaya
+  // konsisten dengan style light mode di halaman lain (biru untuk
+  // chrome, putih untuk permukaan kartu/konten).
+  static const Color settingsPageBgLight = Color(0xFF1565C0);
+  static const Color settingsCardBgLight = Color(0xFFFFFFFF);
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'widgets/videostream.dart';
 import 'widgets/zed_camera_stream_widget.dart';
+import 'widgets/bev_frame_view.dart';
+import 'widgets/bev_point_cloud_view.dart';
 import 'package:dashboardmevi/services/data_source_service.dart';
 import 'package:dashboardmevi/core/theme/colors.dart';
 
@@ -17,7 +19,17 @@ import 'package:dashboardmevi/core/theme/colors.dart';
 ///    sebagai Stack overlay di atas semua halaman. Memanggil lagi di sini
 ///    menyebabkan widget muncul 2x.
 /// 3. Dropdown pilihan tipe kamera (RGB/Depth/Segmentation/BEV·SDC) di
-///    kiri atas — hanya tampilan UI, belum ada aksi.
+///    kiri atas.
+///    - RGB: tetap ZED ROS stream / USB (seperti sebelumnya).
+///    - BEV/SDC: Tahap 6b — slot frame diganti [BevPointCloudView],
+///      yang subscribe ke RosService().bevFrameStream (topic
+///      /bev/frame) dan me-render point cloud LiDAR beneran pakai
+///      flutter_cube (downsample + reuse buffer, lihat komentar di
+///      file itu). [BevFrameView] (Tahap 6a, ringkasan angka doang)
+///      masih ada di project sebagai fallback kalau BevPointCloudView
+///      kena masalah compile/performa di device kamu — tinggal ganti
+///      baris di bawah balik ke `BevFrameView(...)`.
+///    - Depth/Segmentation: belum ada aksi (placeholder di masa depan).
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
 
@@ -139,6 +151,16 @@ class _CameraPageState extends State<CameraPage> {
 
   Widget _buildCameraContent() {
     final showSourceToggle = _dataSourceService.mode == DataSourceMode.live;
+
+    // Tahap 6b: dropdown BEV/SDC gantiin frame kamera dengan point cloud
+    // LiDAR beneran (proof-of-concept Tahap 6a ada di BevFrameView, masih
+    // disimpan sebagai fallback).
+    if (_selectedCameraType == 'BEV/SDC') {
+      return const BevPointCloudView();
+    }
+
+    // Depth & Segmentation belum ada aksi — fallback ke stream RGB yang
+    // sama untuk sekarang (placeholder, sama seperti perilaku sebelumnya).
 
     if (_useRosStream) {
       return ZedCameraStreamWidget(
