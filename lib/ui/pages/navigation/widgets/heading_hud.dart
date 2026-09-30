@@ -52,7 +52,7 @@ class HeadingHUD extends StatelessWidget {
     final double iconSize = isLaptop ? 28.0 : (isTablet ? 24.0 : 18.0);
     final double horizontalPadding = isLaptop ? 16.0 : (isTablet ? 14.0 : 10.0);
     final double verticalPadding = isLaptop ? 12.0 : (isTablet ? 10.0 : 8.0);
-    final double containerWidth = isLaptop ? 120.0 : (isTablet ? 105.0 : 85.0);
+    final double containerWidth = isLaptop ? 135.0 : (isTablet ? 120.0 : 100.0);
     final double fontSizeHeading = isLaptop ? 22.0 : (isTablet ? 18.0 : 14.0);
     final double fontSizeCardinal = isLaptop ? 16.0 : (isTablet ? 14.0 : 11.0);
     final double spacing = isLaptop ? 12.0 : (isTablet ? 10.0 : 8.0);
@@ -75,7 +75,9 @@ class HeadingHUD extends StatelessWidget {
               horizontal: horizontalPadding,
               vertical: verticalPadding,
             ),
-            width: containerWidth,
+            constraints: BoxConstraints(
+              minWidth: containerWidth,
+            ),
             // THEME-AWARE: putih bersih di light mode, navy gelap di dark mode
             decoration: BoxDecoration(
               color: bgColor,

@@ -148,14 +148,19 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
   /// MODIFIED: Background arc yang minimalis ala Code 2.
   /// - Grid 1m, 2m, 3m DIHAPUS.
   /// - Pulse dibuat lebih tipis dan transparan.
-  void _drawMinimalBackgroundArc(Canvas canvas, Offset center, double maxRadius) {
+  void _drawMinimalBackgroundArc(
+    Canvas canvas,
+    Offset center,
+    double maxRadius,
+  ) {
     final arcDeg = displayFovMax - displayFovMin;
     final startDeg = -90.0 + displayFovMin;
 
     // Batas luar arc (dibuat lebih tipis dan samar)
     final outerPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 // Lebih tipis dari Code 1 (1.2)
+      ..strokeWidth =
+          1.0 // Lebih tipis dari Code 1 (1.2)
       ..color = Colors.greenAccent.withValues(alpha: 0.10); // Lebih samar
 
     canvas.drawArc(
@@ -199,7 +204,8 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
     const segmentAngles = [40.0, 30.0, 20.0, 0.0, -20.0, -30.0, -40.0];
     final linePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5 // Sedikit lebih tipis
+      ..strokeWidth =
+          0.5 // Sedikit lebih tipis
       ..color = Colors.greenAccent.withValues(alpha: 0.15); // Lebih samar
 
     for (final lidarAngle in segmentAngles) {
@@ -212,8 +218,11 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
   }
 
   void _drawRawPoints(
-      Canvas canvas, Offset center, double maxRadius,
-      {_DetectionHit? excludeHit}) {
+    Canvas canvas,
+    Offset center,
+    double maxRadius, {
+    _DetectionHit? excludeHit,
+  }) {
     if (lidarRanges.isEmpty || maxRangeMeters <= 0) return;
     final len = lidarRanges.length;
     if (len == 0) return;
@@ -239,7 +248,10 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
       final canvasAngleDeg = -90.0 + lidarAngleDeg;
       final rad = _degToRad(canvasAngleDeg);
 
-      final pos = Offset(center.dx + rPix * math.cos(rad), center.dy + rPix * math.sin(rad));
+      final pos = Offset(
+        center.dx + rPix * math.cos(rad),
+        center.dy + rPix * math.sin(rad),
+      );
 
       if (excludeHit != null) {
         final diffAng = (excludeHit.lidarAngle - lidarAngleDeg).abs();
@@ -256,8 +268,9 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
       final bySegments = _findHitNearReportedObstacle();
       if (bySegments != null) {
         return _DetectionHit(
-            distance: obstacleDistance.clamp(0.0, maxRangeMeters),
-            lidarAngle: bySegments.lidarAngle);
+          distance: obstacleDistance.clamp(0.0, maxRangeMeters),
+          lidarAngle: bySegments.lidarAngle,
+        );
       }
       final angle = switch (obstaclePosition) {
         'left' => -30.0,
@@ -266,8 +279,9 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
         _ => 0.0,
       };
       return _DetectionHit(
-          distance: obstacleDistance.clamp(0.0, maxRangeMeters),
-          lidarAngle: angle);
+        distance: obstacleDistance.clamp(0.0, maxRangeMeters),
+        lidarAngle: angle,
+      );
     }
     return _closestFrontHitFromRaw();
   }
@@ -281,10 +295,17 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
 
     List<double> candidateAngles;
     switch (obstaclePosition) {
-      case 'right': candidateAngles = [20.0, 30.0, 40.0]; break;
-      case 'left': candidateAngles = [-20.0, -30.0, -40.0]; break;
-      case 'front': candidateAngles = [-20.0, 0.0, 20.0]; break;
-      default: return null;
+      case 'right':
+        candidateAngles = [20.0, 30.0, 40.0];
+        break;
+      case 'left':
+        candidateAngles = [-20.0, -30.0, -40.0];
+        break;
+      case 'front':
+        candidateAngles = [-20.0, 0.0, 20.0];
+        break;
+      default:
+        return null;
     }
 
     const windowSamples = 3;
@@ -292,11 +313,16 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
     int? bestIndex;
     double bestDiff = double.infinity;
 
-    int angleToIndex(double angleDeg) => ((angleDeg - angleMinDeg) / angleIncDeg).round();
+    int angleToIndex(double angleDeg) =>
+        ((angleDeg - angleMinDeg) / angleIncDeg).round();
 
     for (final baseAngle in candidateAngles) {
       final centerIdx = angleToIndex(baseAngle);
-      for (int i = centerIdx - windowSamples; i <= centerIdx + windowSamples; i++) {
+      for (
+        int i = centerIdx - windowSamples;
+        i <= centerIdx + windowSamples;
+        i++
+      ) {
         if (i < 0 || i >= len) continue;
         final r = lidarRanges[i];
         if (!r.isFinite || r <= 0.02 || r > lidarMaxRange || r.isNaN) continue;
@@ -308,7 +334,10 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
       }
     }
     if (bestIndex == null) return null;
-    return _DetectionHit(distance: lidarRanges[bestIndex], lidarAngle: angleMinDeg + bestIndex * angleIncDeg);
+    return _DetectionHit(
+      distance: lidarRanges[bestIndex],
+      lidarAngle: angleMinDeg + bestIndex * angleIncDeg,
+    );
   }
 
   _DetectionHit? _closestFrontHitFromRaw() {
@@ -332,13 +361,20 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
       }
     }
     if (minDistance == null || minIndex < 0) return null;
-    return _DetectionHit(distance: minDistance, lidarAngle: lidarMinAngle + minIndex * angleIncDeg);
+    return _DetectionHit(
+      distance: minDistance,
+      lidarAngle: lidarMinAngle + minIndex * angleIncDeg,
+    );
   }
 
   /// MODIFIED: Highlight obstacle dibuat lebih subtle (tidak terlalu nge-glow)
   /// agar cocok dengan tema minimalis.
   void _drawDetectionArcSubtle(
-    Canvas canvas, Offset center, double maxRadius, _DetectionHit hit) {
+    Canvas canvas,
+    Offset center,
+    double maxRadius,
+    _DetectionHit hit,
+  ) {
     final d = hit.distance.clamp(0.0, maxRangeMeters);
     final rPix = (d / maxRangeMeters) * maxRadius;
     final canvasAngleDeg = -90.0 + hit.lidarAngle;
@@ -351,36 +387,55 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
     // Glow dibuat lebih tipis dan samar
     final glowPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4 * pulseScale // Dikurangi dari 7
-      ..color = color.withValues(alpha: 0.15 * pulseScale) // Alpha dikurangi dari 0.22
+      ..strokeWidth =
+          4 *
+          pulseScale // Dikurangi dari 7
+      ..color = color
+          .withValues(alpha: 0.15 * pulseScale) // Alpha dikurangi dari 0.22
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4); // Blur dikurangi
+      ..maskFilter = const MaskFilter.blur(
+        BlurStyle.normal,
+        4,
+      ); // Blur dikurangi
 
     canvas.drawArc(arcRect, startRad, sweepRad, false, glowPaint);
 
     // Garis utama highlight juga sedikit ditipiskan
     final arcPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5 // Dikurangi dari 3
+      ..strokeWidth =
+          2.5 // Dikurangi dari 3
       ..color = color.withValues(alpha: 0.9)
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(arcRect, startRad, sweepRad, false, arcPaint);
   }
 
   void _drawDetectionPointAndLabel(
-    Canvas canvas, Size size, Offset center, double maxRadius, _DetectionHit hit) {
+    Canvas canvas,
+    Size size,
+    Offset center,
+    double maxRadius,
+    _DetectionHit hit,
+  ) {
     final d = hit.distance.clamp(0.0, maxRangeMeters);
     final rPix = (d / maxRangeMeters) * maxRadius;
     final canvasAngleDeg = -90.0 + hit.lidarAngle;
     final rad = _degToRad(canvasAngleDeg);
-    final pos = Offset(center.dx + rPix * math.cos(rad), center.dy + rPix * math.sin(rad));
+    final pos = Offset(
+      center.dx + rPix * math.cos(rad),
+      center.dy + rPix * math.sin(rad),
+    );
     final color = _colorForDistance(d);
 
     // Glow point juga dikurangi
     final glowPaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = color.withValues(alpha: 0.25 * pulseScale) // Alpha dikurangi
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4); // Blur dikurangi
+      ..color = color
+          .withValues(alpha: 0.25 * pulseScale) // Alpha dikurangi
+      ..maskFilter = const MaskFilter.blur(
+        BlurStyle.normal,
+        4,
+      ); // Blur dikurangi
     canvas.drawCircle(pos, 6 * pulseScale, glowPaint); // Radius dikurangi
 
     final dotPaint = Paint()
@@ -408,7 +463,12 @@ class LidarArcRadarMinimalPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(lx - tp.width / 2 - 3, ly - tp.height / 2 - 2, tp.width + 6, tp.height + 4),
+        Rect.fromLTWH(
+          lx - tp.width / 2 - 3,
+          ly - tp.height / 2 - 2,
+          tp.width + 6,
+          tp.height + 4,
+        ),
         const Radius.circular(4),
       ),
       Paint()..color = Colors.black.withValues(alpha: 0.5),

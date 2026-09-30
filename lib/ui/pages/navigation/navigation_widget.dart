@@ -66,6 +66,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
       NavigationDistanceService();
 
   StreamSubscription<InAppNotification>? _inAppSubscription;
+  StreamSubscription<Map<String, double>>? _rosGpsSubscription;
   StreamSubscription<double>? _rosLatSubscription;
   StreamSubscription<double>? _rosLngSubscription;
   StreamSubscription<double>? _rosSpeedSubscription;
@@ -120,6 +121,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
   @override
   void dispose() {
     _inAppSubscription?.cancel();
+    _rosGpsSubscription?.cancel();
     _rosLatSubscription?.cancel();
     _rosLngSubscription?.cancel();
     _rosSpeedSubscription?.cancel();
@@ -161,76 +163,34 @@ class NavigationWidgetState extends State<NavigationWidget> {
   }
 
   void _setupRosStreams() {
-    // Listen to ROS GPS latitude updates
-    _rosLatSubscription = rosService.gpsStream
-        .map((gps) => gps["lat"]!)
-        .listen(
-          (lat) {
-            // The stream keeps emitting for as long as RosService is
-            // alive (it's a global singleton), independent of whether
-            // this widget is still on screen. Bail out if we've already
-            // been disposed (e.g. user navigated away to another page)
-            // so we never call setState() on a defunct State.
-            if (!mounted) return;
-            if (_currentPosition != null) {
-              setState(() {
-                _currentPosition = LatLng(lat, _currentPosition!.longitude);
-              });
-              debugPrint('🗺️ Updated latitude from ROS: $lat');
-            } else {
-              final placeholder = _getPlaceholderLocation();
-              setState(() {
-                _currentPosition = LatLng(lat, placeholder.longitude);
-              });
-              debugPrint('🗺️ Initial latitude from ROS: $lat');
-            }
+    // Listen to ROS GPS coordinates updates (lat & lng)
+    _rosGpsSubscription = rosService.gpsStream.listen(
+      (gps) {
+        if (!mounted) return;
+        final lat = gps['lat'];
+        final lng = gps['lng'];
+        if (lat == null || lng == null || (lat == 0.0 && lng == 0.0)) return;
 
-            // Update route data service
-            if (_currentPosition != null) {
-              _routeDataService.updateCurrentPosition(_currentPosition!);
-              // Update distance service for real-time distance calculation
-              _distanceService.updateCurrentPosition(_currentPosition!);
-            }
+        final newPos = LatLng(lat, lng);
+        setState(() {
+          _currentPosition = newPos;
+        });
 
-            _checkArrival();
-          },
-          onError: (error) {
-            debugPrint('❌ ROS Latitude stream error: $error');
-          },
-        );
+        // Geser posisi kamera peta mengikuti pergerakan mobil
+        try {
+          _mapController.move(newPos, _mapController.camera.zoom);
+        } catch (_) {}
 
-    // Listen to ROS GPS longitude updates
-    _rosLngSubscription = rosService.gpsStream
-        .map((gps) => gps["lng"]!)
-        .listen(
-          (lon) {
-            if (!mounted) return;
-            if (_currentPosition != null) {
-              setState(() {
-                _currentPosition = LatLng(_currentPosition!.latitude, lon);
-              });
-              debugPrint('🗺️ Updated longitude from ROS: $lon');
-            } else {
-              final placeholder = _getPlaceholderLocation();
-              setState(() {
-                _currentPosition = LatLng(placeholder.latitude, lon);
-              });
-              debugPrint('🗺️ Initial longitude from ROS: $lon');
-            }
+        // Update route data service & distance service
+        _routeDataService.updateCurrentPosition(newPos);
+        _distanceService.updateCurrentPosition(newPos);
 
-            // Update route data service
-            if (_currentPosition != null) {
-              _routeDataService.updateCurrentPosition(_currentPosition!);
-              // Update distance service for real-time distance calculation
-              _distanceService.updateCurrentPosition(_currentPosition!);
-            }
-
-            _checkArrival();
-          },
-          onError: (error) {
-            debugPrint('❌ ROS Longitude stream error: $error');
-          },
-        );
+        _checkArrival();
+      },
+      onError: (error) {
+        debugPrint('❌ ROS GPS stream error: $error');
+      },
+    );
 
     // Optional: Listen to ROS speed for debugging
     _rosSpeedSubscription = rosService.speedometerRosStream.listen(

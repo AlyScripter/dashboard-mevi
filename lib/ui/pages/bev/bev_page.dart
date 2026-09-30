@@ -6,44 +6,19 @@ import '../../core/panels/status_indicator_panel.dart';
 import '../../core/widgets/dashboard/speed_display_widget.dart';
 import '../../core/widgets/dashboard/battery_indicator_widget.dart';
 import '../../core/widgets/dashboard/gear_selector_widget.dart';
-import '../../core/widgets/sensors/topdown_bev_widget.dart';
+import '../../core/widgets/sensors/perspective_bev_3d_widget.dart';
+import '../../core/widgets/sensors/navigation_hud_banner.dart';
 import '../navigation/bloc/navigation_cubit.dart';
 import '../navigation/bloc/navigation_state.dart';
 
-/// BEV page — REVISI #4:
-///  - The 3D car model + glow-road + raw per-point LIDAR rendering
-///    (`VehicleStageWidget` / `FrontBevWidget`) is REMOVED from this
-///    page — it was too heavy to paint every frame. Replaced with
-///    [TopDownBevWidget]: a flat, lightweight 2D bird's-eye scene
-///    (single-lane boundary lines + a blue detection ring hugging MEVI
-///    + MEVI as `assets/images/mevicar.png`), styled after the
-///    reference 360° sensor illustration. Nearby traffic (currently
-///    disabled) uses `assets/images/car.png`. `VehicleStageWidget`
-///    itself is left untouched in the codebase in case it's needed
-///    again — this page just no longer references it.
-///  - REVISI #6: nearby-object detections are turned back on with two
-///    sample entries positioned like the reference mock-up — a car
-///    ahead on MEVI's left and a pedestrian ahead on MEVI's right — so
-///    the boxed-detection look (see `TopDownBevWidget`'s
-///    `_buildDetectionSprite`) is visible by default instead of an
-///    empty scene. Swap `_demoNearbyDetections` for a real detection
-///    stream once one exists; nothing else needs to change since
-///    `TopDownBevWidget` already accepts any `List<NearbyVehicle>`.
-///  - REVISI #5: the road now follows the real Maps route — this page
-///    reads the shared `NavigationCubit` (promoted to an app-wide
-///    ancestor in `LayoutDashboard`, same instance the Maps page
-///    itself uses) for `routePoints` + `current` position, and the
-///    same IMU-yaw-with-fallback heading source already used by the
-///    Maps page's heading HUD / car marker. A left turn on the map now
-///    draws as a left turn here too, matching Maps 1:1. With no active
-///    route yet, [TopDownBevWidget] falls back to its static straight
-///    single-lane road on its own — no extra handling needed here.
-///  - Everything else (speedometer top-center, battery top-left, gear
-///    rail left / status rail right, no boxes, vertically centered
-///    side rails) is unchanged from the previous revision.
-///
-/// All ROS stream wiring below is copied as-is from the old LeftPanel —
-/// intentionally untouched, per existing project convention.
+/// BEV page — 3D Perspective Edition:
+///  - Visualisasi BEV 3D Perspective dengan Scenario Control Bar (1: Lurus, 2: Kanan,
+///    3: Kiri, 4: Pertigaan, 5: Perempatan, dan AUTO cycle 5 detik).
+///  - Menggunakan model 3D MEVI murni yang menghadap ke depan membelakangi layar (chase view).
+///  - Waypoint ribbon bercahaya continuous dengan panah chevron bergerak.
+///  - Pop-up HUD notifikasi navigasi dan peringatan otonom di bawah speedometer.
+///  - Seluruh widget kontrol dashboard (Speedometer, Baterai & Jarak,
+///    Perseneling P-R-N-D, Status Lampu/Listrik/Alert) 100% UTUH dan tidak disentuh.
 class BevPage extends StatefulWidget {
   const BevPage({super.key});
 
@@ -58,76 +33,55 @@ class _BevPageState extends State<BevPage> {
   double _batteryPercent = 0.6;
   String _gear = 'P';
 
-  // Sample nearby detections matching the reference mock-up's layout —
-  // a car ahead-left of MEVI, a pedestrian ahead-right and a bit
-  // closer. See the class doc (REVISI #6) for why these are static
-  // placeholders for now.
-  static const List<NearbyVehicle> _demoNearbyDetections = [
-    NearbyVehicle(dx: -0.34, dy: -0.62, kind: DetectedObjectKind.car),
-    NearbyVehicle(dx: 0.30, dy: -0.38, kind: DetectedObjectKind.pedestrian),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    // REVISI: light mode → background halaman jadi putih (bukan hitam
-    // pekat), dan widget speedometer/baterai/gear di dalamnya
-    // menyesuaikan warna teks & elemen supaya tetap kontras di atas
-    // putih. Dark mode tidak berubah.
     final pageBg = isLight ? Colors.white : Colors.black;
 
     return Container(
       color: pageBg,
       child: Stack(
         children: [
-          // 1. Full-bleed 2D top-down BEV scene (lanes + detection ring
-          // + MEVI/nearby-traffic sprites) — fills the whole page.
+          // 1. Full-bleed 3D Perspective BEV scene (3D Road + Trajectory Ribbon
+          // + 3D MEVI Ego Car + 3D Bounding Boxes & Floating Badges + Scenario Buttons).
           Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: 100,
-                bottom: AppDimensions.spacingXL,
-              ),
-              child: BlocBuilder<NavigationCubit, NavigationState>(
-                builder: (context, navState) {
-                  return StreamBuilder<double>(
-                    stream: RosService().steeringAngleStream,
-                    builder: (context, steerSnap) {
-                      final steeringAngle = steerSnap.data ?? 0.0;
-                      return StreamBuilder<Map<String, double>>(
-                        stream: RosService().imuStream,
-                        builder: (context, imuSnap) {
-                          // Same heading source as the Maps page's
-                          // heading HUD / car marker: IMU yaw when
-                          // available, else the cubit's fallback.
-                          final imu = imuSnap.data;
-                          final heading = (imu != null && imu['yaw'] != null)
-                              ? imu['yaw']!
-                              : navState.fallbackHeadingDeg;
-                          return TopDownBevWidget(
-                            steeringAngle: steeringAngle,
-                            routePoints: navState.routePoints,
-                            currentPosition: navState.current,
-                            headingDeg: heading,
-                            nearbyVehicles: _demoNearbyDetections,
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
+            child: BlocBuilder<NavigationCubit, NavigationState>(
+              builder: (context, navState) {
+                return StreamBuilder<double>(
+                  stream: RosService().steeringAngleStream,
+                  builder: (context, steerSnap) {
+                    final steeringAngle = steerSnap.data ?? 0.0;
+                    return StreamBuilder<double>(
+                      stream: RosService().speedometerRosStream,
+                      builder: (context, speedSnap) {
+                        final speed = speedSnap.data ?? 20.0;
+                        return PerspectiveBev3DWidget(
+                          steeringAngle: steeringAngle,
+                          speed: speed,
+                        );
+                      },
+                    );
+                  },
+                );
+              },
             ),
           ),
 
-          // 2. Speedometer — top-center, no surrounding box. The arc
-          // gauge already paints its own glow, so it reads fine sitting
-          // directly on the black background.
+          // 2. Speedometer & Navigation HUD Banner — top-center, no surrounding box.
           Positioned(
             top: AppDimensions.spacingL,
             left: 0,
             right: 0,
-            child: const Center(child: SpeedDisplayWidget()),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  SpeedDisplayWidget(),
+                  SizedBox(height: 8),
+                  NavigationHudBanner(),
+                ],
+              ),
+            ),
           ),
 
           // 3. Battery + range — top-left, no surrounding box.

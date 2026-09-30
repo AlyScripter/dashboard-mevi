@@ -32,6 +32,8 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   // Timers and subscriptions
   Timer? _dataTimer;
   StreamSubscription? _speedSubscription;
+  StreamSubscription? _distanceSubscription;
+  StreamSubscription? _nearestSubscription;
   StreamSubscription? _lidarSubscription;
   StreamSubscription? _lidar2DSubscription;
   StreamSubscription? _obstacleSubscription;
@@ -43,7 +45,9 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
 
   // Slider state
   int _currentPageIndex = 0;
-  final int _totalPages = 4; // LiDAR, Trajectory, Steering+CTE, Control System
+  // NOTE: Total 3 slide (Trajectory Planning, Steering+CTE, Control System).
+  // Slide 2D LiDAR disimpan/dinonaktifkan sementara dari dashboard.
+  final int _totalPages = 3;
 
   // Sensor data
   List<double> lidarRanges = [];
@@ -64,6 +68,10 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
 
   double batterySoc = 85.0;
   double currentSpeed = 0.0;
+  double distanceTraveled = 0.0;
+  double nearestObstacle = 0.0;
+  bool _hasReceivedDistance = false;
+  bool _hasReceivedNearest = false;
   double imuYaw = 0.0;
 
   @override
@@ -88,9 +96,29 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     rosService.initialize();
 
     _speedSubscription = rosService.speedometerRosStream.listen((speed) {
-      setState(() {
-        currentSpeed = speed;
-      });
+      if (mounted) {
+        setState(() {
+          currentSpeed = speed;
+        });
+      }
+    });
+
+    _distanceSubscription = rosService.vehicleDistanceStream.listen((dist) {
+      if (mounted) {
+        setState(() {
+          distanceTraveled = dist;
+          _hasReceivedDistance = true;
+        });
+      }
+    });
+
+    _nearestSubscription = rosService.vehicleNearestStream.listen((nearest) {
+      if (mounted) {
+        setState(() {
+          nearestObstacle = nearest;
+          _hasReceivedNearest = true;
+        });
+      }
     });
 
     _lidarSubscription = rosService.lidarStream.listen((ranges) {
@@ -145,13 +173,13 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
 
   String _getPageTitle(int index) {
     switch (index) {
+      // NOTE: 2D LiDAR disimpan untuk kebutuhan mendatang (dinonaktifkan dari dashboard).
+      // case 0: return 'LiDAR Visualization';
       case 0:
-        return 'LiDAR Visualization';
-      case 1:
         return 'Trajectory Planning';
-      case 2:
+      case 1:
         return 'Steering & CTE Analysis';
-      case 3:
+      case 2:
         return 'Control System Status';
       default:
         return 'Data Visualization';
@@ -243,6 +271,9 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     );
   }
 
+  // Widget visualisasi LiDAR 2D disimpan secara utuh (tidak dihapus)
+  // agar dapat diaktifkan kembali jika sewaktu-waktu dibutuhkan.
+  // ignore: unused_element
   Widget _buildLidarVisualizationPage() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -363,11 +394,13 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Calculate metrics for sensor status row
-        final frontDistance =
-            DataUtils.calculateFrontDistance([], lidarRanges) ?? 0.0;
+        final frontDistance = _hasReceivedDistance
+            ? distanceTraveled
+            : (DataUtils.calculateFrontDistance([], lidarRanges) ?? 0.0);
 
-        final nearestObstacle =
-            DataUtils.findNearestObstacle(lidarRanges) ?? 0.0;
+        final nearestValue = _hasReceivedNearest
+            ? nearestObstacle
+            : (DataUtils.findNearestObstacle(lidarRanges) ?? 0.0);
 
         final isLight = Theme.of(context).brightness == Brightness.light;
 
@@ -392,7 +425,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
               SensorStatusRow(
                 currentSpeed: currentSpeed,
                 frontDistance: frontDistance,
-                nearestObstacle: nearestObstacle,
+                nearestObstacle: nearestValue,
                 imuYaw: imuYaw,
                 batterySoc: batterySoc,
               ),
@@ -434,10 +467,13 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                   controller: _pageController,
                   onPageChanged: _onPageChanged,
                   children: [
-                    _buildLidarVisualizationPage(), // LiDAR Only
-                    _buildTrajectoryPlanningPage(), // Trajectory Planning
-                    _buildSteeringCteAnalysisPage(), // Steering + CTE Analysis
-                    _buildControlSystemPage(), // Control System Status
+                    // SIMPAN: Widget visualisasi LiDAR 2D dikomentari agar tidak tampil di dashboard,
+                    // namun kodenya tetap utuh agar dapat digunakan kembali jika diperlukan:
+                    // _buildLidarVisualizationPage(),
+
+                    _buildTrajectoryPlanningPage(), // Slide 1 (Aktif pertama saat dibuka): Trajectory Planning
+                    _buildSteeringCteAnalysisPage(), // Slide 2: Steering + CTE Analysis
+                    _buildControlSystemPage(), // Slide 3: Control System Status
                   ],
                 ),
               ),
@@ -454,6 +490,8 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     _dotAnimationController.dispose();
     _dataTimer?.cancel();
     _speedSubscription?.cancel();
+    _distanceSubscription?.cancel();
+    _nearestSubscription?.cancel();
     _lidarSubscription?.cancel();
     _lidar2DSubscription?.cancel();
     _obstacleSubscription?.cancel();

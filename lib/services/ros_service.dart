@@ -162,6 +162,16 @@ class RosService {
       StreamController<Map<int, Color>>.broadcast();
   Map<int, Color>? _bevClassColorMapCache;
 
+  // Vehicle telemetry streams (Fase 6 — streaming topic terpisah dari Python)
+  final StreamController<double> _vehicleSpeedController =
+      StreamController<double>.broadcast();
+  final StreamController<double> _vehicleDistanceController =
+      StreamController<double>.broadcast();
+  final StreamController<double> _vehicleNearestController =
+      StreamController<double>.broadcast();
+  final StreamController<double> _vehicleImuYawController =
+      StreamController<double>.broadcast();
+
   // Public streams
   Stream<double> get speedometerStream => _speedometerController.stream;
   Stream<double> get speedometerRosStream => _speedometerRosController.stream;
@@ -212,6 +222,12 @@ class RosService {
   Stream<Map<int, Color>> get bevClassColorMapStream =>
       _bevClassColorMapController.stream;
   Map<int, Color>? get bevClassColorMap => _bevClassColorMapCache;
+
+  // Telemetry streams (Fase 6 — topic terpisah)
+  Stream<double> get vehicleSpeedStream => _vehicleSpeedController.stream;
+  Stream<double> get vehicleDistanceStream => _vehicleDistanceController.stream;
+  Stream<double> get vehicleNearestStream => _vehicleNearestController.stream;
+  Stream<double> get vehicleImuYawStream => _vehicleImuYawController.stream;
 
   // Get number of subscribed topics
   int get subscribedTopicsCount {
@@ -875,6 +891,12 @@ class RosService {
       // Python jalan, publish pertama itu akan lewat kalau kita belum
       // subscribe dari awal.
       {'topic': '/bev/class_color_map', 'type': 'std_msgs/String'},
+      // Telemetri kendaraan (Fase 6 — streaming topic terpisah dari Python)
+      {'topic': '/vehicle/speed', 'type': 'std_msgs/String'},
+      {'topic': '/vehicle/distance', 'type': 'std_msgs/String'},
+      {'topic': '/vehicle/nearest', 'type': 'std_msgs/String'},
+      {'topic': '/vehicle/imu_yaw', 'type': 'std_msgs/String'},
+      {'topic': '/vehicle/gps', 'type': 'std_msgs/String'},
     ];
 
     for (final t in topics) {
@@ -1086,6 +1108,21 @@ class RosService {
       case '/bev/class_color_map':
         _handleBevClassColorMapData(msg);
         break;
+      case '/vehicle/speed':
+        _handleVehicleSpeedData(msg);
+        break;
+      case '/vehicle/distance':
+        _handleVehicleDistanceData(msg);
+        break;
+      case '/vehicle/nearest':
+        _handleVehicleNearestData(msg);
+        break;
+      case '/vehicle/imu_yaw':
+        _handleVehicleImuYawData(msg);
+        break;
+      case '/vehicle/gps':
+        _handleVehicleGpsData(msg);
+        break;
       default:
         if (kDebugMode) _log('🔍 Unknown topic: $topic', level: 'DEBUG');
     }
@@ -1214,6 +1251,169 @@ class RosService {
     var value = hex.replaceFirst('#', '');
     if (value.length == 6) value = 'FF$value'; // tanpa alpha -> anggap opaque
     return Color(int.parse(value, radix: 16));
+  }
+
+  // Helper parser string JSON payload
+  Map<String, dynamic>? _parseJsonString(dynamic data) {
+    if (data == null) return null;
+    if (data is Map<String, dynamic>) return data;
+    if (data is String) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // Telemetri Fase 6 — /vehicle/speed (m/s -> km/h)
+  void _handleVehicleSpeedData(Map<String, dynamic> msg) {
+    try {
+      final parsed = _parseJsonString(msg['data']);
+      double? speedMs;
+      if (parsed != null && parsed.containsKey('value')) {
+        final val = parsed['value'];
+        if (val is num) speedMs = val.toDouble();
+      } else if (msg['data'] is num) {
+        speedMs = (msg['data'] as num).toDouble();
+      }
+      if (speedMs != null) {
+        final speedKmh = (speedMs * 3.6).clamp(0.0, 200.0);
+        _currentSpeed = speedKmh;
+        _safeAdd<double>(_vehicleSpeedController, speedKmh);
+        _safeAdd<double>(_speedometerController, speedKmh);
+        _safeAdd<double>(_speedometerRosController, speedKmh);
+        if (kDebugMode) {
+          _log(
+            '🚗 /vehicle/speed: ${speedMs.toStringAsFixed(2)} m/s → ${speedKmh.toStringAsFixed(2)} km/h',
+            level: 'DEBUG',
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        _log('❌ Error parsing /vehicle/speed: $e', level: 'ERROR');
+      }
+    }
+  }
+
+  // Telemetri Fase 6 — /vehicle/distance (meter)
+  void _handleVehicleDistanceData(Map<String, dynamic> msg) {
+    try {
+      final parsed = _parseJsonString(msg['data']);
+      double? distMeters;
+      if (parsed != null && parsed.containsKey('value')) {
+        final val = parsed['value'];
+        if (val is num) distMeters = val.toDouble();
+      } else if (msg['data'] is num) {
+        distMeters = (msg['data'] as num).toDouble();
+      }
+      if (distMeters != null) {
+        _safeAdd<double>(_vehicleDistanceController, distMeters);
+        if (kDebugMode) {
+          _log(
+            '📏 /vehicle/distance: ${distMeters.toStringAsFixed(2)} m',
+            level: 'DEBUG',
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        _log('❌ Error parsing /vehicle/distance: $e', level: 'ERROR');
+      }
+    }
+  }
+
+  // Telemetri Fase 6 — /vehicle/nearest (meter)
+  void _handleVehicleNearestData(Map<String, dynamic> msg) {
+    try {
+      final parsed = _parseJsonString(msg['data']);
+      double? nearestMeters;
+      if (parsed != null && parsed.containsKey('value')) {
+        final val = parsed['value'];
+        if (val is num) nearestMeters = val.toDouble();
+      } else if (msg['data'] is num) {
+        nearestMeters = (msg['data'] as num).toDouble();
+      }
+      if (nearestMeters != null) {
+        _safeAdd<double>(_vehicleNearestController, nearestMeters);
+        if (kDebugMode) {
+          _log(
+            '⚠️ /vehicle/nearest: ${nearestMeters.toStringAsFixed(2)} m',
+            level: 'DEBUG',
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        _log('❌ Error parsing /vehicle/nearest: $e', level: 'ERROR');
+      }
+    }
+  }
+
+  // Telemetri Fase 6 — /vehicle/imu_yaw (radian -> derajat)
+  void _handleVehicleImuYawData(Map<String, dynamic> msg) {
+    try {
+      final parsed = _parseJsonString(msg['data']);
+      double? yawRad;
+      if (parsed != null && parsed.containsKey('value')) {
+        final val = parsed['value'];
+        if (val is num) yawRad = val.toDouble();
+      } else if (msg['data'] is num) {
+        yawRad = (msg['data'] as num).toDouble();
+      }
+      if (yawRad != null) {
+        final yawDeg = _wrapDeg(yawRad * 180.0 / math.pi);
+        _currentImu['yaw'] = yawDeg;
+        _safeAdd<double>(_vehicleImuYawController, yawDeg);
+        _safeAdd<Map<String, double>>(_imuController, Map.from(_currentImu));
+        if (kDebugMode) {
+          _log(
+            '🧭 /vehicle/imu_yaw: ${yawRad.toStringAsFixed(3)} rad → ${yawDeg.toStringAsFixed(1)}°',
+            level: 'DEBUG',
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        _log('❌ Error parsing /vehicle/imu_yaw: $e', level: 'ERROR');
+      }
+    }
+  }
+
+  // Telemetri Fase 6 — /vehicle/gps (latitude, longitude)
+  void _handleVehicleGpsData(Map<String, dynamic> msg) {
+    try {
+      final parsed = _parseJsonString(msg['data']);
+      if (parsed != null) {
+        final latVal = parsed['lat'] ??
+            parsed['latitude'] ??
+            (parsed['value'] is Map ? parsed['value']['lat'] : null);
+        final lonVal = parsed['lon'] ??
+            parsed['lng'] ??
+            parsed['longitude'] ??
+            (parsed['value'] is Map
+                ? (parsed['value']['lon'] ?? parsed['value']['lng'])
+                : null);
+        final lat = (latVal is num) ? latVal.toDouble() : null;
+        final lon = (lonVal is num) ? lonVal.toDouble() : null;
+        if (lat != null && lon != null && (lat != 0.0 || lon != 0.0)) {
+          _currentGPS['lat'] = lat;
+          _currentGPS['lng'] = lon;
+          _safeAdd<Map<String, double>>(_gpsController, Map.from(_currentGPS));
+          if (kDebugMode) {
+            _log(
+              '📍 /vehicle/gps: (${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)})',
+              level: 'DEBUG',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        _log('❌ Error parsing /vehicle/gps: $e', level: 'ERROR');
+      }
+    }
   }
 
   // Enhanced GPS handler - simplified since we use /velocity for speed
@@ -1951,6 +2151,10 @@ class RosService {
     await _witmotionAngularVelocityController.close();
     await _bevFrameController.close();
     await _bevClassColorMapController.close();
+    await _vehicleSpeedController.close();
+    await _vehicleDistanceController.close();
+    await _vehicleNearestController.close();
+    await _vehicleImuYawController.close();
 
     _isConnected = false;
     _log('🛑 RosService disposed', level: 'INFO');

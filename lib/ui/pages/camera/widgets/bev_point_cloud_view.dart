@@ -102,9 +102,12 @@ const Map<int, String> _fallbackClassNames = {
 /// Panjang mobil kanonik (meter) -- buat menghitung skala layar model ego.
 const double _egoLengthMeters = 4.2;
 
-/// Koreksi arah depan model mevi3d dari sudut pandang top-down (tidak
-/// berubah dari versi sebelumnya).
-const double _bevEgoYawFixDeg = 180;
+/// Koreksi sudut hadap model mevi3d untuk tampilan ego BEV/SDC.
+/// Nilai 0 karena Car3DViewerWidget (Windows/Web) sudah secara internal
+/// menerapkan Car3DConstants.forwardYawOffsetDeg (180 deg) agar model menghadap
+/// ke depan (+x). Nilai 180 sebelumnya menyebabkan sudut total menjadi 360/0 derajat
+/// sehingga mobil menghadap terbalik ke belakang.
+const double _bevEgoYawFixDeg = 0;
 
 // ---------------------------------------------------------------------
 // Pengaturan ego (mobil 3D) -- semua bisa di-tuning di sini.
@@ -237,8 +240,9 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   // setState -> pohon widget tidak di-rebuild, cuma painter yang repaint.
   final ValueNotifier<_BevFrameData?> _frame = ValueNotifier(null);
   final ValueNotifier<_CamState> _cam = ValueNotifier(
-    // Mulai dari belakang ego, lihat ke depan (+x), ~31 derajat dari atas.
-    const _CamState(math.pi, 0.55, 28),
+    // Default POV: sudut elevasi tinggi / top-down (~80.2 derajat dari atas)
+    // agar mobil ego dan area sekitar tampak jelas dan proporsional.
+    const _CamState(math.pi, 1.4, 29.5),
   );
   final ValueNotifier<double> _egoYaw = ValueNotifier(0);
   late final Listenable _egoListenable = Listenable.merge([_cam, _egoYaw]);
@@ -251,7 +255,7 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   double _yawFrom = 0;
   double _yawTo = 0; // nilai target yang sudah difilter (EMA + deadband)
 
-  double _pinchStartDistance = 28;
+  double _pinchStartDistance = 29.5;
 
   // Hasil snapshot model 3D ego (kalau berhasil, WebView dibuang).
   ui.Image? _egoImage;
