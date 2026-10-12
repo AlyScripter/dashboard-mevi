@@ -8,6 +8,7 @@ import '../../../../core/theme/glass_container.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/theme/theme_controller.dart';
 import 'search_results_widget.dart';
+import 'in_app_notification_widget.dart';
 
 // ─── Tema token untuk SearchBar ───────────────────────────────────────────────
 // Semua warna widget dikontrol melalui kelas ini, bukan hardcode di dalam build.
@@ -172,10 +173,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
 
   OverlayEntry _createOverlayEntry() {
     // Ambil ukuran layar saat overlay dibuat agar lebar dropdown
-    // selalu sama dengan barWidth search bar (520 FullHD / 440 lainnya).
+    // selalu sama dengan barWidth search bar.
     final screenSize = MediaQuery.of(context).size;
     final isFullHD = screenSize.width >= 1900 && screenSize.height >= 1000;
-    final overlayWidth = isFullHD ? 520.0 : 440.0;
+    final overlayWidth = isFullHD ? 420.0 : 360.0;
 
     return OverlayEntry(
       builder: (context) {
@@ -184,7 +185,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            offset: const Offset(0, 70),
+            offset: const Offset(0, 56),
             child: Material(
               color: Colors.transparent,
               elevation: 0,
@@ -198,15 +199,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (_disposed || !mounted) return;
                     widget.onPreviewLocation?.call(trip.destination);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text('Preview: ${trip.name}'),
-                        duration: const Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+                    CenterNotification.show(
+                      this.context,
+                      message: 'Preview: ${trip.name}',
+                      kind: NotificationKind.info,
+                      duration: const Duration(seconds: 3),
                     );
                   });
                 },
@@ -286,68 +283,29 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       Navigator.of(context).pop();
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(
-                  LucideIcons.circleCheck,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Perjalanan dimulai: ${trip.name}',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green.shade600,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
+        CenterNotification.show(
+          context,
+          message: 'Perjalanan dimulai: ${trip.name}',
+          kind: NotificationKind.success,
+          duration: const Duration(seconds: 3),
         );
         widget.onLocationSelected(trip.destination);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(LucideIcons.circleAlert, color: Colors.white, size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Gagal memulai perjalanan. Pastikan sistem aktif.',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red.shade600,
-            duration: const Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
+        CenterNotification.show(
+          context,
+          message: 'Gagal memulai perjalanan. Pastikan sistem aktif.',
+          kind: NotificationKind.error,
+          duration: const Duration(seconds: 4),
         );
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red.shade600,
-          duration: const Duration(seconds: 4),
-        ),
+      CenterNotification.show(
+        context,
+        message: 'Error: $e',
+        kind: NotificationKind.error,
+        duration: const Duration(seconds: 4),
       );
     }
 
@@ -360,11 +318,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
     final screenHeight = MediaQuery.of(context).size.height;
     final isFullHD = screenWidth >= 1900 && screenHeight >= 1000;
 
-    final barHeight = isFullHD ? 60.0 : 52.0;
-    final barWidth = isFullHD ? 520.0 : 440.0;
-    final iconSize = isFullHD ? 22.0 : 20.0;
-    final fontSize = isFullHD ? 16.0 : 15.0;
-    final borderRadius = isFullHD ? 18.0 : 16.0;
+    final barHeight = isFullHD ? 50.0 : 44.0;
+    final barWidth = isFullHD ? 420.0 : 360.0;
+    final iconSize = isFullHD ? 20.0 : 18.0;
+    final fontSize = isFullHD ? 14.0 : 13.0;
+    final borderRadius = isFullHD ? 14.0 : 12.0;
 
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: appThemeMode,
@@ -383,20 +341,21 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             tint: t.containerBg,
             tintOpacity: 1.0,
             borderColor: t.containerBorder,
-            borderOpacity: 0.85,
-            borderWidth: 1.4,
+            borderOpacity: 0.7,
+            borderWidth: 1.2,
             boxShadow: [
               BoxShadow(
                 color: t.shadow,
-                blurRadius: 14,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(width: 18),
-                Icon(LucideIcons.search, color: t.iconColor, size: iconSize),
                 const SizedBox(width: 14),
+                Icon(LucideIcons.search, color: t.iconColor, size: iconSize),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
@@ -407,22 +366,24 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                       }
                     },
                     cursorColor: t.containerBorder,
+                    textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       hintText: 'Cari tujuan perjalanan...',
                       hintStyle: TextStyle(
                         color: t.hintColor,
                         fontSize: fontSize,
                         fontWeight: FontWeight.w400,
-                        letterSpacing: -0.3,
+                        letterSpacing: -0.2,
                       ),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                     style: TextStyle(
                       color: t.textColor,
                       fontSize: fontSize,
                       fontWeight: FontWeight.w500,
-                      letterSpacing: -0.3,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ),
@@ -441,9 +402,9 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                       FocusScope.of(context).unfocus();
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           color: t.clearBtnBg,
                           shape: BoxShape.circle,
@@ -451,12 +412,12 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
                         child: Icon(
                           LucideIcons.x,
                           color: t.clearBtnIcon,
-                          size: 14,
+                          size: 12,
                         ),
                       ),
                     ),
                   ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
             ),
           ),

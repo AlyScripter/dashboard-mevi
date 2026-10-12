@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:math' as math;
-import 'dart:ui' show Color;
+import 'dart:ui' show Color, Offset;
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
@@ -259,6 +259,10 @@ class RosService {
   List<double> get currentLidarRanges => List.from(_currentLidarRanges);
   LidarScan2D? get currentLidar2DScan => _currentLidar2DScan;
   bool get isConnected => _isConnected;
+  double _currentSteeringAngle = 0.0;
+  double _currentCte = 0.0;
+  double get currentSteeringAngle => _currentSteeringAngle;
+  double get currentCte => _currentCte;
 
   // Legacy speed getters - return 0 since we use /velocity topic
   double get gpsSpeed => 0.0; // No longer calculated
@@ -1202,6 +1206,12 @@ class RosService {
         );
       }
 
+      // Hitung otomatis Steering Angle & CTE jika tidak ada topik langsung dari ROS
+      // (misalnya saat memutar rekaman rosbag yang hanya mengirimkan stream /bev/frame)
+      if (wp is List && wp.isNotEmpty) {
+        _calculateDerivedSteeringAndCte(wp);
+      }
+
       _safeAdd<Map<String, dynamic>>(_bevFrameController, {
         'frame_idx': frameIdx,
         't': t,
@@ -1840,8 +1850,15 @@ class RosService {
     }
   }
 
+  DateTime? _lastDirectSteeringTime;
+  DateTime? _lastDirectCteTime;
+  double _filteredSteeringAngle = 0.0;
+  double _filteredCte = 0.0;
+
   void _handleSteeringAngleData(Map<String, dynamic> msg) {
+    _lastDirectSteeringTime = DateTime.now();
     final steeringAngle = (msg['data'] as num).toDouble();
+    _currentSteeringAngle = steeringAngle;
     _safeAdd<double>(_steeringAngleController, steeringAngle);
     if (kDebugMode) {
       _log(
@@ -1852,8 +1869,94 @@ class RosService {
   }
 
   void _handleCrossTrackErrorData(Map<String, dynamic> msg) {
+    _lastDirectCteTime = DateTime.now();
     final cte = (msg['data'] as num).toDouble();
+    _currentCte = cte;
     _safeAdd<double>(_crossTrackErrorController, cte);
+  }
+
+  /// Menghitung Cross Track Error (CTE) dan Steering Angle secara otomatis
+  /// dari rangkaian waypoints stream (/bev/frame) jika tidak ada topik langsung (/steering_angle, /cte)
+  /// yang dipublish oleh rosbag atau node ROS.
+  /// Jika sedang menerima topik langsung dari mobil (mode live asli), kalkulasi ini tidak akan menimpa data asli.
+  void _calculateDerivedSteeringAndCte(List<dynamic> wpList) {
+    if (wpList.length < 2) return;
+
+    final points = <Offset>[];
+    for (final p in wpList) {
+      if (p is List && p.length >= 2) {
+        final x = (p[0] as num).toDouble();
+        final y = (p[1] as num).toDouble();
+        points.add(Offset(x, y));
+      }
+    }
+    if (points.length < 2) return;
+
+    final now = DateTime.now();
+    final hasRecentDirectSteering = _lastDirectSteeringTime != null &&
+        now.difference(_lastDirectSteeringTime!).inMilliseconds < 2000;
+    final hasRecentDirectCte = _lastDirectCteTime != null &&
+        now.difference(_lastDirectCteTime!).inMilliseconds < 2000;
+
+    // 1. Hitung Cross Track Error (CTE)
+    if (!hasRecentDirectCte) {
+      final p0 = points[0];
+      final p1 = points[1];
+      final dx = p1.dx - p0.dx;
+      final dy = p1.dy - p0.dy;
+      final segLen = math.sqrt(dx * dx + dy * dy);
+
+      double rawCte = 0.0;
+      if (segLen > 1e-4) {
+        // Jarak deviasi lateral dari posisi mobil (0, 0) ke garis segmen waypoint terdekat
+        rawCte = (p0.dx * p1.dy - p0.dy * p1.dx) / segLen;
+      } else {
+        rawCte = p0.dy;
+      }
+
+      // Filter perataan (EMA) agar grafik mulus dan stabil
+      _filteredCte = _filteredCte * 0.70 + rawCte * 0.30;
+      _currentCte = _filteredCte;
+      _safeAdd<double>(_crossTrackErrorController, _filteredCte);
+    }
+
+    // 2. Hitung Steering Angle (Pure Pursuit Lookahead)
+    if (!hasRecentDirectSteering) {
+      const double lookaheadDist = 4.0;
+      Offset targetPoint = points.last;
+
+      for (int i = 0; i < points.length; i++) {
+        final pt = points[i];
+        final dist = math.sqrt(pt.dx * pt.dx + pt.dy * pt.dy);
+        if (dist >= lookaheadDist) {
+          targetPoint = pt;
+          break;
+        }
+      }
+
+      final alphaRad = math.atan2(targetPoint.dy, targetPoint.dx);
+      final distToTarget = math.sqrt(
+        targetPoint.dx * targetPoint.dx + targetPoint.dy * targetPoint.dy,
+      );
+
+      // Model kinematis sepeda (wheelbase MEVI ≈ 1.6 m)
+      const double wheelbase = 1.6;
+      final effectiveDist = math.max(1.5, distToTarget);
+      final deltaRad = math.atan2(
+        2.0 * wheelbase * math.sin(alphaRad),
+        effectiveDist,
+      );
+
+      // Konversi ke derajat (Di ROS ego frame: +y adalah kiri, -y adalah kanan.
+      // Di kemudi MEVI: + kanan, - kiri, maka -deltaRad * 180 / pi)
+      double rawSteeringDeg = -deltaRad * 180.0 / math.pi;
+      rawSteeringDeg = rawSteeringDeg.clamp(-35.0, 35.0);
+
+      _filteredSteeringAngle =
+          _filteredSteeringAngle * 0.70 + rawSteeringDeg * 0.30;
+      _currentSteeringAngle = _filteredSteeringAngle;
+      _safeAdd<double>(_steeringAngleController, _filteredSteeringAngle);
+    }
   }
 
   void _handleCbfValueData(Map<String, dynamic> msg) {

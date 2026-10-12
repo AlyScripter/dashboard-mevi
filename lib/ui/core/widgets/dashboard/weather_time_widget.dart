@@ -196,69 +196,69 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
         final compact = widget.compactMode || availW < 380 || screenW < 420;
 
         final timeFont = widget.embedded
-            ? 20.0
+            ? 18.0
             : widget.compactMode
             ? (isLargeScreen
-                  ? 18.0
+                  ? 15.0
                   : isTablet
-                  ? 16.0
-                  : 14.0)
+                  ? 13.0
+                  : 12.0)
             : (isLargeScreen
-                  ? 24.0
+                  ? 20.0
                   : compact
-                  ? 16.0
-                  : 20.0);
+                  ? 14.0
+                  : 17.0);
         final weatherFont = widget.compactMode
             ? (isLargeScreen
-                  ? 14.0
+                  ? 12.0
                   : isTablet
-                  ? 12.0
-                  : 11.0)
+                  ? 11.0
+                  : 10.0)
             : (isLargeScreen
-                  ? 18.0
+                  ? 14.0
                   : compact
-                  ? 12.0
-                  : 16.0);
+                  ? 11.0
+                  : 13.0);
         final iconSize = widget.compactMode
             ? (isLargeScreen
-                  ? 20.0
+                  ? 16.0
                   : isTablet
-                  ? 18.0
-                  : 16.0)
+                  ? 14.0
+                  : 13.0)
             : (isLargeScreen
-                  ? 28.0
+                  ? 22.0
                   : compact
-                  ? 18.0
-                  : 24.0);
+                  ? 15.0
+                  : 19.0);
         final gap = widget.compactMode
             ? (isLargeScreen
-                  ? 10.0
+                  ? 8.0
                   : isTablet
-                  ? 8.0
-                  : 6.0)
+                  ? 6.0
+                  : 5.0)
             : (isLargeScreen
-                  ? 16.0
+                  ? 12.0
                   : compact
-                  ? 8.0
-                  : 12.0);
-        // REVISI: containerHeight compactMode difix ke 38px (= tinggi dropdown)
+                  ? 6.0
+                  : 10.0);
+        // REVISI: containerHeight compactMode difix ke 34px
         final containerHeight = widget.embedded
             ? null
             : widget.compactMode
-            ? 38.0
+            ? 34.0
             : (isLargeScreen
-                  ? 70.0
+                  ? 56.0
                   : compact
-                  ? 38.0
-                  : 58.0);
-        // REVISI: horizontalPadding compactMode = 12px (sama dengan dropdown)
+                  ? 34.0
+                  : 48.0);
+        // REVISI: horizontalPadding compactMode = 10px
         final horizontalPadding = widget.compactMode
-            ? 12.0
+            ? 10.0
             : (isLargeScreen
-                  ? 20.0
+                  ? 16.0
                   : compact
-                  ? 12.0
-                  : 16.0);
+                  ? 10.0
+                  : 14.0);
 
         final content = Row(
           mainAxisSize: MainAxisSize.min,
@@ -318,19 +318,19 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
           height: containerHeight,
           padding: EdgeInsets.symmetric(
             horizontal: horizontalPadding,
-            // vertical 0 di compactMode — height sudah fix 38px
-            vertical: widget.compactMode ? 0 : 12,
+            // vertical 0 di compactMode — height sudah fix
+            vertical: widget.compactMode ? 0 : 8,
           ),
           decoration: BoxDecoration(
             color: bgColor,
             gradient: bgGradient,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: borderColor, width: 1.0),
             boxShadow: [
               BoxShadow(
                 color: shadowColor,
-                blurRadius: 14,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -348,12 +348,12 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
         return ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: isLargeScreen
-                ? 520
+                ? 420
                 : compact
-                ? 260
-                : 480,
+                ? 220
+                : 380,
           ),
-          child: SizedBox(height: containerHeight ?? 56, child: box),
+          child: SizedBox(height: containerHeight ?? 48, child: box),
         );
       },
     );

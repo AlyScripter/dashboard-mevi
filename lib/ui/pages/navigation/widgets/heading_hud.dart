@@ -6,7 +6,8 @@ import 'package:dashboardmevi/services/ros_service.dart';
 import 'package:dashboardmevi/core/theme/colors.dart';
 
 class HeadingHUD extends StatelessWidget {
-  const HeadingHUD({super.key});
+  final double? headingOverride;
+  const HeadingHUD({super.key, this.headingOverride});
 
   String _headingToCardinal(double heading) {
     const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -47,16 +48,16 @@ class HeadingHUD extends StatelessWidget {
     final isLaptop = diagonal >= 700;
     final isTablet = diagonal >= 500 && diagonal < 700;
 
-    final double rightPos = isLaptop ? 55.0 : (isTablet ? 40.0 : 25.0);
-    final double topPos = isLaptop ? 120.0 : (isTablet ? 105.0 : 110.0);
-    final double iconSize = isLaptop ? 28.0 : (isTablet ? 24.0 : 18.0);
-    final double horizontalPadding = isLaptop ? 16.0 : (isTablet ? 14.0 : 10.0);
-    final double verticalPadding = isLaptop ? 12.0 : (isTablet ? 10.0 : 8.0);
-    final double containerWidth = isLaptop ? 135.0 : (isTablet ? 120.0 : 100.0);
-    final double fontSizeHeading = isLaptop ? 22.0 : (isTablet ? 18.0 : 14.0);
-    final double fontSizeCardinal = isLaptop ? 16.0 : (isTablet ? 14.0 : 11.0);
-    final double spacing = isLaptop ? 12.0 : (isTablet ? 10.0 : 8.0);
-    final double borderRadiusValue = isLaptop ? 20.0 : (isTablet ? 18.0 : 16.0);
+    final double rightPos = isLaptop ? 40.0 : (isTablet ? 30.0 : 20.0);
+    final double topPos = isLaptop ? 96.0 : (isTablet ? 80.0 : 72.0);
+    final double iconSize = isLaptop ? 22.0 : (isTablet ? 18.0 : 15.0);
+    final double horizontalPadding = isLaptop ? 12.0 : (isTablet ? 10.0 : 8.0);
+    final double verticalPadding = isLaptop ? 10.0 : (isTablet ? 8.0 : 6.0);
+    final double containerWidth = isLaptop ? 105.0 : (isTablet ? 90.0 : 78.0);
+    final double fontSizeHeading = isLaptop ? 18.0 : (isTablet ? 15.0 : 12.0);
+    final double fontSizeCardinal = isLaptop ? 12.0 : (isTablet ? 11.0 : 10.0);
+    final double spacing = isLaptop ? 8.0 : (isTablet ? 7.0 : 6.0);
+    final double borderRadiusValue = isLaptop ? 14.0 : (isTablet ? 12.0 : 10.0);
 
     return Positioned(
       right: rightPos,
@@ -64,11 +65,15 @@ class HeadingHUD extends StatelessWidget {
       child: StreamBuilder<Map<String, double>>(
         stream: RosService().imuStream,
         builder: (context, snapshot) {
-          double heading = context.select(
-            (NavigationCubit c) => c.state.fallbackHeadingDeg,
-          );
+          double heading = headingOverride ??
+              context.select(
+                (NavigationCubit c) => c.state.fallbackHeadingDeg,
+              );
           final imu = snapshot.data;
-          if (imu != null && imu['yaw'] != null) heading = imu['yaw']!;
+          // Hanya gunakan raw IMU yaw jika tidak ada headingOverride dan fallbackHeadingDeg belum terset (0.0)
+          if (headingOverride == null && heading == 0.0 && imu != null && imu['yaw'] != null) {
+            heading = imu['yaw']!;
+          }
 
           return Container(
             padding: EdgeInsets.symmetric(
@@ -82,12 +87,12 @@ class HeadingHUD extends StatelessWidget {
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(borderRadiusValue),
-              border: Border.all(color: borderColor, width: 1.4),
+              border: Border.all(color: borderColor, width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: shadowColor,
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),

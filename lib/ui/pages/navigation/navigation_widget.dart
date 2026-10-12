@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'bloc/navigation_cubit.dart';
 import 'widgets/map_view.dart';
 import 'widgets/heading_hud.dart';
 import 'widgets/search_bar_widget.dart';
@@ -67,9 +69,16 @@ class NavigationWidgetState extends State<NavigationWidget> {
 
   StreamSubscription<InAppNotification>? _inAppSubscription;
   StreamSubscription<Map<String, double>>? _rosGpsSubscription;
+  StreamSubscription<Map<String, double>>? _rosImuSubscription;
   StreamSubscription<double>? _rosLatSubscription;
   StreamSubscription<double>? _rosLngSubscription;
   StreamSubscription<double>? _rosSpeedSubscription;
+
+  // Heading and motion tracking
+  LatLng? _lastMovementPosition;
+  double _vehicleHeading = 0.0;
+  double? _imuHeadingOffset;
+  double _lastRawImuYaw = 0.0;
 
   // State management
   bool _isLoading = false;
@@ -122,6 +131,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
   void dispose() {
     _inAppSubscription?.cancel();
     _rosGpsSubscription?.cancel();
+    _rosImuSubscription?.cancel();
     _rosLatSubscription?.cancel();
     _rosLngSubscription?.cancel();
     _rosSpeedSubscription?.cancel();
@@ -150,10 +160,13 @@ class NavigationWidgetState extends State<NavigationWidget> {
     });
 
     _gpsSimulatorTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      final nextPos = samplePath[_simIndex % samplePath.length];
       setState(() {
-        _currentPosition = samplePath[_simIndex % samplePath.length];
+        _currentPosition = nextPos;
         _simIndex++;
       });
+
+      _updateVehicleHeadingOnMovement(nextPos);
 
       // Update route data service dengan posisi simulator
       if (_currentPosition != null) {
@@ -176,6 +189,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
           _currentPosition = newPos;
         });
 
+        // Update arah gerak mobil berdasarkan Course Over Ground & keselarasan rute jalan
+        _updateVehicleHeadingOnMovement(newPos);
+
         // Geser posisi kamera peta mengikuti pergerakan mobil
         try {
           _mapController.move(newPos, _mapController.camera.zoom);
@@ -192,6 +208,20 @@ class NavigationWidgetState extends State<NavigationWidget> {
       },
     );
 
+    // Listen to ROS IMU updates untuk merespons rotasi bermanuver dengan sinkron
+    _rosImuSubscription = rosService.imuStream.listen(
+      (imu) {
+        if (!mounted) return;
+        final yaw = imu['yaw'];
+        if (yaw != null) {
+          _handleImuYawUpdate(yaw);
+        }
+      },
+      onError: (error) {
+        debugPrint('❌ ROS IMU stream error: $error');
+      },
+    );
+
     // Optional: Listen to ROS speed for debugging
     _rosSpeedSubscription = rosService.speedometerRosStream.listen(
       (speed) {
@@ -204,6 +234,146 @@ class NavigationWidgetState extends State<NavigationWidget> {
         debugPrint('❌ ROS Speed stream error: $error');
       },
     );
+  }
+
+  /// Hitung bearing (derajat 0-360) antara dua titik koordinat
+  double _calculateBearing(LatLng from, LatLng to) {
+    final lat1 = from.latitude * (pi / 180.0);
+    final lon1 = from.longitude * (pi / 180.0);
+    final lat2 = to.latitude * (pi / 180.0);
+    final lon2 = to.longitude * (pi / 180.0);
+
+    final dLon = lon2 - lon1;
+    final y = sin(dLon) * cos(lat2);
+    final x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+
+    final radians = atan2(y, x);
+    return (radians * (180.0 / pi) + 360.0) % 360.0;
+  }
+
+  /// Hitung jarak permukaan bumi dalam meter
+  double _calculateDistanceMeters(LatLng p1, LatLng p2) {
+    const earthRadius = 6371000.0;
+    final lat1 = p1.latitude * (pi / 180.0);
+    final lat2 = p2.latitude * (pi / 180.0);
+    final dLat = (p2.latitude - p1.latitude) * (pi / 180.0);
+    final dLon = (p2.longitude - p1.longitude) * (pi / 180.0);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  /// Selisih sudut melingkar terpendek (-180 sampai 180)
+  double _angleDifference(double target, double current) {
+    return ((target - current + 180.0) % 360.0) - 180.0;
+  }
+
+  /// Blend/interpolasi sudut melingkar (lerp angular)
+  double _blendAngles(double current, double target, double weight) {
+    final diff = _angleDifference(target, current);
+    return (current + diff * weight + 360.0) % 360.0;
+  }
+
+  /// Cari arah segmen jalur polyline rute yang paling dekat dengan posisi mobil
+  double? _findClosestSegmentBearing(LatLng currentPos, List<LatLng> points) {
+    if (points.length < 2) return null;
+
+    double minDistance = double.infinity;
+    double? bestBearing;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+
+      final midPoint = LatLng(
+        (p1.latitude + p2.latitude) / 2,
+        (p1.longitude + p2.longitude) / 2,
+      );
+      final dist = _calculateDistanceMeters(currentPos, midPoint);
+
+      if (dist < minDistance && dist < 40.0) {
+        minDistance = dist;
+        bestBearing = _calculateBearing(p1, p2);
+      }
+    }
+
+    return bestBearing;
+  }
+
+  /// Update heading mobil ketika posisi berpindah maju di jalur
+  void _updateVehicleHeadingOnMovement(LatLng newPos) {
+    if (_lastMovementPosition == null) {
+      _lastMovementPosition = newPos;
+      // Coba inisialisasi arah awal jika ada rute
+      if (_polylinePoints.length >= 2) {
+        final initialBearing = _calculateBearing(_polylinePoints[0], _polylinePoints[1]);
+        _vehicleHeading = initialBearing;
+        if (mounted) {
+          try {
+            context.read<NavigationCubit>().updateHeading(initialBearing);
+          } catch (_) {}
+        }
+      }
+      return;
+    }
+
+    final dist = _calculateDistanceMeters(_lastMovementPosition!, newPos);
+
+    // Filter noise/jitter GPS: hanya update heading jika mobil berpindah >= 0.30 meter
+    if (dist >= 0.30) {
+      double targetBearing = _calculateBearing(_lastMovementPosition!, newPos);
+
+      // Jika ada rute navigasi yang aktif, selaraskan dengan segmen jalur rute
+      // agar posisi dan orientasi mobil presisi mengikuti lintasan jalan
+      if (_polylinePoints.length >= 2) {
+        final routeBearing = _findClosestSegmentBearing(newPos, _polylinePoints);
+        if (routeBearing != null) {
+          final diff = _angleDifference(routeBearing, targetBearing).abs();
+          if (diff < 70.0) {
+            // Prioritaskan keselarasan dengan jalur rute jalan (85% rute, 15% gerakan GPS)
+            targetBearing = _blendAngles(targetBearing, routeBearing, 0.85);
+          }
+        }
+      }
+
+      // Haluskan transisi sudut rotasi
+      final smoothed = _blendAngles(_vehicleHeading, targetBearing, 0.5);
+      setState(() {
+        _vehicleHeading = smoothed;
+      });
+      _lastMovementPosition = newPos;
+
+      // Update kalibrasi offset IMU dari pergerakan Course Over Ground
+      _imuHeadingOffset = (_vehicleHeading - _lastRawImuYaw + 360.0) % 360.0;
+
+      if (mounted) {
+        try {
+          context.read<NavigationCubit>().updateHeading(_vehicleHeading);
+        } catch (_) {}
+      }
+    }
+  }
+
+  /// Menangani update IMU yaw sensor
+  void _handleImuYawUpdate(double rawYaw) {
+    _lastRawImuYaw = rawYaw;
+    // Jika sudah ada kalibrasi offset dari pergerakan, gunakan IMU terkalibrasi saat bermanuver
+    if (_imuHeadingOffset != null) {
+      final calibrated = (rawYaw + _imuHeadingOffset! + 360.0) % 360.0;
+      final smoothed = _blendAngles(_vehicleHeading, calibrated, 0.2);
+      if ((_vehicleHeading - smoothed).abs() > 0.15) {
+        setState(() {
+          _vehicleHeading = smoothed;
+        });
+        if (mounted) {
+          try {
+            context.read<NavigationCubit>().updateHeading(_vehicleHeading);
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   void _setupNotifications() {
@@ -231,7 +401,8 @@ class NavigationWidgetState extends State<NavigationWidget> {
       _inAppNotificationKind = kind;
     });
 
-    Timer(Duration(seconds: seconds), () {
+    _inAppNotificationTimer?.cancel();
+    _inAppNotificationTimer = Timer(Duration(seconds: seconds), () {
       if (mounted) {
         setState(() {
           _showInAppNotification = false;
@@ -367,9 +538,11 @@ class NavigationWidgetState extends State<NavigationWidget> {
       _fitMapBounds();
 
       if (mounted) {
-        ScaffoldMessenger.of(
+        CenterNotification.show(
           context,
-        ).showSnackBar(SnackBar(content: Text("Route error: $e")));
+          message: "Route error: $e",
+          kind: NotificationKind.error,
+        );
       }
     } finally {
       _setLoadingState(false);
@@ -476,6 +649,12 @@ class NavigationWidgetState extends State<NavigationWidget> {
 
     setState(() {
       _polylinePoints = routePoints;
+      if (routePoints.length >= 2 && _vehicleHeading == 0.0) {
+        _vehicleHeading = _calculateBearing(routePoints[0], routePoints[1]);
+        try {
+          context.read<NavigationCubit>().updateHeading(_vehicleHeading);
+        } catch (_) {}
+      }
     });
 
     // Update RouteDataService untuk videostream
@@ -790,9 +969,9 @@ class NavigationWidgetState extends State<NavigationWidget> {
     final isLargeScreen = diagonal >= 700; // ~13 inches threshold
 
     // Spacing & sizing tuned based on screen physical size
-    final searchBarTop = isLargeScreen ? 36.0 : 16.0;
-    final searchBarLeft = isLargeScreen ? 48.0 : 16.0;
-    final searchBarMaxWidth = isLargeScreen ? 720.0 : 480.0;
+    final searchBarTop = isLargeScreen ? 24.0 : 14.0;
+    final searchBarLeft = isLargeScreen ? 32.0 : 14.0;
+    final searchBarMaxWidth = isLargeScreen ? 440.0 : 380.0;
 
     // REVISI: tombol "pusatkan ke mobil" diturunkan dan disejajarkan
     // dengan pill "Tentukan destinasi Anda" (bottom pill di
@@ -800,10 +979,10 @@ class NavigationWidgetState extends State<NavigationWidget> {
     // bukan lagi mengambang di tengah layar menumpuk area logo peta.
     // Offset dihitung supaya titik tengah tombol sejajar dengan titik
     // tengah pill tersebut.
-    final centerBtnRight = isLargeScreen ? 48.0 : 35.0;
-    final centerBtnSize = isLargeScreen ? 56.0 : 48.0;
-    const routePillBottomPadding = {'large': 40.0, 'small': 24.0};
-    const routePillHeight = {'large': 72.0, 'small': 62.0};
+    final centerBtnRight = isLargeScreen ? 36.0 : 28.0;
+    final centerBtnSize = isLargeScreen ? 46.0 : 40.0;
+    const routePillBottomPadding = {'large': 32.0, 'small': 20.0};
+    const routePillHeight = {'large': 80.0, 'small': 68.0};
     final centerBtnBottom = isLargeScreen
         ? routePillBottomPadding['large']! +
               (routePillHeight['large']! - centerBtnSize) / 2
@@ -826,10 +1005,13 @@ class NavigationWidgetState extends State<NavigationWidget> {
               destinationLocation: _destinationLocation,
               polylinePoints: _polylinePoints,
               placeholderPosition: _getPlaceholderLocation(),
+              vehicleHeading: _vehicleHeading,
             ),
 
-            // Heading HUD (kept as-is; assumed responsive internally)
-            const HeadingHUD(),
+            // Heading HUD yang menampilkan arah gerak aktual mobil
+            HeadingHUD(
+              headingOverride: _vehicleHeading > 0.0 ? _vehicleHeading : null,
+            ),
 
             // Search bar — hanya tampil di halaman Maps (showSearchBar: true).
             // Saat false, widget tidak dirender sama sekali sehingga overlay

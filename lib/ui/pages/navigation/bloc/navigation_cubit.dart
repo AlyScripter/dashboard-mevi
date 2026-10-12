@@ -27,6 +27,14 @@ class NavigationCubit extends Cubit<NavigationState> {
     });
   }
 
+  /// Update vehicle heading yang sudah dikalkulasi dari arah gerak/jalur
+  void updateHeading(double headingDeg) {
+    final normalized = (headingDeg % 360.0 + 360.0) % 360.0;
+    if ((state.fallbackHeadingDeg - normalized).abs() > 0.2) {
+      emit(state.copyWith(fallbackHeadingDeg: normalized));
+    }
+  }
+
   void onPanStart(DragStartDetails d) {}
 
   void onPanUpdate(DragUpdateDetails d) {}

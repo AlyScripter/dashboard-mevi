@@ -23,6 +23,9 @@ class _CteChartState extends State<CteChart> {
   }
 
   void _setupCteListener() {
+    if (_rosService.currentCte != 0.0) {
+      _cteHistory.add(DataPoint(DateTime.now(), _rosService.currentCte));
+    }
     _rosService.crossTrackErrorStream.listen((cte) {
       if (mounted) {
         setState(() {
@@ -101,6 +104,7 @@ class _CteChartState extends State<CteChart> {
               const Spacer(),
               StreamBuilder<double>(
                 stream: _rosService.crossTrackErrorStream,
+                initialData: _rosService.currentCte,
                 builder: (context, snapshot) {
                   final currentValue = snapshot.data ?? 0.0;
                   return Container(

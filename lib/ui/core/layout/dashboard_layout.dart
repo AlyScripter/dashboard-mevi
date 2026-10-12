@@ -14,6 +14,7 @@ import '../../pages/bev/bev_page.dart';
 import '../widgets/navigation/side_nav_rail.dart';
 import '../../../services/navigation_distance_service.dart';
 import '../../../services/trip_service.dart';
+import '../../../services/voice_navigation_service.dart';
 import '../../../core/theme/glass_container.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -93,6 +94,10 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   }
 
   void _onNavSelect(String id) {
+    if (id != 'bev') {
+      VoiceNavigationService().stop();
+      VoiceNavigationService().clearInstruction();
+    }
     setState(() {
       switch (id) {
         case 'maps':
@@ -433,8 +438,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   // "mendekati" sejajar seperti sebelumnya.
   Widget _buildBottomOverlay() {
     final isLargeScreen = _isLargeScreen(context);
-    final bottomPadding = isLargeScreen ? 40.0 : 24.0;
-    final horizontalPadding = isLargeScreen ? 48.0 : 16.0;
+    final bottomPadding = isLargeScreen ? 32.0 : 20.0;
+    final horizontalPadding = isLargeScreen ? 32.0 : 14.0;
 
     // Ikuti tema aktif — dark mode pakai navy glass, light mode pakai putih
     return ValueListenableBuilder<ThemeMode>(
@@ -456,25 +461,15 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   // more in line with the search bar above. Pass dark: true over dark
   // backgrounds so it doesn't wash out.
   Widget _buildRouteInfoContainer(bool isLargeScreen, {bool dark = false}) {
-    // REVISI 2: lebar sebelumnya disamakan ke `searchBarMaxWidth`
-    // (720/480), TAPI itu cuma sebuah ConstrainedBox longgar yang tidak
-    // pernah dipakai penuh — SearchBarWidget sendiri (lihat
-    // search_bar_widget.dart) sudah punya `width` tetap sendiri
-    // (`barWidth = isFullHD ? 520.0 : 440.0`, berdasarkan resolusi
-    // layar, bukan `isLargeScreen`/diagonal seperti di sini), jadi
-    // hasilnya pill ini malah lebih lebar dari search bar aslinya.
-    // Sekarang dihitung ulang persis dengan rumus + angka yang sama
-    // dengan search_bar_widget.dart supaya lebarnya betul-betul sama,
-    // bukan cuma dikira-kira dari `isLargeScreen`.
     final screenSize = MediaQuery.of(context).size;
     final isFullHD = screenSize.width >= 1900 && screenSize.height >= 1000;
 
-    final containerHeight = isLargeScreen ? 110.0 : 94.0;
-    final horizontalPadding = isLargeScreen ? 20.0 : 17.0;
-    final verticalPadding = isLargeScreen ? 15.0 : 12.0;
-    final maxWidth = isFullHD ? 520.0 : 440.0;
-    final cardBorderRadius = isLargeScreen ? 22.0 : 18.0;
-    final iconSize = isLargeScreen ? 24.0 : 21.0;
+    final containerHeight = isLargeScreen ? 86.0 : 74.0;
+    final horizontalPadding = isLargeScreen ? 16.0 : 14.0;
+    final verticalPadding = isLargeScreen ? 12.0 : 10.0;
+    final maxWidth = isFullHD ? 420.0 : 360.0;
+    final cardBorderRadius = isLargeScreen ? 16.0 : 14.0;
+    final iconSize = isLargeScreen ? 20.0 : 18.0;
     // Light mode: teks biru tua senada dengan nav rail & search bar terang
     final textColor = dark ? Colors.white : const Color(0xFF1A237E);
     final subTextColor = dark ? Colors.white70 : const Color(0xFF546E7A);
@@ -486,34 +481,30 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         horizontal: horizontalPadding,
         vertical: verticalPadding,
       ),
-      // Rounded rectangle (bukan pill lagi) — radius disamakan dengan
-      // widget kaca lain di dashboard supaya bentuknya senada.
+      // Rounded rectangle — radius disamakan dengan widget lain
       borderRadius: cardBorderRadius,
       blurSigma: 0,
       // Light mode: putih solid + border biru, senada dengan search bar & dropdown
       tint: dark ? AppColors.glassNavyTint : Colors.white,
       tintOpacity: 1.0,
       borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFF1976D2),
-      borderOpacity: 0.85,
-      borderWidth: 1.4,
+      borderOpacity: 0.7,
+      borderWidth: 1.2,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: dark ? 0.35 : 0.15),
-          blurRadius: 14,
-          offset: const Offset(0, 4),
+          color: Colors.black.withValues(alpha: dark ? 0.3 : 0.12),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
         ),
       ],
       child: Row(
         children: [
           Container(
-            width: isLargeScreen ? 60 : 50,
-            height: isLargeScreen ? 60 : 50,
+            width: isLargeScreen ? 44 : 38,
+            height: isLargeScreen ? 44 : 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              // Blue gradient badge, same accent family used by the
-              // active item in the side nav rail — ties the pill back
-              // to the reference's blue-highlight style.
               gradient: dark
                   ? LinearGradient(
                       colors: [
@@ -532,7 +523,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
               color: _getRouteStatusColor(),
             ),
           ),
-          SizedBox(width: isLargeScreen ? 14 : 12),
+          SizedBox(width: isLargeScreen ? 12 : 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,7 +533,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                 Text(
                   _routeName,
                   style: TextStyle(
-                    fontSize: isLargeScreen ? 16.0 : 14.0,
+                    fontSize: isLargeScreen ? 14.0 : 12.5,
                     fontWeight: FontWeight.w500,
                     color: textColor,
                     letterSpacing: -0.2,
@@ -550,7 +541,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                SizedBox(height: isLargeScreen ? 6 : 5),
+                SizedBox(height: isLargeScreen ? 5 : 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -562,7 +553,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                       color: subTextColor,
                       valueColor: textColor,
                     ),
-                    SizedBox(width: isLargeScreen ? 16.0 : 14.0),
+                    SizedBox(width: isLargeScreen ? 14.0 : 12.0),
                     _buildMetricItem(
                       icon: LucideIcons.clock,
                       value: _getDisplayEta(),
@@ -577,7 +568,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
             ),
           ),
           if (_showCancelButton) ...[
-            SizedBox(width: isLargeScreen ? 10 : 8),
+            SizedBox(width: isLargeScreen ? 8 : 6),
             _buildCancelButton(isLargeScreen: isLargeScreen),
           ],
         ],
@@ -587,8 +578,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   /// Build cancel button (Apple-style)
   Widget _buildCancelButton({required bool isLargeScreen}) {
-    final buttonSize = isLargeScreen ? 46.0 : 40.0;
-    final iconSize = isLargeScreen ? 22.0 : 19.0;
+    final buttonSize = isLargeScreen ? 38.0 : 34.0;
+    final iconSize = isLargeScreen ? 18.0 : 16.0;
 
     return GestureDetector(
       onTap: _cancelNavigation,
@@ -600,9 +591,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF3B30).withValues(alpha: 0.25),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: const Color(0xFFFF3B30).withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -623,8 +614,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     // dengan ukuran ikon badge status) alih-alih dihitung sendiri di
     // sini, supaya semua ikon dalam pill "Tentukan destinasi Anda"
     // konsisten satu ukuran.
-    final fontSize = isLargeScreen ? 16.0 : 14.0;
-    final spacing = isLargeScreen ? 7.0 : 6.0;
+    final fontSize = isLargeScreen ? 13.0 : 11.5;
+    final spacing = isLargeScreen ? 5.0 : 4.0;
 
     return Row(
       children: [
@@ -639,7 +630,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
               fontSize: fontSize,
               fontWeight: FontWeight.w500,
               color: valueColor ?? Colors.black87,
-              letterSpacing: -0.3,
+              letterSpacing: -0.2,
             ),
           ),
         ),
@@ -705,11 +696,11 @@ class _LayoutDashboardState extends State<LayoutDashboard>
       rightPadding = 10.0;
     } else if (compactMode) {
       // For DataPage - position higher to avoid collision with DataPageHeader
-      topPadding = isLargeScreen ? 18.0 : (isTablet ? 12.0 : 10.0);
-      rightPadding = isLargeScreen ? 24.0 : (isTablet ? 16.0 : 12.0);
+      topPadding = isLargeScreen ? 16.0 : (isTablet ? 10.0 : 8.0);
+      rightPadding = isLargeScreen ? 20.0 : (isTablet ? 14.0 : 10.0);
     } else {
-      topPadding = isLargeScreen ? 36.0 : 16.0;
-      rightPadding = isLargeScreen ? 48.0 : 20.0;
+      topPadding = isLargeScreen ? 24.0 : 14.0;
+      rightPadding = isLargeScreen ? 36.0 : 16.0;
     }
 
     return Positioned(

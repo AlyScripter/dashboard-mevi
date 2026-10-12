@@ -23,6 +23,11 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
   }
 
   void _setupSteeringListener() {
+    if (_rosService.currentSteeringAngle != 0.0) {
+      _steeringHistory.add(
+        DataPoint(DateTime.now(), _rosService.currentSteeringAngle),
+      );
+    }
     _rosService.steeringAngleStream.listen((steeringAngle) {
       if (mounted) {
         setState(() {
@@ -105,6 +110,7 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
               const Spacer(),
               StreamBuilder<double>(
                 stream: _rosService.steeringAngleStream,
+                initialData: _rosService.currentSteeringAngle,
                 builder: (context, snapshot) {
                   final currentValue = snapshot.data ?? 0.0;
                   return Container(

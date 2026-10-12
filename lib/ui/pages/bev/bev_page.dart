@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/dimensions.dart';
 import '../../../services/ros_service.dart';
+import '../../../services/voice_navigation_service.dart';
 import '../../core/panels/status_indicator_panel.dart';
 import '../../core/widgets/dashboard/speed_display_widget.dart';
 import '../../core/widgets/dashboard/battery_indicator_widget.dart';
@@ -32,6 +33,13 @@ class _BevPageState extends State<BevPage> {
   bool _hazardOn = false;
   double _batteryPercent = 0.6;
   String _gear = 'P';
+
+  @override
+  void dispose() {
+    VoiceNavigationService().stop();
+    VoiceNavigationService().clearInstruction();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

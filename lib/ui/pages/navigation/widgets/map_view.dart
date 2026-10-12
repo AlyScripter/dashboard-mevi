@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 // ignore: unused_import -- used below for headingRadians
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../services/ros_service.dart';
@@ -27,6 +27,8 @@ class MapView extends StatelessWidget {
   final List<LatLng> polylinePoints;
   // Stable placeholder position to prevent marker drift when GPS unavailable
   final LatLng? placeholderPosition;
+  // Dynamic vehicle heading aligned with road/travel path
+  final double? vehicleHeading;
 
   const MapView({
     super.key,
@@ -43,6 +45,7 @@ class MapView extends StatelessWidget {
     this.destinationLocation,
     this.polylinePoints = const [],
     this.placeholderPosition,
+    this.vehicleHeading,
   });
 
   @override
@@ -99,77 +102,20 @@ class MapView extends StatelessWidget {
               MarkerLayer(
                 markers: [
                   Marker(
-                    width: 50,
-                    height: 50,
+                    width: 56,
+                    height: 56,
                     point: currentPosition ?? placeholderPosition ?? center,
                     child: StreamBuilder<Map<String, double>>(
                       stream: RosService().imuStream,
                       builder: (context, snapshot) {
-                        // Get heading from IMU stream or fallback
-                        // Start with fallback heading; override if IMU provides yaw
-                        double heading = fallbackHeading;
+                        double heading = vehicleHeading ?? fallbackHeading;
                         final imu = snapshot.data;
-                        if (imu != null && imu['yaw'] != null) {
+                        // Fallback ke raw IMU hanya jika belum ada heading kalkulasi rute/gerak
+                        if (vehicleHeading == null && heading == 0.0 && imu != null && imu['yaw'] != null) {
                           heading = imu['yaw']!;
                         }
-                        final headingRadians = heading * (pi / 180);
 
-                        return Transform.rotate(
-                          angle: headingRadians,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Clean light background circle
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.white, // White background
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(
-                                      0xFF1976D2,
-                                    ), // Material blue border
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFF1976D2,
-                                      ).withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 0),
-                                    ),
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Car icon with clean styling
-                              Image.asset(
-                                'assets/images/mevicar.png',
-                                width: 36,
-                                height: 36,
-                                color: const Color(
-                                  0xFF1976D2,
-                                ), // Material blue tint
-                                colorBlendMode: BlendMode.modulate,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.directions_car,
-                                    size: 30,
-                                    color: Color(0xFF1976D2), // Material blue
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        );
+                        return VehicleCarMarker(headingDeg: heading);
                       },
                     ),
                   ),
@@ -244,4 +190,141 @@ class MapView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Marker kendaraan mobil MEVI dengan animasi rotasi kontinu dan pointer arah
+class VehicleCarMarker extends StatefulWidget {
+  final double headingDeg;
+
+  const VehicleCarMarker({
+    super.key,
+    required this.headingDeg,
+  });
+
+  @override
+  State<VehicleCarMarker> createState() => _VehicleCarMarkerState();
+}
+
+class _VehicleCarMarkerState extends State<VehicleCarMarker> {
+  double _unwrappedDeg = 0.0;
+  bool _isFirst = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _unwrappedDeg = widget.headingDeg;
+  }
+
+  @override
+  void didUpdateWidget(VehicleCarMarker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_isFirst) {
+      _unwrappedDeg = widget.headingDeg;
+      _isFirst = false;
+      return;
+    }
+    // Shortest angular difference (-180 to 180) agar transisi putaran selalu terpendek
+    final diff = ((widget.headingDeg - _unwrappedDeg + 180) % 360) - 180;
+    _unwrappedDeg += diff;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 1 turn = 360 degrees
+    final turns = _unwrappedDeg / 360.0;
+
+    return AnimatedRotation(
+      turns: turns,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          // Background lingkaran putih bersih dengan shadow & border navigasi
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF1976D2),
+                width: 2.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1976D2).withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 1),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+
+          // Forward heading pointer di puncak lingkaran (menunjuk lurus ke depan)
+          Positioned(
+            top: 2,
+            child: CustomPaint(
+              size: const Size(10, 6),
+              painter: _ForwardArrowPainter(color: const Color(0xFF1976D2)),
+            ),
+          ),
+
+          // Icon mobil MEVI tampak atas dengan orientasi tegak lurus (menghadap ke depan/North)
+          Image.asset(
+            'assets/images/mevicar.png',
+            width: 32,
+            height: 38,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Image.asset(
+                'assets/images/car.png',
+                width: 28,
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.navigation,
+                    size: 28,
+                    color: Color(0xFF1976D2),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForwardArrowPainter extends CustomPainter {
+  final Color color;
+  const _ForwardArrowPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ForwardArrowPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../ui/pages/navigation/widgets/in_app_notification_widget.dart';
 
 enum NotificationType { info, warning, error, critical, success }
 
@@ -37,6 +38,32 @@ class NotificationService {
     final context = _scaffoldKey.currentContext;
     if (context == null) return;
 
+    if (onAction == null) {
+      NotificationKind kind;
+      switch (type) {
+        case NotificationType.error:
+        case NotificationType.critical:
+          kind = NotificationKind.error;
+          break;
+        case NotificationType.warning:
+          kind = NotificationKind.warning;
+          break;
+        case NotificationType.success:
+          kind = NotificationKind.success;
+          break;
+        case NotificationType.info:
+          kind = NotificationKind.info;
+          break;
+      }
+      CenterNotification.show(
+        context,
+        message: message,
+        kind: kind,
+        duration: duration,
+      );
+      return;
+    }
+
     final color = _getColorForType(type);
     final icon = _getIconForType(type);
 
@@ -62,7 +89,7 @@ class NotificationService {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
-        action: onAction != null && actionLabel != null
+        action: actionLabel != null
             ? SnackBarAction(
                 label: actionLabel,
                 textColor: Colors.white,

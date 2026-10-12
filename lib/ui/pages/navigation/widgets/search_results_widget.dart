@@ -157,35 +157,34 @@ class SearchResultsWidget extends StatelessWidget {
   }
 
   Widget _buildContainer({required _ResultTheme t, required Widget child}) {
-    // Lebar disesuaikan dengan search bar: isFullHD → 520, selainnya → 440
-    // (rumus identik dengan barWidth di search_bar_widget.dart)
+    // Lebar disesuaikan dengan search bar
     final screen = WidgetsBinding
         .instance.platformDispatcher.views.first.physicalSize /
         WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
     final isFullHD = screen.width >= 1900 && screen.height >= 1000;
-    final dropdownWidth = isFullHD ? 520.0 : 440.0;
+    final dropdownWidth = isFullHD ? 420.0 : 360.0;
 
     return Container(
       width: dropdownWidth,
-      constraints: const BoxConstraints(maxHeight: 420),
+      constraints: const BoxConstraints(maxHeight: 360),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: t.shadow,
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
             color: t.containerBg,
             border: Border.all(
-              color: t.containerBorder.withValues(alpha: 0.85),
-              width: 1.4,
+              color: t.containerBorder.withValues(alpha: 0.7),
+              width: 1.2,
             ),
           ),
           child: child,
@@ -240,20 +239,20 @@ class _TripResultItem extends StatelessWidget {
       splashColor: t.inkSplashColor,
       highlightColor: t.inkSplashColor,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            // Icon badge — warna ikon kategori tetap vivid di kedua mode
+            // Icon badge — compact proportional size
             Container(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12),
+                color: iconColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(_getTripIcon(), size: 22, color: iconColor),
+              child: Icon(_getTripIcon(), size: 18, color: iconColor),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,33 +260,33 @@ class _TripResultItem extends StatelessWidget {
                   Text(
                     trip.name,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                       color: t.itemTitleColor,
-                      letterSpacing: -0.3,
+                      letterSpacing: -0.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 3),
                   Row(
                     children: [
                       Icon(LucideIcons.mapPin,
-                          size: 13, color: t.itemSubColor),
-                      const SizedBox(width: 4),
+                          size: 11, color: t.itemSubColor),
+                      const SizedBox(width: 3),
                       Text(
                         '${trip.waypoints.length} titik',
                         style:
-                            TextStyle(fontSize: 13, color: t.itemSubColor),
+                            TextStyle(fontSize: 11.5, color: t.itemSubColor),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Icon(LucideIcons.clock,
-                          size: 13, color: t.itemSubColor),
-                      const SizedBox(width: 4),
+                          size: 11, color: t.itemSubColor),
+                      const SizedBox(width: 3),
                       Text(
                         '${trip.estimatedDuration.toInt()} mnt',
                         style:
-                            TextStyle(fontSize: 13, color: t.itemSubColor),
+                            TextStyle(fontSize: 11.5, color: t.itemSubColor),
                       ),
                     ],
                   ),
@@ -297,8 +296,10 @@ class _TripResultItem extends StatelessWidget {
             if (onPreview != null)
               IconButton(
                 icon:
-                    Icon(LucideIcons.eye, size: 20, color: t.chevronColor),
-                splashRadius: 22,
+                    Icon(LucideIcons.eye, size: 17, color: t.chevronColor),
+                splashRadius: 18,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     onPreview!();
@@ -306,7 +307,7 @@ class _TripResultItem extends StatelessWidget {
                 },
               ),
             Icon(LucideIcons.chevronRight,
-                size: 20, color: t.chevronColor),
+                size: 16, color: t.chevronColor),
           ],
         ),
       ),

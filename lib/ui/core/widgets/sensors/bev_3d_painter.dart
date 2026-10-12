@@ -36,6 +36,9 @@ class Bev3DPainter extends CustomPainter {
   final double animationValue;
   final List<Detected3DObject> detectedObjects;
   final bool isLight;
+  final List<Offset>? liveWaypoints;
+  final bool isLiveMode;
+  final double? liveWaypointsEndDistance;
 
   Bev3DPainter({
     required this.camera,
@@ -45,6 +48,9 @@ class Bev3DPainter extends CustomPainter {
     required this.animationValue,
     required this.detectedObjects,
     required this.isLight,
+    this.liveWaypoints,
+    this.isLiveMode = false,
+    this.liveWaypointsEndDistance,
   });
 
   @override
@@ -97,6 +103,11 @@ class Bev3DPainter extends CustomPainter {
   /// Untuk skenario Belok Kanan dan Belok Kiri, membentuk tikungan tajam 90° yang kompak
   /// dan realistis sesuai dengan kontur jalan lingkungan kampus/institusi (BRIN).
   List<_RoadSample> _generateRoadSamples() {
+    if (isLiveMode && liveWaypoints != null && liveWaypoints!.length >= 2) {
+      final liveSamples = _generateRoadSamplesFromLiveWaypoints(liveWaypoints!);
+      if (liveSamples.isNotEmpty) return liveSamples;
+    }
+
     final isSharpTurn =
         scenario == BevScenarioType.rightTurn ||
         scenario == BevScenarioType.leftTurn;
@@ -147,9 +158,9 @@ class Bev3DPainter extends CustomPainter {
 
     // Tikungan Tajam 90 Derajat Kontur Jalan Lingkungan BRIN (KST Samaun Samadikun)
     final dir = (scenario == BevScenarioType.rightTurn) ? 1.0 : -1.0;
-    const rRadius = 7.0; // Radius belokan tikungan jalan kampus
+    const rRadius = 8.0; // Radius belokan tikungan jalan kampus yang proporsional
     const zStart = 11.5; // Titik awal mulai membelok (setelah pendekatan lurus)
-    const branchLen = 14.5; // Panjang jalan cabang horizontal setelah belok 90°
+    const branchLen = 16.0; // Panjang jalan cabang horizontal setelah belok 90°
 
     final samples = <_RoadSample>[];
     double dist = 0.0;
@@ -188,8 +199,8 @@ class Bev3DPainter extends CustomPainter {
       addSample(0.0, z, 1.0, 0.0, 0.0, 1.0);
     }
 
-    // 2. Busur belokan 90 derajat tajam
-    const stepsArc = 24;
+    // 2. Busur belokan 90 derajat tajam yang mulus
+    const stepsArc = 32;
     for (int i = 0; i <= stepsArc; i++) {
       final phi = (math.pi / 2.0) * (i / stepsArc);
       final cx = dir * rRadius * (1.0 - math.cos(phi));
@@ -208,6 +219,212 @@ class Bev3DPainter extends CustomPainter {
       final cx = cxEnd + dir * d;
       final cz = czEnd;
       addSample(cx, cz, 0.0, -dir, dir, 0.0);
+    }
+
+    return samples;
+  }
+
+  /// Menghasilkan titik sampel jalan 3D adaptif dari waypoints live ROS (Metode 1: Waypoint-Corridor Extrusion).
+  /// Menggunakan urutan asli trajectory, smoothing multi-pass, interpolasi busur kontinu Catmull-Rom,
+  /// ekstrapolasi tangen alami tanpa clamping artifisial, dan vektor normal ortogonal presisi.
+  List<_RoadSample> _generateRoadSamplesFromLiveWaypoints(List<Offset> waypoints) {
+    // 1. Ekstraksi titik valid dengan mempertahankan urutan sekuensial asli planner
+    final validPts = <Offset>[];
+    for (final p in waypoints) {
+      if (p.dx.isFinite && p.dy.isFinite) {
+        if (validPts.isEmpty) {
+          validPts.add(p);
+        } else {
+          final prev = validPts.last;
+          final d = (p - prev).distance;
+          // Abaikan titik duplikat atau terlalu rapat (< 15cm) agar interpolasi stabil
+          if (d >= 0.15) {
+            validPts.add(p);
+          }
+        }
+      }
+    }
+    if (validPts.length < 2) return const [];
+
+    // 2. Hubungkan secara mulus dari posisi mobil ego (z = -1.6m di bawah bodi MEVI)
+    final controlPoints = <Offset>[];
+    final firstWp = validPts.first;
+    if (firstWp.dy > -1.2) {
+      controlPoints.add(const Offset(0.0, -1.6));
+      if (firstWp.dy > 0.6) {
+        controlPoints.add(Offset(firstWp.dx * 0.35, 0.0));
+      }
+    }
+    controlPoints.addAll(validPts);
+
+    // 3. Penghalusan kurva (Weighted 3-point Gaussian Filter) untuk meratakan jitter planner
+    final smoothed = List<Offset>.from(controlPoints);
+    for (int pass = 0; pass < 2; pass++) {
+      for (int i = 1; i < smoothed.length - 1; i++) {
+        final prev = smoothed[i - 1];
+        final cur = smoothed[i];
+        final next = smoothed[i + 1];
+        smoothed[i] = Offset(
+          0.20 * prev.dx + 0.60 * cur.dx + 0.20 * next.dx,
+          0.20 * prev.dy + 0.60 * cur.dy + 0.20 * next.dy,
+        );
+      }
+    }
+
+    // 4. Parameterisasi Panjang Busur (Cumulative Arc Length)
+    final arcLengths = <double>[0.0];
+    for (int i = 1; i < smoothed.length; i++) {
+      final segDist = (smoothed[i] - smoothed[i - 1]).distance;
+      arcLengths.add(arcLengths.last + math.max(1e-4, segDist));
+    }
+    final totalPathLength = arcLengths.last;
+
+    // 5. Resampling Padat & Mulus (Equidistant Arc-Length Catmull-Rom Spline)
+    final densePoints = <Offset>[];
+    const double stepDist = 0.40; // 40 cm per sampel untuk transisi tikungan yang sangat halus
+    int segIdx = 0;
+
+    for (double s = 0.0; s <= totalPathLength; s += stepDist) {
+      while (segIdx < arcLengths.length - 2 && arcLengths[segIdx + 1] < s) {
+        segIdx++;
+      }
+      final s0 = arcLengths[segIdx];
+      final s1 = arcLengths[segIdx + 1];
+      final segLen = s1 - s0;
+      final t = segLen > 1e-4 ? ((s - s0) / segLen).clamp(0.0, 1.0) : 0.0;
+
+      final cp0 = segIdx > 0 ? smoothed[segIdx - 1] : smoothed[segIdx];
+      final cp1 = smoothed[segIdx];
+      final cp2 = smoothed[segIdx + 1];
+      final cp3 = segIdx + 2 < smoothed.length
+          ? smoothed[segIdx + 2]
+          : smoothed[segIdx + 1];
+
+      final t2 = t * t;
+      final t3 = t2 * t;
+
+      final x = 0.5 * (
+        (2.0 * cp1.dx) +
+        (-cp0.dx + cp2.dx) * t +
+        (2.0 * cp0.dx - 5.0 * cp1.dx + 4.0 * cp2.dx - cp3.dx) * t2 +
+        (-cp0.dx + 3.0 * cp1.dx - 3.0 * cp2.dx + cp3.dx) * t3
+      );
+      final z = 0.5 * (
+        (2.0 * cp1.dy) +
+        (-cp0.dy + cp2.dy) * t +
+        (2.0 * cp0.dy - 5.0 * cp1.dy + 4.0 * cp2.dy - cp3.dy) * t2 +
+        (-cp0.dy + 3.0 * cp1.dy - 3.0 * cp2.dy + cp3.dy) * t3
+      );
+
+      densePoints.add(Offset(x, z));
+    }
+    densePoints.add(smoothed.last);
+
+    // 6. Ekstrapolasi Maju Terarah (Meneruskan Tangen Hadap Terakhir Tanpa Clamping)
+    if (densePoints.length >= 2) {
+      final lastIdx = densePoints.length - 1;
+      final lookback = math.min(4, densePoints.length - 1);
+      final refPt = densePoints[lastIdx - lookback];
+      final endPt = densePoints[lastIdx];
+      double dirX = endPt.dx - refPt.dx;
+      double dirZ = endPt.dy - refPt.dy;
+      final len = math.sqrt(dirX * dirX + dirZ * dirZ);
+
+      if (len > 1e-4) {
+        dirX /= len;
+        dirZ /= len;
+      } else {
+        dirX = 0.0;
+        dirZ = 1.0;
+      }
+
+      double curX = endPt.dx;
+      double curZ = endPt.dy;
+      const forwardStep = 0.55;
+      int extraCount = 0;
+      while (curZ < 42.0 && extraCount < 35) {
+        curX += dirX * forwardStep;
+        curZ += dirZ * forwardStep;
+        densePoints.add(Offset(curX, curZ));
+        extraCount++;
+      }
+    }
+
+    // 7. Konstruksi Sampel Jalan dengan Vektor Tangen & Normal Ortogonal yang Dihaluskan
+    final rawTangents = <Offset>[];
+    for (int i = 0; i < densePoints.length; i++) {
+      double tx, tz;
+      if (i > 0 && i < densePoints.length - 1) {
+        final prevP = densePoints[i - 1];
+        final nextP = densePoints[i + 1];
+        final dx = nextP.dx - prevP.dx;
+        final dz = nextP.dy - prevP.dy;
+        final len = math.sqrt(dx * dx + dz * dz);
+        tx = len > 1e-5 ? dx / len : 0.0;
+        tz = len > 1e-5 ? dz / len : 1.0;
+      } else if (i < densePoints.length - 1) {
+        final nextP = densePoints[i + 1];
+        final dx = nextP.dx - densePoints[i].dx;
+        final dz = nextP.dy - densePoints[i].dy;
+        final len = math.sqrt(dx * dx + dz * dz);
+        tx = len > 1e-5 ? dx / len : 0.0;
+        tz = len > 1e-5 ? dz / len : 1.0;
+      } else {
+        final prevP = densePoints[i - 1];
+        final dx = densePoints[i].dx - prevP.dx;
+        final dz = densePoints[i].dy - prevP.dy;
+        final len = math.sqrt(dx * dx + dz * dz);
+        tx = len > 1e-5 ? dx / len : 0.0;
+        tz = len > 1e-5 ? dz / len : 1.0;
+      }
+      rawTangents.add(Offset(tx, tz));
+    }
+
+    // Filter perataan vektor tangen agar transisi normal di tikungan benar-benar kontinu
+    final smoothedTangents = <Offset>[];
+    for (int i = 0; i < rawTangents.length; i++) {
+      if (i == 0 || i == rawTangents.length - 1) {
+        smoothedTangents.add(rawTangents[i]);
+      } else {
+        final t0 = rawTangents[i - 1];
+        final t1 = rawTangents[i];
+        final t2 = rawTangents[i + 1];
+        final avgX = 0.25 * t0.dx + 0.50 * t1.dx + 0.25 * t2.dx;
+        final avgZ = 0.25 * t0.dy + 0.50 * t1.dy + 0.25 * t2.dy;
+        final len = math.sqrt(avgX * avgX + avgZ * avgZ);
+        smoothedTangents.add(len > 1e-5 ? Offset(avgX / len, avgZ / len) : t1);
+      }
+    }
+
+    final samples = <_RoadSample>[];
+    double totalDist = 0.0;
+    Offset? prevPt;
+
+    for (int i = 0; i < densePoints.length; i++) {
+      final cur = densePoints[i];
+      final tx = smoothedTangents[i].dx;
+      final tz = smoothedTangents[i].dy;
+
+      // Vektor normal tegak lurus mengarah ke kanan jalan (+x)
+      final nx = tz;
+      final nz = -tx;
+
+      if (prevPt != null) {
+        totalDist += (cur - prevPt).distance;
+      }
+      prevPt = cur;
+
+      samples.add(
+        _RoadSample(
+          cx: cur.dx,
+          cz: cur.dy,
+          nx: nx,
+          nz: nz,
+          tx: tx,
+          tz: tz,
+          distanceAlongPath: totalDist,
+        ),
+      );
     }
 
     return samples;
@@ -245,74 +462,227 @@ class Bev3DPainter extends CustomPainter {
     );
   }
 
+  /// Mencari titik perpotongan antara dua segmen garis 2D (p1-p2) dan (p3-p4).
+  Offset? _findSegmentIntersection(Offset p1, Offset p2, Offset p3, Offset p4) {
+    final d1x = p2.dx - p1.dx;
+    final d1z = p2.dy - p1.dy;
+    final d2x = p4.dx - p3.dx;
+    final d2z = p4.dy - p3.dy;
+
+    final cross = d1x * d2z - d1z * d2x;
+    if (cross.abs() < 1e-7) return null; // Segmen sejajar atau kolinear
+
+    final dx = p3.dx - p1.dx;
+    final dz = p3.dy - p1.dy;
+
+    final t = (dx * d2z - dz * d2x) / cross;
+    final u = (dx * d1z - dz * d1x) / cross;
+
+    // Titik potong strictly di dalam kedua segmen
+    if (t >= 0.001 && t <= 0.999 && u >= 0.001 && u <= 0.999) {
+      return Offset(p1.dx + t * d1x, p1.dy + t * d1z);
+    }
+    return null;
+  }
+
+  /// Menghilangkan lipatan / self-intersection loops (swallowtail) pada polyline batas jalan.
+  /// Memotong seluruh titik di dalam loop tertutup dan menggantinya dengan titik potong persimpangan yang rapi.
+  List<Offset> _untanglePolyline(List<Offset> pts) {
+    if (pts.length < 4) return pts;
+    var result = List<Offset>.from(pts);
+
+    bool changed = true;
+    int maxPasses = 10;
+    while (changed && maxPasses > 0) {
+      changed = false;
+      maxPasses--;
+
+      for (int i = 0; i < result.length - 3; i++) {
+        final p1 = result[i];
+        final p2 = result[i + 1];
+
+        // Cari perpotongan dengan segmen ke depan mulai dari segmen terujung
+        // untuk langsung memotong loop terbesar dalam satu irisan bersih
+        for (int j = result.length - 2; j >= i + 2; j--) {
+          final p3 = result[j];
+          final p4 = result[j + 1];
+
+          final inter = _findSegmentIntersection(p1, p2, p3, p4);
+          if (inter != null) {
+            final newPts = <Offset>[];
+            for (int k = 0; k <= i; k++) {
+              newPts.add(result[k]);
+            }
+            newPts.add(inter);
+            for (int k = j + 1; k < result.length; k++) {
+              newPts.add(result[k]);
+            }
+            result = newPts;
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+
+    return result;
+  }
+
+  /// Memfilter titik-titik yang membalik arah (retrograde) atau berdempetan rapat
+  /// agar tidak ada spike patah di tikungan.
+  List<Offset> _filterRetrogradePoints(List<Offset> pts) {
+    if (pts.length < 3) return pts;
+    final filtered = <Offset>[pts.first];
+
+    for (int i = 1; i < pts.length; i++) {
+      final p = pts[i];
+      final prev = filtered.last;
+      final dist = (p - prev).distance;
+
+      // Abaikan titik yang terlalu berdekatan (< 4 cm)
+      if (dist < 0.04) continue;
+
+      // Cek apakah ada spike patah membalik arah tajam (> 135 derajat)
+      if (filtered.length >= 2 && i < pts.length - 1) {
+        final prevPrev = filtered[filtered.length - 2];
+        final v1 = prev - prevPrev;
+        final v2 = p - prev;
+        final dot = v1.dx * v2.dx + v1.dy * v2.dy;
+        final l1 = v1.distance;
+        final l2 = v2.distance;
+        if (l1 > 1e-4 && l2 > 1e-4) {
+          final cosA = dot / (l1 * l2);
+          if (cosA < -0.70) {
+            continue; // Lewati spike balik arah
+          }
+        }
+      }
+
+      filtered.add(p);
+    }
+
+    if (filtered.length < 2) return pts;
+    return filtered;
+  }
+
+  /// Menghaluskan polyline batas jalan menggunakan Chaikin corner cutting & Gaussian smoothing
+  /// untuk menciptakan sudut fillet lengkung yang bulat dan mulus (tanpa lipatan / patahan).
+  List<Offset> _smoothBoundaryPolyline(List<Offset> pts) {
+    if (pts.length < 4) return pts;
+
+    // 1 pass Chaikin corner cutting untuk membulatkan lekukan sudut
+    final chaikin = <Offset>[pts.first];
+    for (int i = 0; i < pts.length - 1; i++) {
+      final p0 = pts[i];
+      final p1 = pts[i + 1];
+      chaikin.add(Offset(0.75 * p0.dx + 0.25 * p1.dx, 0.75 * p0.dy + 0.25 * p1.dy));
+      chaikin.add(Offset(0.25 * p0.dx + 0.75 * p1.dx, 0.25 * p0.dy + 0.75 * p1.dy));
+    }
+    chaikin.add(pts.last);
+
+    // 2 pass Gaussian weighted moving average (0.20, 0.60, 0.20)
+    var cur = chaikin;
+    for (int pass = 0; pass < 2; pass++) {
+      final next = List<Offset>.from(cur);
+      for (int i = 1; i < cur.length - 1; i++) {
+        final p0 = cur[i - 1];
+        final p1 = cur[i];
+        final p2 = cur[i + 1];
+        next[i] = Offset(
+          0.20 * p0.dx + 0.60 * p1.dx + 0.20 * p2.dx,
+          0.20 * p0.dy + 0.60 * p1.dy + 0.20 * p2.dy,
+        );
+      }
+      cur = next;
+    }
+
+    return cur;
+  }
+
+  /// Menghasilkan koordinat 3D batas jalan (x, z) mulus yang bebas dari lipatan
+  List<Offset> _generateSmoothBoundary3D(
+    List<_RoadSample> samples,
+    double offsetDist,
+  ) {
+    if (samples.length < 2) return const [];
+
+    // 1. Ekstraksi koordinat mentah offset di ground plane dunia (x, z)
+    final rawPts = <Offset>[];
+    for (final s in samples) {
+      rawPts.add(Offset(
+        s.cx + offsetDist * s.nx,
+        s.cz + offsetDist * s.nz,
+      ));
+    }
+
+    // 2. Hilangkan lipatan / self-intersection loops (swallowtail loop clipping)
+    final untangled = _untanglePolyline(rawPts);
+
+    // 3. Filter titik balik arah liar (retrograde / spike filter)
+    final filtered = _filterRetrogradePoints(untangled);
+
+    // 4. Penghalusan kurva sudut (Chaikin subdivision & Gaussian fillet smoothing)
+    final smoothed = _smoothBoundaryPolyline(filtered);
+
+    return smoothed;
+  }
+
+  /// Memproyeksikan titik ground (x, z) ke koordinat layar 2D
+  List<Offset> _projectPolyline(
+    List<Offset> groundPoints,
+    Size size, {
+    double y = 0.0,
+  }) {
+    final screenPts = <Offset>[];
+    for (final pt in groundPoints) {
+      final p = camera.project(pt.dx, y, pt.dy, size);
+      if (p.isVisible) {
+        screenPts.add(p.screenOffset);
+      }
+    }
+    return screenPts;
+  }
+
   void _draw3DRoadNetwork(
     Canvas canvas,
     Size size,
     double horizonY,
     List<_RoadSample> samples,
   ) {
-    // Lebar jalan terukur 11.2 meter total (-5.6m s/d +5.6m) agar proporsional dan tidak menabrak rail menu kiri & tombol kanan
+    // Lebar jalan proporsional 5.6m (total lebar 11.2m) agar seluruh kendaraan & objek muat di lajur
     const roadHalfWidth = 5.6;
 
-    // Poligon Jalan Utama (dimulai dari z = -1.6m agar mentok penuh sampai ke dasar layar paling bawah)
-    final leftRoadPoints = <Offset>[];
-    final rightRoadPoints = <Offset>[];
-    final leftLane1Points = <Offset>[];
-    final rightLane1Points = <Offset>[];
-    final leftLane2Points = <Offset>[];
-    final rightLane2Points = <Offset>[];
+    // Batasi area render jalan agar selalu berada di koridor pandang aman
+    // dan tidak menabrak atau merusak panel roda gigi kiri (P-R-N-D) dan tombol aksi kanan
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(92.0, 0, size.width - 92.0, size.height));
 
-    for (final s in samples) {
-      final pLeft = camera.project(
-        s.cx - roadHalfWidth * s.nx,
-        0.0,
-        s.cz - roadHalfWidth * s.nz,
-        size,
-      );
-      final pRight = camera.project(
-        s.cx + roadHalfWidth * s.nx,
-        0.0,
-        s.cz + roadHalfWidth * s.nz,
-        size,
-      );
-      final pLeft1 = camera.project(
-        s.cx - 1.8 * s.nx,
-        0.0,
-        s.cz - 1.8 * s.nz,
-        size,
-      );
-      final pRight1 = camera.project(
-        s.cx + 1.8 * s.nx,
-        0.0,
-        s.cz + 1.8 * s.nz,
-        size,
-      );
-      final pLeft2 = camera.project(
-        s.cx - 4.8 * s.nx,
-        0.0,
-        s.cz - 4.8 * s.nz,
-        size,
-      );
-      final pRight2 = camera.project(
-        s.cx + 4.8 * s.nx,
-        0.0,
-        s.cz + 4.8 * s.nz,
-        size,
-      );
-
-      if (pLeft.isVisible && pRight.isVisible) {
-        leftRoadPoints.add(pLeft.screenOffset);
-        rightRoadPoints.add(pRight.screenOffset);
-      }
-      if (pLeft1.isVisible && pRight1.isVisible) {
-        leftLane1Points.add(pLeft1.screenOffset);
-        rightLane1Points.add(pRight1.screenOffset);
-      }
-      if (pLeft2.isVisible && pRight2.isVisible) {
-        leftLane2Points.add(pLeft2.screenOffset);
-        rightLane2Points.add(pRight2.screenOffset);
-      }
-    }
+    // Ekstraksi garis batas jalan dan marka lajur yang mulus dan bebas lipatan
+    final leftRoadPoints = _projectPolyline(
+      _generateSmoothBoundary3D(samples, -roadHalfWidth),
+      size,
+    );
+    final rightRoadPoints = _projectPolyline(
+      _generateSmoothBoundary3D(samples, roadHalfWidth),
+      size,
+    );
+    final leftLane1Points = _projectPolyline(
+      _generateSmoothBoundary3D(samples, -1.8),
+      size,
+    );
+    final rightLane1Points = _projectPolyline(
+      _generateSmoothBoundary3D(samples, 1.8),
+      size,
+    );
+    final leftLane2Points = _projectPolyline(
+      _generateSmoothBoundary3D(samples, -4.8),
+      size,
+    );
+    final rightLane2Points = _projectPolyline(
+      _generateSmoothBoundary3D(samples, 4.8),
+      size,
+    );
 
     final roadPaint = Paint()
       ..shader = LinearGradient(
@@ -348,7 +718,7 @@ class Bev3DPainter extends CustomPainter {
       ..strokeWidth = 1.3;
 
     // Topologi Simpang Pertigaan (panjang cabang aman dari menu samping)
-    if (scenario == BevScenarioType.tJunction) {
+    if (!isLiveMode && scenario == BevScenarioType.tJunction) {
       _drawIntersectionBranchRoads(canvas, size, roadPaint, outerShoulderPaint);
     }
 
@@ -399,7 +769,7 @@ class Bev3DPainter extends CustomPainter {
         canvas.drawPath(lane, sideLanePaint);
       }
 
-      // Pembatas Bahu Parkir Samping
+      // Pembatas Bahu Samping
       if (leftLane2Points.length > 2) {
         final lane = Path()
           ..moveTo(leftLane2Points.first.dx, leftLane2Points.first.dy);
@@ -420,6 +790,8 @@ class Bev3DPainter extends CustomPainter {
 
     // Marka Garis Tengah Putus-Putus
     _draw3DDashedCenterLine(canvas, size, samples);
+
+    canvas.restore();
   }
 
   void _drawIntersectionBranchRoads(
@@ -517,39 +889,43 @@ class Bev3DPainter extends CustomPainter {
   ) {
     const ribbonHalfWidth = 1.15;
 
-    final leftRibbon = <Offset>[];
-    final rightRibbon = <Offset>[];
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(92.0, 0, size.width - 92.0, size.height));
 
+    final ribbonSamples = <_RoadSample>[];
     for (final s in samples) {
-      if (scenario == BevScenarioType.crossroad && s.cz > 4.1) {
+      if (!isLiveMode && scenario == BevScenarioType.crossroad && s.cz > 4.1) {
         break;
       }
 
       double cx = s.cx;
       double cz = s.cz;
-      if (scenario == BevScenarioType.tJunction && cz > 13.0) {
+      if (!isLiveMode && scenario == BevScenarioType.tJunction && cz > 13.0) {
         final turnProgress = ((cz - 13.0) / 14.0).clamp(0.0, 1.0);
         cx += turnProgress * turnProgress * 3.5;
       }
 
-      final pLeft = camera.project(
-        cx - ribbonHalfWidth * s.nx,
-        0.02,
-        cz - ribbonHalfWidth * s.nz,
-        size,
-      );
-      final pRight = camera.project(
-        cx + ribbonHalfWidth * s.nx,
-        0.02,
-        cz + ribbonHalfWidth * s.nz,
-        size,
-      );
-
-      if (pLeft.isVisible && pRight.isVisible) {
-        leftRibbon.add(pLeft.screenOffset);
-        rightRibbon.add(pRight.screenOffset);
-      }
+      ribbonSamples.add(_RoadSample(
+        cx: cx,
+        cz: cz,
+        nx: s.nx,
+        nz: s.nz,
+        tx: s.tx,
+        tz: s.tz,
+        distanceAlongPath: s.distanceAlongPath,
+      ));
     }
+
+    final leftRibbon = _projectPolyline(
+      _generateSmoothBoundary3D(ribbonSamples, -ribbonHalfWidth),
+      size,
+      y: 0.02,
+    );
+    final rightRibbon = _projectPolyline(
+      _generateSmoothBoundary3D(ribbonSamples, ribbonHalfWidth),
+      size,
+      y: 0.02,
+    );
 
     if (leftRibbon.length > 2) {
       final ribbonPath = Path();
@@ -615,6 +991,8 @@ class Bev3DPainter extends CustomPainter {
 
       _drawTrajectoryChevrons(canvas, size, samples);
     }
+
+    canvas.restore();
   }
 
   void _drawTrajectoryChevrons(
@@ -635,7 +1013,7 @@ class Bev3DPainter extends CustomPainter {
 
       double cx = s.cx;
       double cz = s.cz;
-      if (scenario == BevScenarioType.tJunction && cz > 13.0) {
+      if (!isLiveMode && scenario == BevScenarioType.tJunction && cz > 13.0) {
         final turnProgress = ((cz - 13.0) / 14.0).clamp(0.0, 1.0);
         cx += turnProgress * turnProgress * 3.5;
       }
@@ -676,12 +1054,17 @@ class Bev3DPainter extends CustomPainter {
 
 
   void _draw3DDetectedBoundingBoxes(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(92.0, 0, size.width - 92.0, size.height));
+
     final sortedObjects = List<Detected3DObject>.from(detectedObjects)
       ..sort((a, b) => b.z.compareTo(a.z));
 
     for (final obj in sortedObjects) {
       _drawSingle3DBoundingBox(canvas, size, obj);
     }
+
+    canvas.restore();
   }
 
   void _drawSingle3DBoundingBox(
@@ -705,18 +1088,23 @@ class Bev3DPainter extends CustomPainter {
 
     final primaryColor = obj.objectClass.primaryColor;
 
-    // A. Tapak Tanah / Bayangan
-    final groundPath = Path()
-      ..moveTo(vertices[0].screenOffset.dx, vertices[0].screenOffset.dy)
-      ..lineTo(vertices[1].screenOffset.dx, vertices[1].screenOffset.dy)
-      ..lineTo(vertices[2].screenOffset.dx, vertices[2].screenOffset.dy)
-      ..lineTo(vertices[3].screenOffset.dx, vertices[3].screenOffset.dy)
-      ..close();
+    // A. Tapak Tanah / Bayangan (hanya jika 4 sudut dasar di depan kamera)
+    if (vertices[0].isVisible &&
+        vertices[1].isVisible &&
+        vertices[2].isVisible &&
+        vertices[3].isVisible) {
+      final groundPath = Path()
+        ..moveTo(vertices[0].screenOffset.dx, vertices[0].screenOffset.dy)
+        ..lineTo(vertices[1].screenOffset.dx, vertices[1].screenOffset.dy)
+        ..lineTo(vertices[2].screenOffset.dx, vertices[2].screenOffset.dy)
+        ..lineTo(vertices[3].screenOffset.dx, vertices[3].screenOffset.dy)
+        ..close();
 
-    final groundShadowPaint = Paint()
-      ..color = primaryColor.withValues(alpha: isLight ? 0.24 : 0.32)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(groundPath, groundShadowPaint);
+      final groundShadowPaint = Paint()
+        ..color = primaryColor.withValues(alpha: isLight ? 0.24 : 0.32)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(groundPath, groundShadowPaint);
+    }
 
     // B. Sisi-Sisi Poligon Kubus
     const faces = [
@@ -729,6 +1117,9 @@ class Bev3DPainter extends CustomPainter {
 
     for (int faceIdx = 0; faceIdx < faces.length; faceIdx++) {
       final idxs = faces[faceIdx];
+      // Pastikan semua 4 sudut sisi terlihat agar tidak melempar garis artefak ke luar layar
+      if (!idxs.every((i) => vertices[i].isVisible)) continue;
+
       final facePath = Path()
         ..moveTo(
           vertices[idxs[0]].screenOffset.dx,
@@ -776,7 +1167,8 @@ class Bev3DPainter extends CustomPainter {
       [3, 7],
     ];
 
-    final avgDepth = vertices.map((v) => v.depth).reduce((a, b) => a + b) / 8.0;
+    final avgDepth =
+        vertices.map((v) => v.depth).reduce((a, b) => a + b) / 8.0;
     final edgeWidth = (3.6 / (avgDepth * 0.28)).clamp(1.5, 3.8);
 
     final edgePaint = Paint()
@@ -789,7 +1181,8 @@ class Bev3DPainter extends CustomPainter {
     for (final edge in edges) {
       final p1 = vertices[edge[0]];
       final p2 = vertices[edge[1]];
-      if (p1.isVisible || p2.isVisible) {
+      // Hanya gambar garis jika KEDUA ujung titik berada di depan kamera
+      if (p1.isVisible && p2.isVisible) {
         canvas.drawLine(p1.screenOffset, p2.screenOffset, edgePaint);
       }
     }
@@ -819,6 +1212,9 @@ class Bev3DPainter extends CustomPainter {
         oldDelegate.speed != speed ||
         oldDelegate.animationValue != animationValue ||
         oldDelegate.detectedObjects != detectedObjects ||
-        oldDelegate.isLight != isLight;
+        oldDelegate.isLight != isLight ||
+        oldDelegate.isLiveMode != isLiveMode ||
+        oldDelegate.liveWaypoints != liveWaypoints ||
+        oldDelegate.liveWaypointsEndDistance != liveWaypointsEndDistance;
   }
 }

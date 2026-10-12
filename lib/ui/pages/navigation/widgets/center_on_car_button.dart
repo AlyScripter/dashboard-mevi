@@ -43,10 +43,10 @@ class CenterOnCarButton extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     final isFullHD = screenWidth >= 1900 && screenHeight >= 1000;
 
-    final buttonSize = size ?? (isFullHD ? 56.0 : 48.0);
-    final icon = iconSize ?? (isFullHD ? 24.0 : 22.0);
+    final buttonSize = size ?? (isFullHD ? 46.0 : 40.0);
+    final icon = iconSize ?? (isFullHD ? 20.0 : 18.0);
     final iconColor = color ?? defaultIconColor;
-    final borderRadiusValue = buttonSize / 2.6;
+    final borderRadiusValue = buttonSize / 2.8;
 
     return Tooltip(
       message: tooltip,
@@ -63,12 +63,12 @@ class CenterOnCarButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(borderRadiusValue),
-              border: Border.all(color: borderColor, width: 1.4),
+              border: Border.all(color: borderColor, width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: shadowColor,
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
