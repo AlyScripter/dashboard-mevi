@@ -98,14 +98,20 @@ class _BevPageState extends State<BevPage> {
             left: AppDimensions.spacingL,
             child: SizedBox(
               width: 268,
-              child: BatteryIndicatorWidget(
-                batteryPercent: _batteryPercent,
-                onTap: () {
-                  setState(() {
-                    _batteryPercent = _batteryPercent > 0.95
-                        ? 0.35
-                        : (_batteryPercent + 0.1).clamp(0.0, 1.0);
-                  });
+              child: StreamBuilder<double>(
+                stream: RosService().vehicleDistanceStream,
+                builder: (context, distSnap) {
+                  return BatteryIndicatorWidget(
+                    batteryPercent: _batteryPercent,
+                    distanceMeters: distSnap.data,
+                    onTap: () {
+                      setState(() {
+                        _batteryPercent = _batteryPercent > 0.95
+                            ? 0.35
+                            : (_batteryPercent + 0.1).clamp(0.0, 1.0);
+                      });
+                    },
+                  );
                 },
               ),
             ),

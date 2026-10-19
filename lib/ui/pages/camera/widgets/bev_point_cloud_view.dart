@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -808,12 +807,15 @@ class Offset3 {
   }
 }
 
-enum _ObjKind { vehicle, person, cyclist, other }
+enum _ObjKind { vehicle, person, cyclist, motorcycle, other }
 
 /// Petakan nama kelas dari payload (`cls`) ke jenis tampilan. Longgar
 /// terhadap penamaan ("Car", "Vehicle", "Pedestrian", "Person", ...).
 _ObjKind _kindFromClass(String cls) {
   final s = cls.toLowerCase();
+  if (s.contains('motorcycle') || s.contains('motor') || s.contains('scooter')) {
+    return _ObjKind.motorcycle;
+  }
   if (s.contains('cyc') || s.contains('bike') || s.contains('bicycle')) {
     return _ObjKind.cyclist;
   }
@@ -1102,6 +1104,8 @@ class _PointCloudPainter extends CustomPainter {
         return classColors[5] ?? const Color(0xFFFF4D4D);
       case _ObjKind.cyclist:
         return const Color(0xFF9575FF);
+      case _ObjKind.motorcycle:
+        return const Color(0xFF00B0FF);
       case _ObjKind.other:
         return const Color(0xFFFFC107);
     }
@@ -1115,6 +1119,8 @@ class _PointCloudPainter extends CustomPainter {
         return Icons.directions_walk_rounded;
       case _ObjKind.cyclist:
         return Icons.pedal_bike_rounded;
+      case _ObjKind.motorcycle:
+        return Icons.two_wheeler_rounded;
       case _ObjKind.other:
         return Icons.help_outline_rounded;
     }

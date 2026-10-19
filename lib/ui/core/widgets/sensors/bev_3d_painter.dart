@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'bev_3d_camera.dart';
+import 'bev_3d_object_mesh.dart';
 import 'models/detected_3d_object.dart';
 import 'models/bev_scenario_type.dart';
 
@@ -1101,12 +1102,21 @@ class Bev3DPainter extends CustomPainter {
         ..close();
 
       final groundShadowPaint = Paint()
-        ..color = primaryColor.withValues(alpha: isLight ? 0.24 : 0.32)
+        ..color = primaryColor.withValues(alpha: isLight ? 0.20 : 0.28)
         ..style = PaintingStyle.fill;
       canvas.drawPath(groundPath, groundShadowPaint);
     }
 
-    // B. Sisi-Sisi Poligon Kubus
+    // B. Model 3D Solid / Hologram Procedural di Dalam Bounding Box (Mobil, Pejalan Kaki, Truk, dsb.)
+    Bev3DObjectMesh.drawObjectMesh(
+      canvas: canvas,
+      size: size,
+      camera: camera,
+      obj: obj,
+      isLight: isLight,
+    );
+
+    // C. Sisi-Sisi Poligon Kubus Pembungkus (Translucent Bounding Cage)
     const faces = [
       [0, 1, 5, 4], // Depan
       [1, 2, 6, 5], // Kanan
@@ -1140,9 +1150,10 @@ class Bev3DPainter extends CustomPainter {
         ..close();
 
       final isTopFace = faceIdx == 4;
+      // Tingkat transparansi dinding kubus dibuat halus agar model 3D di dalamnya terlihat jelas
       final alpha = isTopFace
-          ? (isLight ? 0.28 : 0.38)
-          : (isLight ? 0.16 : 0.24);
+          ? (isLight ? 0.16 : 0.22)
+          : (isLight ? 0.08 : 0.14);
 
       final facePaint = Paint()
         ..color = primaryColor.withValues(alpha: alpha)
@@ -1172,9 +1183,11 @@ class Bev3DPainter extends CustomPainter {
     final edgeWidth = (3.6 / (avgDepth * 0.28)).clamp(1.5, 3.8);
 
     final edgePaint = Paint()
-      ..color = primaryColor.withValues(alpha: isLight ? 0.95 : 1.0)
+      ..color = obj.isDepthOnly
+          ? primaryColor.withValues(alpha: isLight ? 0.70 : 0.80)
+          : primaryColor.withValues(alpha: isLight ? 0.95 : 1.0)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = edgeWidth
+      ..strokeWidth = obj.isDepthOnly ? edgeWidth * 0.9 : edgeWidth
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
@@ -1183,7 +1196,11 @@ class Bev3DPainter extends CustomPainter {
       final p2 = vertices[edge[1]];
       // Hanya gambar garis jika KEDUA ujung titik berada di depan kamera
       if (p1.isVisible && p2.isVisible) {
-        canvas.drawLine(p1.screenOffset, p2.screenOffset, edgePaint);
+        if (obj.isDepthOnly) {
+          _drawDashedScreenLine(canvas, p1.screenOffset, p2.screenOffset, edgePaint);
+        } else {
+          canvas.drawLine(p1.screenOffset, p2.screenOffset, edgePaint);
+        }
       }
     }
 
@@ -1203,6 +1220,28 @@ class Bev3DPainter extends CustomPainter {
       ..strokeWidth = edgeWidth * 1.2
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(pFrontCenterBottom, pFrontCenterTop, headingPaint);
+  }
+
+  void _drawDashedScreenLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint,
+  ) {
+    const dashLength = 6.0;
+    const gapLength = 4.0;
+    final totalDist = (p2 - p1).distance;
+    if (totalDist <= 0.001) return;
+    final dx = (p2.dx - p1.dx) / totalDist;
+    final dy = (p2.dy - p1.dy) / totalDist;
+    double currentDist = 0.0;
+    while (currentDist < totalDist) {
+      final start = Offset(p1.dx + dx * currentDist, p1.dy + dy * currentDist);
+      final endDist = math.min(currentDist + dashLength, totalDist);
+      final end = Offset(p1.dx + dx * endDist, p1.dy + dy * endDist);
+      canvas.drawLine(start, end, paint);
+      currentDist += dashLength + gapLength;
+    }
   }
 
   @override

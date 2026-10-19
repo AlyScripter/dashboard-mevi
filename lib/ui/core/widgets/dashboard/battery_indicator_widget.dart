@@ -5,19 +5,33 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class BatteryIndicatorWidget extends StatelessWidget {
   final double batteryPercent;
   final VoidCallback onTap;
+  final double? distanceMeters;
 
   const BatteryIndicatorWidget({
     super.key,
     required this.batteryPercent,
     required this.onTap,
+    this.distanceMeters,
   });
 
   static const _green = Color(0xFF34D765);
 
   @override
   Widget build(BuildContext context) {
-    final remainKm = (batteryPercent * 5).clamp(0.0, 999.0);
-    final remainKmText = '${remainKm.toStringAsFixed(1)} km';
+    final String remainKmText;
+    final double distPercent;
+
+    if (distanceMeters != null) {
+      final km = distanceMeters! / 1000.0;
+      remainKmText = '${km.toStringAsFixed(1)} km';
+      // Progres bar indikator jarak (normalisasi ke visual ~10km target rute)
+      distPercent = (km / 10.0).clamp(0.0, 1.0);
+    } else {
+      final remainKm = (batteryPercent * 5).clamp(0.0, 999.0);
+      remainKmText = '${remainKm.toStringAsFixed(1)} km';
+      distPercent = batteryPercent;
+    }
+
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     return GestureDetector(
@@ -42,7 +56,7 @@ class BatteryIndicatorWidget extends StatelessWidget {
               icon: LucideIcons.batteryCharging,
               label: 'Jarak',
               valueText: remainKmText,
-              percent: batteryPercent,
+              percent: distPercent,
               barColor: _green,
               isLight: isLight,
             ),

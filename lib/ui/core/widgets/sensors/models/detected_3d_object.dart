@@ -6,6 +6,7 @@ enum Detected3DClass {
   car,
   pedestrian,
   bicycle,
+  motorcycle,
   truck,
   trafficCone,
   obstacle;
@@ -18,6 +19,8 @@ enum Detected3DClass {
         return 'Pedestrian';
       case Detected3DClass.bicycle:
         return 'Bicycle';
+      case Detected3DClass.motorcycle:
+        return 'Motorcycle';
       case Detected3DClass.truck:
         return 'Truck';
       case Detected3DClass.trafficCone:
@@ -36,6 +39,8 @@ enum Detected3DClass {
         return const Color(0xFFFF6D00); // Vibrant Amber / Orange
       case Detected3DClass.bicycle:
         return const Color(0xFF8E24AA); // Purple / Magenta
+      case Detected3DClass.motorcycle:
+        return const Color(0xFF00B0FF); // Electric Cyan / Blue Azure
       case Detected3DClass.truck:
         return const Color(0xFF1976D2); // Deep Blue
       case Detected3DClass.trafficCone:
@@ -52,6 +57,8 @@ enum Detected3DClass {
       case Detected3DClass.pedestrian:
         return LucideIcons.user;
       case Detected3DClass.bicycle:
+        return LucideIcons.bike;
+      case Detected3DClass.motorcycle:
         return LucideIcons.bike;
       case Detected3DClass.truck:
         return LucideIcons.truck;
@@ -76,6 +83,8 @@ class Detected3DObject {
   final double yawDeg;
   final double confidence;
   final bool isParked;
+  final bool isDepthOnly;
+  final String? status;
   final String? customLabel;
   final String? customDistance;
 
@@ -91,6 +100,8 @@ class Detected3DObject {
     this.yawDeg = 0.0,
     this.confidence = 0.95,
     this.isParked = false,
+    this.isDepthOnly = false,
+    this.status,
     this.customLabel,
     this.customDistance,
   });

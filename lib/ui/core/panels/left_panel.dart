@@ -59,14 +59,20 @@ class _LeftPanelState extends State<LeftPanel> {
           // "Battery 72% / Fuel 83%" header exactly. The old "Efisiensi"
           // stat and the separate "50 m" distance card have been removed
           // so only these two remain, giving the panel more room below.
-          BatteryIndicatorWidget(
-            batteryPercent: _batteryPercent,
-            onTap: () {
-              setState(() {
-                _batteryPercent = _batteryPercent > 0.95
-                    ? 0.35
-                    : (_batteryPercent + 0.1).clamp(0.0, 1.0);
-              });
+          StreamBuilder<double>(
+            stream: RosService().vehicleDistanceStream,
+            builder: (context, distSnap) {
+              return BatteryIndicatorWidget(
+                batteryPercent: _batteryPercent,
+                distanceMeters: distSnap.data,
+                onTap: () {
+                  setState(() {
+                    _batteryPercent = _batteryPercent > 0.95
+                        ? 0.35
+                        : (_batteryPercent + 0.1).clamp(0.0, 1.0);
+                  });
+                },
+              );
             },
           ),
 

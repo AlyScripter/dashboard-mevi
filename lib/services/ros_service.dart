@@ -1238,9 +1238,11 @@ class RosService {
       final colorMap = <int, Color>{};
       decoded.forEach((key, value) {
         final classId = int.tryParse(key);
-        final hex = (value as Map<String, dynamic>)['color'] as String?;
-        if (classId != null && hex != null) {
-          colorMap[classId] = _hexToColor(hex);
+        if (value is Map) {
+          final hex = (value['hex'] ?? value['color']) as String?;
+          if (classId != null && hex != null) {
+            colorMap[classId] = _hexToColor(hex);
+          }
         }
       });
 

@@ -205,10 +205,19 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
           if (o is! Map) continue;
           final id = o['id']?.toString() ?? 'obj_$i';
           final clsStr = (o['cls'] as String? ?? 'car').toLowerCase();
+          final statusStr = o['st']?.toString();
+          final isDepthOnly = statusStr == 'depth_only';
+
           final Detected3DClass cls;
           if (clsStr.contains('pedestrian') || clsStr.contains('person')) {
             cls = Detected3DClass.pedestrian;
-          } else if (clsStr.contains('bike') || clsStr.contains('bicycle')) {
+          } else if (clsStr.contains('motorcycle') ||
+              clsStr.contains('motor') ||
+              clsStr.contains('scooter')) {
+            cls = Detected3DClass.motorcycle;
+          } else if (clsStr.contains('bike') ||
+              clsStr.contains('bicycle') ||
+              clsStr.contains('cyc')) {
             cls = Detected3DClass.bicycle;
           } else if (clsStr.contains('truck') || clsStr.contains('bus')) {
             cls = Detected3DClass.truck;
@@ -237,7 +246,9 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
               height: h,
               length: l,
               yawDeg: -yaw * 180.0 / math.pi,
-              customLabel: cls.label,
+              isDepthOnly: isDepthOnly,
+              status: statusStr,
+              customLabel: isDepthOnly ? '${cls.label} [Depth]' : cls.label,
               customDistance: '${cx.toStringAsFixed(1)}m',
             ),
           );
