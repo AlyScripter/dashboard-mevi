@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'bev_3d_camera.dart';
-import 'bev_3d_object_mesh.dart';
 import 'models/detected_3d_object.dart';
 import 'models/bev_scenario_type.dart';
 
@@ -40,6 +39,7 @@ class Bev3DPainter extends CustomPainter {
   final List<Offset>? liveWaypoints;
   final bool isLiveMode;
   final double? liveWaypointsEndDistance;
+  final Map<String, dynamic>? liveRoadScene;
 
   Bev3DPainter({
     required this.camera,
@@ -52,6 +52,7 @@ class Bev3DPainter extends CustomPainter {
     this.liveWaypoints,
     this.isLiveMode = false,
     this.liveWaypointsEndDistance,
+    this.liveRoadScene,
   });
 
   @override
@@ -64,27 +65,49 @@ class Bev3DPainter extends CustomPainter {
 
     _drawSkyAndGround(canvas, size, horizonY);
 
-    final samples = _generateRoadSamples();
+    // Cek apakah data jalan atau waypoint riil sudah tersedia
+    final hasRealRoadScene = liveRoadScene != null &&
+        liveRoadScene!['road'] is Map &&
+        ((liveRoadScene!['road']['p'] as List?)?.isNotEmpty ?? false);
+    final hasLiveWaypoints = liveWaypoints != null && liveWaypoints!.length >= 2;
 
-    // 2. Jaringan Jalan 3D Perspektif Proporsional (Mentok penuh sampai dasar layar)
-    _draw3DRoadNetwork(canvas, size, horizonY, samples);
+    // Sesuai permintaan user: Jika data belum masuk (saat halaman BEV baru dibuka),
+    // jangan render visualisasi jalan lurus buatan maupun waypoint, cukup mobil MEVI saja.
+    // Jalan & waypoint hanya dirender jika ada data riil yang masuk, atau jika bukan live mode.
+    final shouldRenderRoad = hasRealRoadScene || (!isLiveMode && scenario != BevScenarioType.straight);
+    final shouldRenderTrajectory = hasLiveWaypoints || (!isLiveMode && scenario != BevScenarioType.straight);
 
-    // 3. Pita Trajektori Navigasi Otonom (Waypoint Path Ribbon mentok sampai bawah layar)
-    _drawAutonomousTrajectoryRibbon(canvas, size, samples);
+    final samples = (shouldRenderRoad || shouldRenderTrajectory)
+        ? _generateRoadSamples()
+        : const <_RoadSample>[];
+
+    // 2. Jaringan Jalan 3D (Hanya dirender bila data segmentasi nyata tersedia)
+    if (shouldRenderRoad && (hasRealRoadScene || samples.isNotEmpty)) {
+      _draw3DRoadNetwork(canvas, size, horizonY, samples);
+    }
+
+    // 3. Pita Trajektori Navigasi Otonom (Hanya bila waypoints riil masuk)
+    if (shouldRenderTrajectory && samples.isNotEmpty) {
+      _drawAutonomousTrajectoryRibbon(canvas, size, samples);
+    }
 
     // 4. 3D Bounding Boxes untuk Objek Terdeteksi
-    _draw3DDetectedBoundingBoxes(canvas, size);
+    if (detectedObjects.isNotEmpty) {
+      _draw3DDetectedBoundingBoxes(canvas, size);
+    }
   }
 
   void _drawSkyAndGround(Canvas canvas, Size size, double horizonY) {
+    // Mode Terang: Latar abu-abu muda elegan khas autonomous vehicle (Tesla / Waymo / Streetscape style)
+    // Mode Gelap: Sleek dark cockpit cockpit tone
     final skyRect = Rect.fromLTRB(0, 0, size.width, horizonY);
     final skyPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: isLight
-            ? const [Color(0xFFE0EBF6), Color(0xFFEFF5FB)]
-            : const [Color(0xFF081018), Color(0xFF0E1824)],
+            ? const [Color(0xFFE2E8F0), Color(0xFFEDF2F7)]
+            : const [Color(0xFF0A0F18), Color(0xFF0F1722)],
       ).createShader(skyRect);
     canvas.drawRect(skyRect, skyPaint);
 
@@ -94,8 +117,8 @@ class Bev3DPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: isLight
-            ? const [Color(0xFFF3F7FA), Color(0xFFDFE8F1)]
-            : const [Color(0xFF0B141F), Color(0xFF050A0E)],
+            ? const [Color(0xFFEDF2F7), Color(0xFFE2E8F0)]
+            : const [Color(0xFF0F1722), Color(0xFF0A0F18)],
       ).createShader(groundRect);
     canvas.drawRect(groundRect, groundPaint);
   }
@@ -278,7 +301,9 @@ class Bev3DPainter extends CustomPainter {
       final segDist = (smoothed[i] - smoothed[i - 1]).distance;
       arcLengths.add(arcLengths.last + math.max(1e-4, segDist));
     }
-    final totalPathLength = arcLengths.last;
+    // Sesuai permintaan user: Render waypoint visual cukup ~setengah saja agar proporsional
+    // dan tidak menjulur terlalu panjang melebihi visualisasi jalan riil.
+    final totalPathLength = (arcLengths.last * 0.52).clamp(2.5, arcLengths.last);
 
     // 5. Resampling Padat & Mulus (Equidistant Arc-Length Catmull-Rom Spline)
     final densePoints = <Offset>[];
@@ -319,37 +344,9 @@ class Bev3DPainter extends CustomPainter {
 
       densePoints.add(Offset(x, z));
     }
-    densePoints.add(smoothed.last);
 
-    // 6. Ekstrapolasi Maju Terarah (Meneruskan Tangen Hadap Terakhir Tanpa Clamping)
-    if (densePoints.length >= 2) {
-      final lastIdx = densePoints.length - 1;
-      final lookback = math.min(4, densePoints.length - 1);
-      final refPt = densePoints[lastIdx - lookback];
-      final endPt = densePoints[lastIdx];
-      double dirX = endPt.dx - refPt.dx;
-      double dirZ = endPt.dy - refPt.dy;
-      final len = math.sqrt(dirX * dirX + dirZ * dirZ);
-
-      if (len > 1e-4) {
-        dirX /= len;
-        dirZ /= len;
-      } else {
-        dirX = 0.0;
-        dirZ = 1.0;
-      }
-
-      double curX = endPt.dx;
-      double curZ = endPt.dy;
-      const forwardStep = 0.55;
-      int extraCount = 0;
-      while (curZ < 42.0 && extraCount < 35) {
-        curX += dirX * forwardStep;
-        curZ += dirZ * forwardStep;
-        densePoints.add(Offset(curX, curZ));
-        extraCount++;
-      }
-    }
+    // 6. Tidak melakukan ekstrapolasi liar ke depan agar pita waypoint tetap berada
+    // di dalam jangkauan jalan segmentasi riil yang terlihat.
 
     // 7. Konstruksi Sampel Jalan dengan Vektor Tangen & Normal Ortogonal yang Dihaluskan
     final rawTangents = <Offset>[];
@@ -651,6 +648,15 @@ class Bev3DPainter extends CustomPainter {
     double horizonY,
     List<_RoadSample> samples,
   ) {
+    // 1. Jika data segmentasi jalan riil dari /bev/scene tersedia, gambar poligon nyata!
+    if (isLiveMode && liveRoadScene != null) {
+      final roadData = liveRoadScene!['road'];
+      if (roadData is Map && roadData['p'] is List && (roadData['p'] as List).isNotEmpty) {
+        _drawSegmentedRoadScene(canvas, size, horizonY, roadData);
+        return;
+      }
+    }
+
     // Lebar jalan proporsional 5.6m (total lebar 11.2m) agar seluruh kendaraan & objek muat di lajur
     const roadHalfWidth = 5.6;
 
@@ -842,6 +848,166 @@ class Bev3DPainter extends CustomPainter {
         shoulderPaint,
       );
     }
+  }
+
+  /// Menggambar jalan nyata dari data segmentasi /bev/scene (road.p, road.h)
+  /// lengkap dengan permukaan aspal gelap realistis dan pita tepi jalan (curb ribbon) putih/terang.
+  void _drawSegmentedRoadScene(
+    Canvas canvas,
+    Size size,
+    double horizonY,
+    Map<dynamic, dynamic> road,
+  ) {
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(92.0, 0, size.width - 92.0, size.height));
+
+    final pList = road['p'] as List?;
+    final hList = road['h'] as List?;
+    if (pList == null || pList.isEmpty) {
+      canvas.restore();
+      return;
+    }
+
+    final roadPath = Path()..fillType = PathFillType.evenOdd;
+    final curbPath = Path();
+
+    // 1. Gambar poligon luar (perimeter road.p) & filter garis tepi dengan road.q
+    final qList = road['q'] as List?;
+
+    for (int k = 0; k < pList.length; k++) {
+      final ring = pList[k];
+      if (ring is! List || ring.length < 3) continue;
+
+      final projectedPts = <Offset>[];
+      for (final pt in ring) {
+        if (pt is! List || pt.length < 2) continue;
+        final xRos = (pt[0] as num).toDouble();
+        final yRos = (pt[1] as num).toDouble();
+        // Koordinat 3D Camera: cx = -yRos, cz = xRos, cy = 0.0
+        final p = camera.project(-yRos, 0.0, xRos, size);
+        if (p.isVisible) {
+          projectedPts.add(p.screenOffset);
+        }
+      }
+
+      if (projectedPts.length >= 3) {
+        roadPath.moveTo(projectedPts.first.dx, projectedPts.first.dy);
+        for (int i = 1; i < projectedPts.length; i++) {
+          roadPath.lineTo(projectedPts[i].dx, projectedPts[i].dy);
+        }
+        roadPath.close();
+
+        // Garis tepi putih: Hanya sisi berbukti di mana q[i] == '0' && q[j] == '0' (Aturan R3)
+        // Tanpa q -> semua sisi dianggap berbukti
+        final qStr = (qList != null && k < qList.length && qList[k] is String)
+            ? qList[k] as String
+            : null;
+
+        for (int i = 0; i < projectedPts.length; i++) {
+          final j = (i + 1) % projectedPts.length;
+          final isProvenEdge = qStr == null ||
+              (i < qStr.length && j < qStr.length && qStr[i] == '0' && qStr[j] == '0');
+          if (isProvenEdge) {
+            curbPath.moveTo(projectedPts[i].dx, projectedPts[i].dy);
+            curbPath.lineTo(projectedPts[j].dx, projectedPts[j].dy);
+          }
+        }
+      }
+    }
+
+    // 2. Gambar lubang / pulau jalan nyata (holes road.h)
+    // Sisi lubang (h) selalu berbukti (Aturan R3)
+    if (hList != null && hList.isNotEmpty) {
+      for (final hole in hList) {
+        if (hole is! List || hole.length < 3) continue;
+
+        final holePts = <Offset>[];
+        for (final pt in hole) {
+          if (pt is! List || pt.length < 2) continue;
+          final xRos = (pt[0] as num).toDouble();
+          final yRos = (pt[1] as num).toDouble();
+          final p = camera.project(-yRos, 0.0, xRos, size);
+          if (p.isVisible) {
+            holePts.add(p.screenOffset);
+          }
+        }
+
+        if (holePts.length >= 3) {
+          roadPath.moveTo(holePts.first.dx, holePts.first.dy);
+          for (int i = 1; i < holePts.length; i++) {
+            roadPath.lineTo(holePts[i].dx, holePts[i].dy);
+          }
+          roadPath.close();
+
+          for (int i = 0; i < holePts.length; i++) {
+            final j = (i + 1) % holePts.length;
+            curbPath.moveTo(holePts[i].dx, holePts[i].dy);
+            curbPath.lineTo(holePts[j].dx, holePts[j].dy);
+          }
+        }
+      }
+    }
+
+    // 3. Permukaan Aspal Nyata (Realistic Asphalt Shader dengan gradasi perspektif dalam)
+    // Warna aspal pekat realistis (#323946 di mode siang / #1A202C di mode gelap)
+    final roadPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: isLight
+            ? const [
+                Color(0xFF38414E), // aspal pekat dekat mobil
+                Color(0xFF454F5E), // aspal tengah
+                Color(0xFF566273), // horizon blend
+              ]
+            : const [
+                Color(0xFF1E2530),
+                Color(0xFF262F3C),
+                Color(0xFF323B4A),
+              ],
+        stops: const [0.0, 0.55, 1.0],
+      ).createShader(Rect.fromLTRB(0, horizonY, size.width, size.height))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(roadPath, roadPaint);
+
+    // 4. Lapisan Inferred Region (ir) jika ada
+    final irList = road['ir'] as List?;
+    if (irList != null && irList.isNotEmpty) {
+      final irPath = Path()..fillType = PathFillType.evenOdd;
+      for (final r in irList) {
+        if (r is! List || r.length < 3) continue;
+        final irPts = <Offset>[];
+        for (final pt in r) {
+          if (pt is! List || pt.length < 2) continue;
+          final xRos = (pt[0] as num).toDouble();
+          final yRos = (pt[1] as num).toDouble();
+          final p = camera.project(-yRos, 0.0, xRos, size);
+          if (p.isVisible) irPts.add(p.screenOffset);
+        }
+        if (irPts.length >= 3) {
+          irPath.moveTo(irPts.first.dx, irPts.first.dy);
+          for (int i = 1; i < irPts.length; i++) {
+            irPath.lineTo(irPts[i].dx, irPts[i].dy);
+          }
+          irPath.close();
+        }
+      }
+      final irPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.18)
+        ..style = PaintingStyle.fill;
+      canvas.drawPath(irPath, irPaint);
+    }
+
+    // 5. Garis tepi jalan / curb ribbon (Putih tebal berbukti ±2.8px, StrokeCap.round)
+    final curbPaint = Paint()
+      ..color = isLight ? const Color(0xFFFFFFFF) : const Color(0xFFF1F5F9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(curbPath, curbPaint);
+
+    canvas.restore();
   }
 
   void _draw3DDashedCenterLine(
@@ -1107,14 +1273,8 @@ class Bev3DPainter extends CustomPainter {
       canvas.drawPath(groundPath, groundShadowPaint);
     }
 
-    // B. Model 3D Solid / Hologram Procedural di Dalam Bounding Box (Mobil, Pejalan Kaki, Truk, dsb.)
-    Bev3DObjectMesh.drawObjectMesh(
-      canvas: canvas,
-      size: size,
-      camera: camera,
-      obj: obj,
-      isLight: isLight,
-    );
+    // B. Kubus Bounding Box 3D Semi-transparan (Gaya Streetscape.gl / AV 3D Bounding Box)
+    // Sesuai permintaan user: Objek di dalam box ditiadakan, murni 3D Wireframe Box & Badges.
 
     // C. Sisi-Sisi Poligon Kubus Pembungkus (Translucent Bounding Cage)
     const faces = [

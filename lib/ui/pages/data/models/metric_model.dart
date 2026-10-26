@@ -9,6 +9,8 @@ class MetricData {
   final String unit;
   final Color color;
   final TrendDirection trend;
+  final Color? badgeBg;
+  final Color? iconColor;
 
   MetricData({
     required this.icon,
@@ -17,5 +19,7 @@ class MetricData {
     required this.unit,
     required this.color,
     required this.trend,
+    this.badgeBg,
+    this.iconColor,
   });
 }

@@ -31,6 +31,7 @@ class NavigationWidget extends StatefulWidget {
   final double destinationLng;
   final Function(bool) onMinimizedChanged;
   final void Function(String name, double distanceKm, String eta)? onRouteInfo;
+  final void Function(String name, double distanceKm, String eta)? onRoutePreview;
   final VoidCallback? onClearRouteInfo;
   final VoidCallback? onRouteCompleted;
   final bool simulateGps;
@@ -44,6 +45,7 @@ class NavigationWidget extends StatefulWidget {
     required this.destinationLng,
     required this.onMinimizedChanged,
     this.onRouteInfo,
+    this.onRoutePreview,
     this.onClearRouteInfo,
     this.onRouteCompleted,
     this.simulateGps = false,
@@ -85,6 +87,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
   LatLng? _currentPosition;
   LatLng? _destinationLocation;
   List<LatLng> _polylinePoints = [];
+  List<LatLng> _waypointMarkers = [];
   List<Location> _geoJsonLocations = [];
   final List<LatLng> _lineStringPoints = [];
 
@@ -815,6 +818,7 @@ class NavigationWidgetState extends State<NavigationWidget> {
   void _clearRouteInfo() {
     setState(() {
       _polylinePoints.clear();
+      _waypointMarkers.clear();
       _destinationLocation = null;
       _arrivalNotified = false;
     });
@@ -831,6 +835,118 @@ class NavigationWidgetState extends State<NavigationWidget> {
     } else if (widget.onRouteInfo != null) {
       // Fallback for backward compatibility
       widget.onRouteInfo!('KST Samaun Samadikun', 0.0, '0 minutes');
+    }
+  }
+
+  /// Menampilkan pratinjau rute lengkap dengan waypoints di peta (Google Maps style)
+  void _previewTrip(TripData trip) {
+    // Kumpulkan titik waypoint dari trip yang dipilih
+    List<LatLng> points = trip.waypoints
+        .map((w) => LatLng(w.latitude, w.longitude))
+        .toList();
+
+    final destLatLng = LatLng(
+      trip.destination.latitude,
+      trip.destination.longitude,
+    );
+
+    // Pastikan titik tujuan terhubung di akhir polyline jika belum ada
+    if (points.isEmpty) {
+      if (_currentPosition != null) {
+        points = [_currentPosition!, destLatLng];
+      } else {
+        points = [destLatLng];
+      }
+    } else {
+      final lastPoint = points.last;
+      final distToDest = _calculateDistance(lastPoint, destLatLng);
+      if (distToDest > 0.005) {
+        points.add(destLatLng);
+      }
+    }
+
+    final double totalDistanceKm = _calculateTotalDistance(points);
+    final String formattedEta = trip.formattedDuration;
+
+    setState(() {
+      _destinationLocation = destLatLng;
+      _polylinePoints = points;
+      _waypointMarkers = trip.waypoints
+          .map((w) => LatLng(w.latitude, w.longitude))
+          .toList();
+    });
+
+    // Sesuaikan kamera agar seluruh rute dan waypoints terlihat jelas setelah frame selesai di-layout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fitRouteBounds(points);
+    });
+
+    // Update RouteDataService
+    _routeDataService.updateRoute(
+      routePoints: points,
+      currentPosition: _currentPosition,
+      destinationPosition: destLatLng,
+    );
+
+    // Notifikasi listener parent (DashboardLayout)
+    if (widget.onRoutePreview != null) {
+      widget.onRoutePreview!(trip.name, totalDistanceKm, formattedEta);
+    } else if (widget.onRouteInfo != null) {
+      widget.onRouteInfo!(trip.name, totalDistanceKm, formattedEta);
+    }
+
+    _displayInAppNotification(
+      'Rute: ${trip.name}',
+      '${trip.waypoints.length} titik waypoint • Estimasi: $formattedEta • ${totalDistanceKm.toStringAsFixed(2)} km',
+      kind: NotificationKind.info,
+      seconds: 4,
+    );
+  }
+
+  /// Menghitung bounds kamera yang optimal agar rute dan mobil pas di layar
+  void _fitRouteBounds(List<LatLng> points) {
+    if (points.isEmpty) return;
+
+    try {
+      double minLat = points.map((p) => p.latitude).reduce(min);
+      double maxLat = points.map((p) => p.latitude).reduce(max);
+      double minLng = points.map((p) => p.longitude).reduce(min);
+      double maxLng = points.map((p) => p.longitude).reduce(max);
+
+      // Sertakan posisi mobil jika ada agar tidak terpotong dari pandangan
+      if (_currentPosition != null) {
+        minLat = min(minLat, _currentPosition!.latitude);
+        maxLat = max(maxLat, _currentPosition!.latitude);
+        minLng = min(minLng, _currentPosition!.longitude);
+        maxLng = max(maxLng, _currentPosition!.longitude);
+      }
+
+      final LatLng center = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
+
+      final double latDiff = maxLat - minLat;
+      final double lngDiff = maxLng - minLng;
+      final double maxDiff = max(latDiff, lngDiff);
+
+      // Skala zoom responsif untuk area BRIN
+      double targetZoom;
+      if (maxDiff < 0.0010) {
+        targetZoom = 18.2;
+      } else if (maxDiff < 0.0020) {
+        targetZoom = 17.8;
+      } else if (maxDiff < 0.0040) {
+        targetZoom = 17.2;
+      } else if (maxDiff < 0.0080) {
+        targetZoom = 16.5;
+      } else if (maxDiff < 0.015) {
+        targetZoom = 15.8;
+      } else {
+        targetZoom = 15.0;
+      }
+
+      _mapController.move(center, targetZoom);
+    } catch (e) {
+      debugPrint('⚠️ Error moving map in _fitRouteBounds: $e');
     }
   }
 
@@ -989,85 +1105,85 @@ class NavigationWidgetState extends State<NavigationWidget> {
         : routePillBottomPadding['small']! +
               (routePillHeight['small']! - centerBtnSize) / 2;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Stack(
-          children: [
-            // Map view with all markers and polylines inside
-            MapView(
-              center: _currentPosition ?? _getPlaceholderLocation(),
-              zoom: 19.0,
-              rotation: _rotation,
-              mapController: _mapController,
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              currentPosition: _currentPosition,
-              destinationLocation: _destinationLocation,
-              polylinePoints: _polylinePoints,
-              placeholderPosition: _getPlaceholderLocation(),
-              vehicleHeading: _vehicleHeading,
-            ),
+    return Stack(
+      children: [
+        // Map view with all markers and polylines inside
+        MapView(
+          center: _currentPosition ?? _getPlaceholderLocation(),
+          zoom: 19.0,
+          rotation: _rotation,
+          mapController: _mapController,
+          onPanStart: _onPanStart,
+          onPanUpdate: _onPanUpdate,
+          currentPosition: _currentPosition,
+          destinationLocation: _destinationLocation,
+          polylinePoints: _polylinePoints,
+          waypointNodes: _waypointMarkers,
+          placeholderPosition: _getPlaceholderLocation(),
+          vehicleHeading: _vehicleHeading,
+        ),
 
-            // Heading HUD yang menampilkan arah gerak aktual mobil
-            HeadingHUD(
-              headingOverride: _vehicleHeading > 0.0 ? _vehicleHeading : null,
-            ),
+        // Heading HUD yang menampilkan arah gerak aktual mobil
+        HeadingHUD(
+          headingOverride: _vehicleHeading > 0.0 ? _vehicleHeading : null,
+        ),
 
-            // Search bar — hanya tampil di halaman Maps (showSearchBar: true).
-            // Saat false, widget tidak dirender sama sekali sehingga overlay
-            // dropdown tidak bisa muncul di halaman Camera/BEV/Data.
-            if (widget.showSearchBar)
-              SafeArea(
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      top: searchBarTop,
-                      left: searchBarLeft,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: searchBarMaxWidth),
-                      child: SearchBarWidget(
-                        onLocationSelected: _onLocationSelected,
-                      ),
-                    ),
+        // Search bar — hanya tampil di halaman Maps (showSearchBar: true).
+        // Saat false, widget tidak dirender sama sekali sehingga overlay
+        // dropdown tidak bisa muncul di halaman Camera/BEV/Data.
+        if (widget.showSearchBar)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: searchBarTop,
+                  left: searchBarLeft,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: searchBarMaxWidth),
+                  child: SearchBarWidget(
+                    onLocationSelected: _onLocationSelected,
+                    onPreviewTrip: _previewTrip,
                   ),
                 ),
               ),
-
-            // Loading indicator
-            LoadingIndicator(isLoading: _isLoading),
-
-            // Center on car button — position tuned for Full HD
-            Positioned(
-              right: centerBtnRight,
-              bottom: centerBtnBottom,
-              child: CenterOnCarButton(
-                size: centerBtnSize,
-                onPressed: () {
-                  try {
-                    centerOnCurrentPosition();
-                  } catch (_) {}
-                },
-              ),
             ),
+          ),
 
-            // In-app notification (kept as-is; uses its own layout)
-            InAppNotificationWidget(
-              showNotification: _showInAppNotification,
-              title: _inAppNotificationTitle,
-              body: _inAppNotificationBody,
-              kind: _inAppNotificationKind,
-              onDismiss: () {
-                setState(() {
-                  _showInAppNotification = false;
-                  _inAppNotificationTimer?.cancel();
-                });
-              },
-            ),
-          ],
-        );
-      },
+        // Loading indicator
+        LoadingIndicator(isLoading: _isLoading),
+
+        // Center on car button — position tuned for Full HD
+        Positioned(
+          right: centerBtnRight,
+          bottom: centerBtnBottom,
+          child: CenterOnCarButton(
+            size: centerBtnSize,
+            onPressed: () {
+              try {
+                centerOnCurrentPosition();
+              } catch (_) {}
+            },
+          ),
+        ),
+
+        // In-app notification
+        Positioned.fill(
+          child: InAppNotificationWidget(
+            showNotification: _showInAppNotification,
+            title: _inAppNotificationTitle,
+            body: _inAppNotificationBody,
+            kind: _inAppNotificationKind,
+            onDismiss: () {
+              setState(() {
+                _showInAppNotification = false;
+                _inAppNotificationTimer?.cancel();
+              });
+            },
+          ),
+        ),
+      ],
     );
   }
 }

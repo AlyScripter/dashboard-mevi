@@ -30,20 +30,21 @@ class NavigationHudBanner extends StatelessWidget {
             key: ValueKey(instruction.text),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isLight
-                  ? Colors.white.withValues(alpha: 0.95)
-                  : const Color(0xFF101926).withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(24),
+              color: isLight ? Colors.white : const Color(0xFF131B2B),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: color.withValues(alpha: 0.85),
-                width: 1.8,
+                color: isLight
+                    ? const Color(0xFFE2E8F0)
+                    : const Color(0xFF1E293B),
+                width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: color.withValues(alpha: isLight ? 0.30 : 0.45),
+                  color: isLight
+                      ? const Color(0x0A0F172A)
+                      : Colors.black.withValues(alpha: 0.35),
                   blurRadius: 16,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 3),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),

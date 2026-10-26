@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 
 import 'package:dashboardmevi/services/ros_service.dart';
 import 'package:dashboardmevi/ui/core/widgets/sensors/car_3d_viewer_widget.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
 /// BEV/SDC — render titik LiDAR terwarnai per kelas + bounding box objek +
 /// garis waypoint + model 3D mobil MEVI (ego), gaya preview Open3D.
@@ -100,6 +102,35 @@ const Map<int, String> _fallbackClassNames = {
 
 /// Panjang mobil kanonik (meter) -- buat menghitung skala layar model ego.
 const double _egoLengthMeters = 4.2;
+
+/// Batas jarak render di belakang mobil (meter).
+/// Sesuai instruksi mentor: hanya disisakan sekitar 5 meter ke belakang (x >= -5.0).
+const double _minRearCutoffMeters = -5.0;
+
+/// Menghitung target fokus kamera (+x) secara dinamis agar titik batas belakang
+/// (x = _minRearCutoffMeters = -5m) SELALU presisi menempel pas di batas bawah
+/// kanvas layar (fit to bottom), baik saat awal masuk maupun saat di-zoom out/in.
+double _computeTargetX(
+  double distance,
+  double elevation,
+  Size size, {
+  double bottomMargin = 2.0,
+}) {
+  const fovYRad = 0.9;
+  final halfHeight = size.height / 2;
+  if (halfHeight <= 0) return 8.0;
+
+  final clampedMargin = bottomMargin.clamp(0.0, halfHeight * 0.4);
+  final beta = math.tan(fovYRad / 2) * (1.0 - (clampedMargin / halfHeight));
+  final safeElevation = elevation.clamp(0.5, 1.5);
+  final sinE = math.sin(safeElevation);
+  final cosE = math.cos(safeElevation);
+  final denom = sinE + beta * cosE;
+  if (denom.abs() < 1e-4) return 8.0;
+
+  final delta = (beta * distance) / denom;
+  return _minRearCutoffMeters + delta;
+}
 
 /// Koreksi sudut hadap model mevi3d untuk tampilan ego BEV/SDC.
 /// Nilai 0 karena Car3DViewerWidget (Windows/Web) sudah secara internal
@@ -311,12 +342,14 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
       final ptsList = raw['pts'];
       if (ptsList is! List) return null;
 
-      // --- Titik: lintasan 1 = hitung per kelas ---
+      // --- Titik: lintasan 1 = hitung per kelas (filter x >= _minRearCutoffMeters) ---
       final n = ptsList.length;
       final counts = <int, int>{};
       for (int i = 0; i < n; i++) {
         final row = ptsList[i];
         if (row is List && row.length >= 4) {
+          final x = (row[0] as num).toDouble();
+          if (x < _minRearCutoffMeters) continue; // Lewati titik di belakang -5 meter
           final c = (row[3] as num).toInt();
           counts[c] = (counts[c] ?? 0) + 1;
         }
@@ -337,9 +370,11 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
       for (int i = 0; i < n; i++) {
         final row = ptsList[i];
         if (row is! List || row.length < 4) continue;
+        final x = (row[0] as num).toDouble();
+        if (x < _minRearCutoffMeters) continue; // Lewati titik di belakang -5 meter
         final g = byId[(row[3] as num).toInt()]!;
         final o = g._filled * 3;
-        g.xyz[o] = (row[0] as num).toDouble();
+        g.xyz[o] = x;
         g.xyz[o + 1] = (row[1] as num).toDouble();
         g.xyz[o + 2] = (row[2] as num).toDouble();
         g._filled++;
@@ -351,6 +386,10 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
       if (objList is List) {
         for (final o in objList) {
           if (o is! Map) continue;
+          final cx = (o['cx'] as num?)?.toDouble() ?? 0;
+          final l = (o['l'] as num?)?.toDouble() ?? 0;
+          // Lewati objek yang seluruhnya berada di belakang batas -5 meter
+          if (cx + l / 2 < _minRearCutoffMeters) continue;
           final cls = o['cls'] as String? ?? '?';
           objs.add(
             _BevObject(
@@ -358,11 +397,11 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
               className: cls,
               kind: _kindFromClass(cls),
               center: Offset3(
-                (o['cx'] as num?)?.toDouble() ?? 0,
+                cx,
                 (o['cy'] as num?)?.toDouble() ?? 0,
                 (o['cz'] as num?)?.toDouble() ?? 0,
               ),
-              length: (o['l'] as num?)?.toDouble() ?? 0,
+              length: l,
               width: (o['w'] as num?)?.toDouble() ?? 0,
               height: (o['h'] as num?)?.toDouble() ?? 0,
               yaw: (o['yaw'] as num?)?.toDouble() ?? 0,
@@ -379,7 +418,9 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
         int k = 0;
         for (final p in wpList) {
           if (p is List && p.length >= 2) {
-            tmp[k++] = (p[0] as num).toDouble();
+            final x = (p[0] as num).toDouble();
+            if (x < _minRearCutoffMeters) continue;
+            tmp[k++] = x;
             tmp[k++] = (p[1] as num).toDouble();
           }
         }
@@ -481,10 +522,12 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
     _CamState cs,
     double yaw,
   ) {
+    final targetX = _computeTargetX(cs.distance, cs.elevation, size);
     final cam = _Camera(
       azimuth: cs.azimuth,
       elevation: cs.elevation,
       distance: cs.distance,
+      target: Offset3(targetX, 0, 0),
     );
     const egoHeightCenter = 0.75; // separuh tinggi kanonik mobil
     final c = cam.project(0, 0, egoHeightCenter, size);
@@ -628,7 +671,7 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Container(
-      color: isLight ? Colors.white : const Color(0xFF05070C),
+      color: isLight ? const Color(0xFFF8FAFC) : const Color(0xFF05070C),
       child: Listener(
         // Scroll wheel mouse buat zoom.
         onPointerSignal: (event) {
@@ -644,13 +687,17 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
         },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onDoubleTap: () {
+            // Reset ke default POV presisi
+            _cam.value = const _CamState(math.pi, 1.4, 29.5);
+          },
           onScaleStart: (_) => _pinchStartDistance = _cam.value.distance,
           onScaleUpdate: (details) {
             final c = _cam.value;
             // details.scale bersifat KUMULATIF sejak gesture mulai, jadi
             // harus dibagi ke jarak awal gesture (bukan jarak saat ini).
             final dist = details.scale != 1.0
-                ? (_pinchStartDistance / details.scale).clamp(4.0, 150.0)
+                ? (_pinchStartDistance / details.scale).clamp(8.0, 150.0)
                 : c.distance;
             _cam.value = _CamState(
               c.azimuth - details.focalPointDelta.dx * 0.008,
@@ -685,46 +732,132 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
 
                   _buildEgoOverlay(size, isLight),
 
+                  // Bottom Left: Telemetry & Gestures info card
                   Positioned(
-                    left: 10,
-                    bottom: 10,
+                    left: 12,
+                    bottom: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 10,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: isLight
-                            ? const Color(0x14000000)
-                            : Colors.black45,
-                        borderRadius: BorderRadius.circular(6),
+                            ? Colors.white.withValues(alpha: 0.95)
+                            : AppColors.glassSurfaceAlt.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isLight
+                              ? const Color(0xFFE2E8F0)
+                              : AppColors.glassBlueBorder.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isLight
+                                ? const Color(0x0C0F172A)
+                                : Colors.black38,
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: ValueListenableBuilder<_BevFrameData?>(
                         valueListenable: _frame,
                         builder: (context, d, _) => Text(
                           d == null
-                              ? 'BEV/SDC — menunggu /bev/frame...'
-                              : 'frame_idx=${d.frameIdx}  t=${d.timestamp}\n'
-                                    'titik=${d.pointCount} (semua, tanpa downsample)  '
-                                    'objek=${d.objects.length}  waypoint=${d.waypoints.length ~/ 2}\n'
-                                    'drag = rotate • scroll/pinch = zoom',
+                              ? 'BEV/SDC — Menunggu /bev/frame...'
+                              : 'Frame: ${d.frameIdx ?? "-"} • Pts: ${d.pointCount} • Objek: ${d.objects.length} • Waypoint: ${d.waypoints.length ~/ 2}\n'
+                                    'Drag = rotate POV • Scroll / Pinch = zoom • Double tap = reset',
                           style: TextStyle(
                             color: isLight
-                                ? const Color(0xFF1B5E20)
-                                : Colors.greenAccent,
-                            fontSize: 10,
+                                ? const Color(0xFF334155)
+                                : const Color(0xFF86EFAC),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
                             fontFamily: 'monospace',
+                            height: 1.35,
                           ),
                         ),
                       ),
                     ),
                   ),
+
+                  // Top Right: Class Legend styled like Data page cards
                   Positioned(
-                    right: 10,
-                    top: 10,
+                    right: 12,
+                    top: 12,
                     child: _ClassLegend(
                       classColors: _classColors,
                       isLight: isLight,
+                    ),
+                  ),
+
+                  // Bottom Right: Reset POV quick button
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: Tooltip(
+                      message: 'Reset Sudut Pandang Kamera',
+                      child: GestureDetector(
+                        onTap: () {
+                          _cam.value = const _CamState(math.pi, 1.4, 29.5);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isLight
+                                ? Colors.white
+                                : AppColors.glassSurfaceAlt,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isLight
+                                  ? const Color(0xFFE2E8F0)
+                                  : AppColors.glassBlueBorder.withValues(
+                                      alpha: 0.35,
+                                    ),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isLight
+                                    ? const Color(0x0C0F172A)
+                                    : AppColors.glassBlueGlow.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.focus,
+                                size: 14,
+                                color: isLight
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFF7DB4FF),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Reset POV',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isLight
+                                      ? const Color(0xFF0F172A)
+                                      : AppColors.glassTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -737,7 +870,7 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   }
 }
 
-/// Legenda kecil di pojok kanan-atas.
+/// Legenda kecil di pojok kanan-atas bergaya kartu modern ala Data Page.
 class _ClassLegend extends StatelessWidget {
   final Map<int, Color> classColors;
   final bool isLight;
@@ -746,42 +879,105 @@ class _ClassLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ids = classColors.keys.toList()..sort();
+    final panelBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
+    final panelBorder = isLight
+        ? const Color(0xFFE2E8F0)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.35);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isLight ? const Color(0x14000000) : Colors.black45,
-        borderRadius: BorderRadius.circular(6),
+        color: panelBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: panelBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: isLight
+                ? const Color(0x0C0F172A)
+                : AppColors.glassBlueGlow.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
-        children: ids.map((id) {
-          final name = _fallbackClassNames[id] ?? 'class $id';
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 1.5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: classColors[id],
-                    shape: BoxShape.circle,
-                  ),
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFEFF6FF)
+                      : const Color(0x1A7DB4FF),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  name,
-                  style: TextStyle(
-                    color: isLight ? Colors.black87 : Colors.white70,
-                    fontSize: 10,
-                  ),
+                child: Icon(
+                  LucideIcons.layers,
+                  size: 12,
+                  color: isLight
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFF7DB4FF),
                 ),
-              ],
-            ),
-          );
-        }).toList(),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'LiDAR Classes',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: isLight
+                      ? const Color(0xFF0F172A)
+                      : AppColors.glassTextPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ...ids.map((id) {
+            final name = _fallbackClassNames[id] ?? 'class $id';
+            final color = classColors[id] ?? Colors.grey;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8.5,
+                    height: 8.5,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.4),
+                          blurRadius: 3,
+                          spreadRadius: 0.5,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: isLight
+                          ? const Color(0xFF334155)
+                          : AppColors.glassTextSecondary,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -996,16 +1192,19 @@ class _PointCloudPainter extends CustomPainter {
     ..strokeWidth = 1.0
     ..strokeJoin = StrokeJoin.round;
 
-  /// Grid cincin jarak tanah. Path di-cache di [cache]; dibangun ulang
-  /// HANYA kalau kamera / ukuran kanvas berubah.
+  /// Grid cincin jarak tanah dengan batas belakang x >= _minRearCutoffMeters (-5m).
+  /// Path di-cache di [cache]; dibangun ulang HANYA kalau kamera / ukuran kanvas berubah.
   void _drawGroundGrid(Canvas canvas, Size size, _Camera camera, _CamState cs) {
     var path = cache.gridPath;
     if (path == null || cache.gridCam != cs || cache.gridSize != size) {
       path = Path();
       for (final r in const [10.0, 20.0, 30.0, 40.0, 50.0]) {
+        // Sudut batas di mana lingkaran memotong x = _minRearCutoffMeters (-5m)
+        final double maxAngle = math.acos((_minRearCutoffMeters / r).clamp(-1.0, 1.0));
         bool pen = false;
-        for (int i = 0; i <= 64; i++) {
-          final a = (i / 64) * 2 * math.pi;
+        const steps = 48;
+        for (int i = 0; i <= steps; i++) {
+          final a = -maxAngle + (2 * maxAngle) * (i / steps);
           final p = camera.project(r * math.cos(a), r * math.sin(a), 0, size);
           if (p == null) {
             pen = false;
@@ -1019,6 +1218,25 @@ class _PointCloudPainter extends CustomPainter {
           }
         }
       }
+
+      // Garis penanda batas bawah pada x = -5.0 meter
+      bool linePen = false;
+      const int lineSteps = 40;
+      for (int i = 0; i <= lineSteps; i++) {
+        final y = -80.0 + 160.0 * (i / lineSteps);
+        final p = camera.project(_minRearCutoffMeters, y, 0, size);
+        if (p == null) {
+          linePen = false;
+          continue;
+        }
+        if (linePen) {
+          path.lineTo(p.x, p.y);
+        } else {
+          path.moveTo(p.x, p.y);
+          linePen = true;
+        }
+      }
+
       cache.gridPath = path;
       cache.gridCam = cs;
       cache.gridSize = size;
@@ -1320,10 +1538,12 @@ class _PointCloudPainter extends CustomPainter {
     // Latar sudah digambar oleh Container induk (tidak perlu drawRect
     // lagi -> hemat satu fill layar penuh per paint).
     final cs = cam.value;
+    final targetX = _computeTargetX(cs.distance, cs.elevation, size);
     final camera = _Camera(
       azimuth: cs.azimuth,
       elevation: cs.elevation,
       distance: cs.distance,
+      target: Offset3(targetX, 0, 0),
     );
 
     _drawGroundGrid(canvas, size, camera, cs);

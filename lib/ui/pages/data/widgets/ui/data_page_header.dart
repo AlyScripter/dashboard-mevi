@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../../services/data_recorder_service.dart';
 import '../../../../../core/theme/colors.dart';
-import '../../../../../core/theme/glass_container.dart';
 
 class DataPageHeader extends StatefulWidget {
   final bool isConnected;
@@ -49,13 +48,6 @@ class _DataPageHeaderState extends State<DataPageHeader>
       _pulseController.stop();
       _pulseController.reset();
     }
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
   }
 
   void _showRecordingOptions() {
@@ -120,79 +112,97 @@ class _DataPageHeaderState extends State<DataPageHeader>
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // Warna nav rail: gradient 0xFF1565C0 → 0xFF1976D2, border 0xFF1E88E5
-    // Dipakai di kedua widget (Data Visualization & Record) saat light mode.
-    const navTop = Color(0xFF1565C0);
-    const navBottom = Color(0xFF1976D2);
-    const navBorder = Color(0xFF1E88E5);
-
-    final defaultGradient = isLight
-        ? const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [navTop, navBottom],
-          )
-        : null;
-    final defaultBg = isLight ? null : AppColors.glassNavyTint;
-    final defaultBorder = isLight
-        ? navBorder
-        : AppColors.glassBlueBorder.withValues(alpha: 0.85);
-    final defaultShadow = isLight
-        ? navTop.withValues(alpha: 0.35)
-        : Colors.black.withValues(alpha: 0.35);
-    final iconClr = isLight ? Colors.white : AppColors.glassBlueBorder;
-    final textClr = isLight ? Colors.white : AppColors.glassTextPrimary;
-    final subTextClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
-
     return ListenableBuilder(
       listenable: _recorderService,
       builder: (context, _) {
         _updatePulseAnimation();
 
-        // Record widget: saat recording → merah; idle → biru nav / navy
-        final recBg = _recorderService.isRecording
-            ? (isLight ? null : const Color(0xFF2A0E10))
-            : defaultBg;
-        final recGradient = _recorderService.isRecording
-            ? null
-            : defaultGradient;
-        final recBorder = _recorderService.isRecording
-            ? Colors.redAccent.withValues(alpha: 0.85)
-            : defaultBorder;
-        final recShadow = _recorderService.isRecording
-            ? Colors.redAccent.withValues(alpha: 0.30)
-            : defaultShadow;
+        // ── Card Styles (Edaca style) ──
+        final cardBg = isLight ? Colors.white : AppColors.glassNavyTint;
+        final cardBorder = isLight
+            ? const Color(0xFFE2E8F0)
+            : AppColors.glassBlueBorder.withValues(alpha: 0.65);
+        final cardShadow = isLight
+            ? const Color(0x0A0F172A)
+            : Colors.black.withValues(alpha: 0.35);
+
+        // Record states
+        final isRecording = _recorderService.isRecording;
+        final recBg = isRecording
+            ? (isLight ? const Color(0xFFFEF2F2) : const Color(0xFF2A0E10))
+            : cardBg;
+        final recBorder = isRecording
+            ? (isLight
+                ? const Color(0xFFFCA5A5)
+                : Colors.redAccent.withValues(alpha: 0.85))
+            : cardBorder;
 
         return Row(
           children: [
             // ── Widget "Data Visualization" ────────────────────────────────
             Container(
-              height: 55,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              height: 54,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
-                color: defaultBg,
-                gradient: defaultGradient,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: defaultBorder, width: 1.4),
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cardBorder, width: 1.0),
                 boxShadow: [
                   BoxShadow(
-                    color: defaultShadow,
-                    blurRadius: 14,
+                    color: cardShadow,
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Row(
                 children: [
-                  Icon(LucideIcons.chartBar, size: 24, color: iconClr),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Data Visualization',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: textClr,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: isLight
+                          ? const Color(0xFFEFF6FF)
+                          : const Color(0x1A7DB4FF),
+                      borderRadius: BorderRadius.circular(11),
                     ),
+                    child: Icon(
+                      LucideIcons.chartBar,
+                      size: 19,
+                      color: isLight
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFF7DB4FF),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Data Visualization',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          height: 1.15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: isLight
+                              ? const Color(0xFF0F172A)
+                              : AppColors.glassTextPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Telemetry & Analytics',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          height: 1.15,
+                          fontWeight: FontWeight.w500,
+                          color: isLight
+                              ? const Color(0xFF64748B)
+                              : AppColors.glassTextSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -202,17 +212,16 @@ class _DataPageHeaderState extends State<DataPageHeader>
 
             // ── Widget "Record" ────────────────────────────────────────────
             Container(
-              height: 55,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              height: 54,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: recBg,
-                gradient: recGradient,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: recBorder, width: 1.4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: recBorder, width: 1.0),
                 boxShadow: [
                   BoxShadow(
-                    color: recShadow,
-                    blurRadius: 14,
+                    color: cardShadow,
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -230,26 +239,16 @@ class _DataPageHeaderState extends State<DataPageHeader>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: _recorderService.isRecording
-                                ? Colors.redAccent
-                                : isLight
-                                ? Colors.white.withValues(alpha: 0.20)
-                                : Colors.white.withValues(alpha: 0.08),
+                            color: isRecording
+                                ? const Color(0xFFDC2626)
+                                : (isLight
+                                    ? const Color(0xFFFEE2E2)
+                                    : const Color(0x1AFF5252)),
                             shape: BoxShape.circle,
-                            border: _recorderService.isRecording
-                                ? null
-                                : Border.all(
-                                    color: isLight
-                                        ? Colors.white.withValues(alpha: 0.60)
-                                        : AppColors.glassBlueBorder.withValues(
-                                            alpha: 0.6,
-                                          ),
-                                    width: 1,
-                                  ),
-                            boxShadow: _recorderService.isRecording
+                            boxShadow: isRecording
                                 ? [
                                     BoxShadow(
-                                      color: Colors.redAccent.withValues(
+                                      color: const Color(0xFFDC2626).withValues(
                                         alpha: 0.4 * _pulseAnimation.value,
                                       ),
                                       blurRadius: 8 * _pulseAnimation.value,
@@ -259,13 +258,13 @@ class _DataPageHeaderState extends State<DataPageHeader>
                                 : null,
                           ),
                           child: Icon(
-                            _recorderService.isRecording
+                            isRecording
                                 ? LucideIcons.square
                                 : LucideIcons.circle,
-                            size: 16,
-                            color: _recorderService.isRecording
+                            size: 15,
+                            color: isRecording
                                 ? Colors.white
-                                : Colors.redAccent,
+                                : const Color(0xFFDC2626),
                           ),
                         );
                       },
@@ -280,48 +279,57 @@ class _DataPageHeaderState extends State<DataPageHeader>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _recorderService.isRecording ? 'REC' : 'Record',
+                        isRecording ? 'RECORDING' : 'Record',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _recorderService.isRecording
-                              ? Colors.redAccent
-                              : textClr,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                          color: isRecording
+                              ? const Color(0xFFDC2626)
+                              : (isLight
+                                  ? const Color(0xFF0F172A)
+                                  : AppColors.glassTextPrimary),
                         ),
                       ),
-                      if (_recorderService.isRecording)
+                      if (isRecording)
                         _RecordingTimer(recorderService: _recorderService)
                       else
                         Text(
                           _getModeLabel(_recorderService.mode),
-                          style: TextStyle(fontSize: 10, color: subTextClr),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: isLight
+                                ? const Color(0xFF64748B)
+                                : AppColors.glassTextSecondary,
+                          ),
                         ),
                     ],
                   ),
 
-                  if (_recorderService.isRecording) ...[
+                  if (isRecording) ...[
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
+                        horizontal: 7,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(4),
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '${_recorderService.recordCount}',
                         style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.redAccent,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFDC2626),
                         ),
                       ),
                     ),
                   ],
 
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
 
                   // Settings button
                   GestureDetector(
@@ -331,23 +339,21 @@ class _DataPageHeaderState extends State<DataPageHeader>
                       height: 32,
                       decoration: BoxDecoration(
                         color: isLight
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : Colors.white.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(8),
+                            ? const Color(0xFFF1F5F9)
+                            : Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(9),
                         border: Border.all(
                           color: isLight
-                              ? Colors.white.withValues(alpha: 0.55)
-                              : AppColors.glassBlueBorder.withValues(
-                                  alpha: 0.5,
-                                ),
-                          width: 1,
+                              ? const Color(0xFFE2E8F0)
+                              : AppColors.glassBlueBorder.withValues(alpha: 0.35),
+                          width: 1.0,
                         ),
                       ),
                       child: Icon(
-                        LucideIcons.settings2,
+                        LucideIcons.slidersHorizontal,
                         size: 14,
                         color: isLight
-                            ? Colors.white
+                            ? const Color(0xFF475569)
                             : AppColors.glassTextSecondary,
                       ),
                     ),
@@ -355,8 +361,6 @@ class _DataPageHeaderState extends State<DataPageHeader>
                 ],
               ),
             ),
-
-            const Spacer(),
           ],
         );
       },

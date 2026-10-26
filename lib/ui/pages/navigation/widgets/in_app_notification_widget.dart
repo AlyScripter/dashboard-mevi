@@ -467,7 +467,8 @@ class _InAppNotificationWidgetState extends State<InAppNotificationWidget>
           return const SizedBox.shrink();
         }
 
-        return Positioned.fill(
+        return IgnorePointer(
+          ignoring: !widget.showNotification,
           child: Align(
             alignment: Alignment.center,
             child: Material(

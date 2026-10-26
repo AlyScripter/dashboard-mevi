@@ -155,6 +155,7 @@ flutter:
     - assets/mevi3d.mtl
     - assets/mevi3d.obj
     - assets/waypoints/
+    - assets/models/adas/
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see

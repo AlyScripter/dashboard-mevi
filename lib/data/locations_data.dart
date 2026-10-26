@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../model/location.dart';
 import '../data/waypoints.dart';
 
@@ -8,13 +9,94 @@ class TripData {
   final List<Location> waypoints;
   final double estimatedDuration;
 
-  const TripData({
+  TripData({
     required this.name,
     required this.description,
     required this.destination,
     required this.waypoints,
-    required this.estimatedDuration,
-  });
+    double? estimatedDuration,
+  }) : estimatedDuration = estimatedDuration ??
+            _calculateDurationMinutes(waypoints, destination);
+
+  /// Kecepatan acuan kendaraan autonomous: 20 km/jam
+  static const double speedKmh = 20.0;
+  static const double speedMps = (speedKmh * 1000.0) / 3600.0; // ~5.556 m/s
+
+  /// Total jarak rute dalam meter (Haversine akumulatif titik waypoint + destinasi)
+  double get totalDistanceMeters =>
+      _calculateTotalDistanceMeters(waypoints, destination);
+
+  /// Total jarak rute dalam kilometer
+  double get totalDistanceKm => totalDistanceMeters / 1000.0;
+
+  /// Estimasi waktu tempuh dalam detik pada kecepatan 20 km/jam
+  double get estimatedDurationSeconds => estimatedDuration * 60.0;
+
+  /// Format ringkas untuk list & badge: '20 dtk', '35 dtk', '1 mnt'
+  String get formattedDuration {
+    final sec = (estimatedDuration * 60.0).round();
+    if (sec < 55) {
+      final s = sec < 5 ? 5 : sec;
+      return '$s dtk';
+    } else {
+      final mins = (sec / 60.0).round();
+      return '$mins mnt';
+    }
+  }
+
+  /// Format lengkap untuk detail info chip: '20 detik', '35 detik', '1 menit'
+  String get formattedDurationLong {
+    final sec = (estimatedDuration * 60.0).round();
+    if (sec < 55) {
+      final s = sec < 5 ? 5 : sec;
+      return '$s detik';
+    } else {
+      final mins = (sec / 60.0).round();
+      return '$mins menit';
+    }
+  }
+
+  static double _calculateDurationMinutes(
+    List<Location> wps,
+    Location dest,
+  ) {
+    final meters = _calculateTotalDistanceMeters(wps, dest);
+    if (meters <= 0) return 0.0;
+    final seconds = meters / speedMps;
+    return seconds / 60.0;
+  }
+
+  static double _calculateTotalDistanceMeters(
+    List<Location> wps,
+    Location dest,
+  ) {
+    if (wps.isEmpty) return 0.0;
+    double total = 0.0;
+    for (int i = 0; i < wps.length - 1; i++) {
+      total += _haversineMeters(wps[i], wps[i + 1]);
+    }
+    final lastPoint = wps.last;
+    final distToDest = _haversineMeters(lastPoint, dest);
+    if (distToDest > 3.0) {
+      total += distToDest;
+    }
+    return total;
+  }
+
+  static double _haversineMeters(Location a, Location b) {
+    const earthRadius = 6371000.0; // meters
+    final dLat = (b.latitude - a.latitude) * (math.pi / 180.0);
+    final dLon = (b.longitude - a.longitude) * (math.pi / 180.0);
+    final lat1 = a.latitude * (math.pi / 180.0);
+    final lat2 = b.latitude * (math.pi / 180.0);
+
+    final sinDLat = math.sin(dLat / 2.0);
+    final sinDLon = math.sin(dLon / 2.0);
+    final h = sinDLat * sinDLat +
+        math.cos(lat1) * math.cos(lat2) * sinDLon * sinDLon;
+    final c = 2.0 * math.atan2(math.sqrt(h), math.sqrt(1.0 - h));
+    return earthRadius * c;
+  }
 }
 
 class LocationsData {
@@ -22,45 +104,40 @@ class LocationsData {
     TripData(
       name: "Keliling Area BRIN (CBF Route)",
       description:
-          "Tour lengkap area BRIN menggunakan jalur CBF Navigation yang sudah teruji (26 waypoints)",
+          "Tour lengkap area BRIN menggunakan jalur CBF Navigation yang sudah teruji (33 waypoints)",
       destination: Waypoints.posSatpam,
       waypoints: Waypoints.allWaypoints,
-      estimatedDuration: 15.0,
     ),
     TripData(
       name: "Gedung 10 BRIN",
-      description: "Menuju Gedung 10 area BRIN via jalur CBF (9 waypoints)",
+      description: "Menuju Gedung 10 area BRIN via jalur CBF (13 waypoints)",
       destination: Waypoints.gedung10,
       waypoints: Waypoints.toGedung10,
-      estimatedDuration: 5.0,
     ),
     TripData(
       name: "Lab Autonomous BRIN",
-      description: "Menuju Lab Autonomous area BRIN via jalur CBF (14 waypoints)",
+      description: "Menuju Lab Autonomous area BRIN via jalur CBF (22 waypoints)",
       destination: Waypoints.labAutonomous,
       waypoints: Waypoints.toLabAutonomous,
-      estimatedDuration: 7.0,
     ),
     TripData(
       name: "Gedung 80 BRIN",
       description: "Menuju Gedung 80 area BRIN via jalur CBF (4 waypoints)",
       destination: Waypoints.gedung80,
       waypoints: Waypoints.toGedung80,
-      estimatedDuration: 3.0,
     ),
     TripData(
       name: "Taman BRIN",
-      description: "Menuju Taman area BRIN via jalur CBF (21 waypoints)",
+      description: "Menuju Taman area BRIN via jalur CBF (24 waypoints)",
       destination: Waypoints.tamanBRIN,
       waypoints: Waypoints.toTamanBRIN,
-      estimatedDuration: 10.0,
     ),
     TripData(
       name: "Pos Satpam BRIN",
-      description: "Menuju Pos Satpam (Gerbang Keluar) via jalur CBF lengkap (26 waypoints)",
+      description:
+          "Menuju Pos Satpam (Gerbang Keluar) via jalur CBF lengkap (33 waypoints)",
       destination: Waypoints.posSatpam,
       waypoints: Waypoints.toPosSatpam,
-      estimatedDuration: 15.0,
     ),
   ];
 

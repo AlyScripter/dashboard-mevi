@@ -39,9 +39,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   StreamSubscription? _obstacleSubscription;
   StreamSubscription? _imuSubscription;
 
-  // Animation controllers
-  late AnimationController _dotAnimationController;
-  late Animation<double> _dotAnimation;
+
 
   // Slider state
   int _currentPageIndex = 0;
@@ -77,19 +75,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
     _initializeROS();
-  }
-
-  void _initializeAnimations() {
-    _dotAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    _dotAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _dotAnimationController, curve: Curves.easeInOut),
-    );
   }
 
   void _initializeROS() {
@@ -166,9 +152,6 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     setState(() {
       _currentPageIndex = index;
     });
-    _dotAnimationController.forward().then((_) {
-      _dotAnimationController.reverse();
-    });
   }
 
   String _getPageTitle(int index) {
@@ -190,81 +173,44 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: List.generate(_totalPages, (index) {
-          return AnimatedBuilder(
-            animation: _dotAnimation,
-            builder: (context, child) {
-              final isActive = _currentPageIndex == index;
-              final animationValue = isActive ? _dotAnimation.value : 0.0;
+          final isActive = _currentPageIndex == index;
+          final activeDotColor = isLight
+              ? const Color(0xFF2563EB)
+              : const Color(0xFF7DB4FF);
+          final inactiveDotColor = isLight
+              ? const Color(0xFFCBD5E1)
+              : Colors.white.withValues(alpha: 0.25);
 
-              // REVISI: light → dot aktif biru nav, inaktif abu tua; dark → neon
-              final activeDotColor = isLight
-                  ? const Color(0xFF1565C0)
-                  : AppColors.glassBlueBorder;
-              final inactiveDotColor = isLight
-                  ? Colors.black38
-                  : Colors.white.withValues(alpha: 0.25);
-              final glowColor = isLight
-                  ? const Color(0xFF1565C0).withValues(alpha: 0.50)
-                  : AppColors.glassBlueGlow.withValues(alpha: 0.7);
-
-              return GestureDetector(
-                onTap: () {
-                  _pageController.animateToPage(
-                    index,
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Background dot — blue-black glass theme: active
-                      // dot glows neon blue instead of solid black.
-                      Container(
-                        width: isActive ? 10 : 10,
-                        height: isActive ? 10 : 10,
-                        decoration: BoxDecoration(
-                          color: isActive ? activeDotColor : inactiveDotColor,
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: glowColor,
-                                    blurRadius: 6,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                      if (isActive)
-                        Transform.scale(
-                          scale: 1.0 + (animationValue * 0.3),
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: activeDotColor.withValues(
-                                  alpha: 0.3 + (animationValue * 0.4),
-                                ),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+          return GestureDetector(
+            onTap: () {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeInOut,
               );
             },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isActive ? 22 : 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: isActive ? activeDotColor : inactiveDotColor,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: isActive && !isLight
+                    ? [
+                        BoxShadow(
+                          color: activeDotColor.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+            ),
           );
         }),
       ),
@@ -305,86 +251,51 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   Widget _buildSteeringCteAnalysisPage() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 600;
+        final isMobile = constraints.maxWidth < 650;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-          child: isMobile
-              ? Column(
-                  children: [
-                    // Steering Angle Chart
-                    Expanded(
-                      flex: 1,
-                      child: ChartContainer(
-                        icon: LucideIcons.rotate3d,
-                        title: 'Steering Angle',
-                        child: const SteeringAngleChart(),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // CTE Chart
-                    Expanded(
-                      flex: 1,
-                      child: ChartContainer(
-                        icon: LucideIcons.navigation,
-                        title: 'Cross Track Error',
-                        child: const CteChart(),
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    // Steering Angle Chart
-                    Expanded(
-                      flex: 1,
-                      child: ChartContainer(
-                        icon: LucideIcons.rotate3d,
-                        title: 'Steering Angle Analysis',
-                        child: const SteeringAngleChart(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // CTE Chart
-                    Expanded(
-                      flex: 1,
-                      child: ChartContainer(
-                        icon: LucideIcons.navigation,
-                        title: 'Cross Track Error Analysis',
-                        child: const CteChart(),
-                      ),
-                    ),
-                  ],
-                ),
-        );
+        return isMobile
+            ? Column(
+                children: const [
+                  Expanded(child: SteeringAngleChart()),
+                  SizedBox(height: 10),
+                  Expanded(child: CteChart()),
+                ],
+              )
+            : Row(
+                children: const [
+                  Expanded(child: SteeringAngleChart()),
+                  SizedBox(width: 12),
+                  Expanded(child: CteChart()),
+                ],
+              );
       },
     );
   }
 
   Widget _buildTrajectoryPlanningPage() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: const ROSTrajectoryWidget(),
-        );
-      },
-    );
+    return const ROSTrajectoryWidget();
   }
 
   Widget _buildControlSystemPage() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-          child: Row(
-            children: [
-              const Expanded(child: SpeedChart()),
-              const SizedBox(width: 8),
-              const Expanded(child: ImuChart()),
-            ],
-          ),
-        );
+        final isMobile = constraints.maxWidth < 650;
+
+        return isMobile
+            ? Column(
+                children: const [
+                  Expanded(child: SpeedChart()),
+                  SizedBox(height: 10),
+                  Expanded(child: ImuChart()),
+                ],
+              )
+            : Row(
+                children: const [
+                  Expanded(child: SpeedChart()),
+                  SizedBox(width: 12),
+                  Expanded(child: ImuChart()),
+                ],
+              );
       },
     );
   }
@@ -414,14 +325,14 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                     end: Alignment.bottomCenter,
                     colors: [Color(0xFF12161F), Color(0xFF0A0D13)],
                   ),
-            color: isLight ? Colors.white : null,
+            color: isLight ? const Color(0xFFF8FAFC) : null,
           ),
-          padding: const EdgeInsets.only(left: 8, right: 8, top: 10, bottom: 0),
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 10, bottom: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const DataPageHeader(isConnected: true),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               SensorStatusRow(
                 currentSpeed: currentSpeed,
                 frontDistance: frontDistance,
@@ -429,10 +340,7 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                 imuYaw: imuYaw,
                 batterySoc: batterySoc,
               ),
-              const SizedBox(height: 4),
-              // REVISI: judul slide & dot indicator digabung dalam 1 Row
-              // agar sejajar — judul di kiri, dot di tengah, counter di kanan.
-              // Font judul diperbesar dari 12 → 14.
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -440,10 +348,11 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                   Text(
                     _getPageTitle(_currentPageIndex),
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
                       color: isLight
-                          ? Colors.black87
+                          ? const Color(0xFF0F172A)
                           : AppColors.glassTextPrimary,
                     ),
                   ),
@@ -451,15 +360,16 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
                   Text(
                     '${_currentPageIndex + 1} / $_totalPages',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
                       color: isLight
-                          ? Colors.black54
+                          ? const Color(0xFF64748B)
                           : AppColors.glassTextSecondary,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 6),
 
               // PageView with visualizations
               Expanded(
@@ -487,7 +397,6 @@ class _DataPageState extends State<DataPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _pageController.dispose();
-    _dotAnimationController.dispose();
     _dataTimer?.cancel();
     _speedSubscription?.cancel();
     _distanceSubscription?.cancel();

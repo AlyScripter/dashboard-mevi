@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../models/metric_model.dart';
 import '../status/metric_card.dart';
-import '../../../../../core/theme/colors.dart';
 
 class SensorStatusRow extends StatelessWidget {
   final double currentSpeed;
@@ -22,16 +21,15 @@ class SensorStatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Blue-black glass theme: icon accent is now the same neon blue used
-    // everywhere else on the dashboard (was plain white before, which
-    // barely showed on the old white card background).
     final metrics = [
       MetricData(
         icon: LucideIcons.gauge,
         label: 'Speed',
         value: currentSpeed.toStringAsFixed(1),
         unit: 'km/h',
-        color: AppColors.glassBlueBorder,
+        color: const Color(0xFF2563EB),
+        badgeBg: const Color(0xFFEFF6FF),
+        iconColor: const Color(0xFF2563EB),
         trend: TrendDirection.stable,
       ),
       MetricData(
@@ -39,15 +37,19 @@ class SensorStatusRow extends StatelessWidget {
         label: 'Distance',
         value: frontDistance.toStringAsFixed(2),
         unit: 'm',
-        color: AppColors.glassBlueBorder,
+        color: const Color(0xFF0D9488),
+        badgeBg: const Color(0xFFF0FDFA),
+        iconColor: const Color(0xFF0D9488),
         trend: TrendDirection.stable,
       ),
       MetricData(
-        icon: Icons.warning,
+        icon: LucideIcons.triangleAlert,
         label: 'Nearest',
         value: nearestObstacle.toStringAsFixed(2),
         unit: 'm',
-        color: AppColors.glassBlueBorder,
+        color: const Color(0xFFD97706),
+        badgeBg: const Color(0xFFFFFBEB),
+        iconColor: const Color(0xFFD97706),
         trend: TrendDirection.stable,
       ),
       MetricData(
@@ -55,29 +57,33 @@ class SensorStatusRow extends StatelessWidget {
         label: 'IMU Yaw',
         value: imuYaw.toStringAsFixed(1),
         unit: '°',
-        color: AppColors.glassBlueBorder,
+        color: const Color(0xFF4F46E5),
+        badgeBg: const Color(0xFFEEF2FF),
+        iconColor: const Color(0xFF4F46E5),
         trend: TrendDirection.stable,
       ),
       MetricData(
-        icon: LucideIcons.battery,
+        icon: LucideIcons.batteryCharging,
         label: 'Battery',
         value: batterySoc.toInt().toString(),
         unit: '%',
-        color: AppColors.glassBlueBorder,
+        color: const Color(0xFF059669),
+        badgeBg: const Color(0xFFECFDF5),
+        iconColor: const Color(0xFF059669),
         trend: TrendDirection.stable,
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // On narrow screens keep a horizontal scrollable list.
-        if (constraints.maxWidth < 600) {
+        // Layar sempit: scroll horizontal
+        if (constraints.maxWidth < 650) {
           return SizedBox(
             height: 110,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: metrics.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 16),
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 return MetricCard(metric: metrics[index]);
               },
@@ -85,17 +91,17 @@ class SensorStatusRow extends StatelessWidget {
           );
         }
 
-        // On wider screens distribute cards evenly across the row.
+        // Layar lebar / Full HD: distribusikan kartu merata
         return SizedBox(
-          height: 100,
+          height: 110,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: metrics
                 .map(
                   (m) => Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 5.0),
                       child: MetricCard(metric: m),
                     ),
                   ),

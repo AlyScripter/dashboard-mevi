@@ -152,6 +152,11 @@ class RosService {
   final StreamController<Map<String, dynamic>> _bevFrameController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // BEV scene stream (Fase 6 — segmentasi jalan riil, curb, edge distance, pose, objek & waypoint).
+  final StreamController<Map<String, dynamic>> _bevSceneController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Map<String, dynamic>? _lastBevSceneCache;
+
   // Peta warna kelas (Fase 6 — node Python publish SEKALI ke
   // /bev/class_color_map, isinya class_id -> {name, color}). Dicache di
   // sini (bukan cuma di-stream) supaya widget yang baru mount SETELAH
@@ -214,6 +219,10 @@ class RosService {
 
   // BEV payload stream — Tahap 6a proof-of-concept (Camera page > BEV/SDC)
   Stream<Map<String, dynamic>> get bevFrameStream => _bevFrameController.stream;
+
+  // BEV scene stream — Fase 6 (Segmentasi jalan riil, curb, edge distance)
+  Stream<Map<String, dynamic>> get bevSceneStream => _bevSceneController.stream;
+  Map<String, dynamic>? get lastBevScene => _lastBevSceneCache;
 
   // BEV class color map — Fase 6 (Camera page > BEV/SDC, render titik).
   // Stream buat yang mau reaktif kalau map-nya berubah (jarang, cuma
@@ -889,6 +898,8 @@ class RosService {
       // dengan /waypoints_array, /trip_data, /navigation_status di bawah).
       // Sesuaikan 'type' di sini kalau node Python-nya pakai msg type lain.
       {'topic': '/bev/frame', 'type': 'std_msgs/String'},
+      // Scene payload dari Fase 6 (Segmentasi jalan riil, curb ribbons, pose, edge dist)
+      {'topic': '/bev/scene', 'type': 'std_msgs/String'},
       // Peta warna kelas (Fase 6) — dipublish SEKALI oleh node streaming
       // pas dia nyala, bukan per-frame. Tetap disubscribe terus (bukan
       // sekali fetch) karena kalau Flutter start duluan sebelum node
@@ -1109,6 +1120,9 @@ class RosService {
       case '/bev/frame':
         _handleBevFrameData(msg);
         break;
+      case '/bev/scene':
+        _handleBevSceneData(msg);
+        break;
       case '/bev/class_color_map':
         _handleBevClassColorMapData(msg);
         break;
@@ -1221,6 +1235,49 @@ class RosService {
       });
     } catch (e) {
       _log('❌ Error parsing /bev/frame: $e', level: 'ERROR');
+    }
+  }
+
+  // Handler /bev/scene (Fase 6 R3) — kontrak scene sv=4 (road-only).
+  // Menolak sv != 4 dan meneruskan field road, e, pose, i, t ke Flutter.
+  void _handleBevSceneData(Map<String, dynamic> msg) {
+    try {
+      final rawData = msg['data'];
+      final Map<String, dynamic>? scene = rawData is String
+          ? (_parseJsonString(rawData) ?? (jsonDecode(rawData) as Map<String, dynamic>?))
+          : (rawData is Map<String, dynamic> ? rawData : null);
+
+      if (scene == null) return;
+
+      // Guard: Tolak bila sv != 4 (sesuai spesifikasi R3)
+      final sv = scene['sv'];
+      if (sv != 4) {
+        if (kDebugMode) {
+          _log('⚠️ [/bev/scene] Ditolak: sv=$sv (bukan sv=4 road-only)', level: 'WARNING');
+        }
+        return;
+      }
+
+      _lastBevSceneCache = scene;
+      _safeAdd<Map<String, dynamic>>(_bevSceneController, scene);
+
+      // Jika ada waypoint di scene, gunakan juga untuk auto derive steering/cte jika perlu
+      final wp = scene['wp'];
+      if (wp is List && wp.isNotEmpty) {
+        _calculateDerivedSteeringAndCte(wp);
+      }
+
+      if (kDebugMode) {
+        final frameIdx = scene['i'];
+        final road = scene['road'];
+        final roadPolys = road is Map ? (road['p'] as List?)?.length ?? 0 : 0;
+        _log(
+          '🗺️ [BEV SCENE] idx=$frameIdx road_polys=$roadPolys wp=${(wp is List) ? wp.length : 0}',
+          level: 'DEBUG',
+        );
+      }
+    } catch (e) {
+      _log('❌ Error parsing /bev/scene: $e', level: 'ERROR');
     }
   }
 

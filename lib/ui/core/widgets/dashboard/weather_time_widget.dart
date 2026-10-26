@@ -20,7 +20,7 @@ class WeatherTimeWidget extends StatefulWidget {
   final bool compactMode; // For smaller display in DataPage
 
   @override
-  _WeatherTimeWidgetState createState() => _WeatherTimeWidgetState();
+  State<WeatherTimeWidget> createState() => _WeatherTimeWidgetState();
 }
 
 class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
@@ -137,46 +137,20 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     // --- THEME-AWARE COLORS ---
-    // REVISI: compactMode + light → gradient persis nav rail
-    // (0xFF1565C0 top → 0xFF1976D2 bottom), border 0xFF1E88E5, teks/icon putih.
-    final useNavStyle = isLight && widget.compactMode;
-
-    final bgColor = useNavStyle
-        ? null
-        : isLight
-        ? Colors.white
-        : AppColors.glassNavyTint;
-    final bgGradient = useNavStyle
-        ? const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
-          )
-        : null;
-    final borderColor = useNavStyle
-        ? const Color(0xFF1E88E5)
-        : isLight
-        ? AppColors.primary.withValues(alpha: 0.35)
+    // Konsisten dengan halaman peta: Putih bersih di tema terang, Navy di tema gelap.
+    final bgColor = isLight ? Colors.white : AppColors.glassNavyTint;
+    const Gradient? bgGradient = null;
+    final borderColor = isLight
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.85);
-    final shadowColor = useNavStyle
-        ? const Color(0xFF1565C0).withValues(alpha: 0.35)
-        : isLight
-        ? Colors.black.withValues(alpha: 0.12)
+    final shadowColor = isLight
+        ? const Color(0x0C0F172A)
         : Colors.black.withValues(alpha: 0.35);
-    final textPrimary = useNavStyle
-        ? Colors.white
-        : isLight
-        ? const Color(0xFF1A1A2E)
+    final textPrimary = isLight
+        ? const Color(0xFF0F172A)
         : AppColors.glassTextPrimary;
-    final textSecondary = useNavStyle
-        ? Colors.white70
-        : isLight
-        ? const Color(0xFF555577)
-        : AppColors.glassTextSecondary;
-    final iconColor = useNavStyle
-        ? Colors.white
-        : isLight
-        ? AppColors.primary
+    final iconColor = isLight
+        ? const Color(0xFF2563EB)
         : const Color(0xFF7DB4FF);
 
     return LayoutBuilder(
@@ -241,15 +215,15 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
                   : compact
                   ? 6.0
                   : 10.0);
-        // REVISI: containerHeight compactMode difix ke 34px
+        // REVISI: containerHeight compactMode difix ke 38px agar presisi sejajar dengan dropdown & chip
         final containerHeight = widget.embedded
             ? null
             : widget.compactMode
-            ? 34.0
+            ? 38.0
             : (isLargeScreen
                   ? 56.0
                   : compact
-                  ? 34.0
+                  ? 38.0
                   : 48.0);
         // REVISI: horizontalPadding compactMode = 10px
         final horizontalPadding = widget.compactMode
@@ -324,13 +298,13 @@ class _WeatherTimeWidgetState extends State<WeatherTimeWidget> {
           decoration: BoxDecoration(
             color: bgColor,
             gradient: bgGradient,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(widget.compactMode ? 14 : 16),
             border: Border.all(color: borderColor, width: 1.0),
             boxShadow: [
               BoxShadow(
                 color: shadowColor,
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                blurRadius: widget.compactMode ? 10 : 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),

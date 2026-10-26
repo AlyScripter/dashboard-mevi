@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../../services/ros_service.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../models/data_point.dart';
+import 'chart_container.dart';
 
 class SteeringAngleChart extends StatefulWidget {
   const SteeringAngleChart({super.key});
@@ -40,213 +42,163 @@ class _SteeringAngleChartState extends State<SteeringAngleChart> {
     });
   }
 
+  Color _getSteeringColor(double angle) {
+    if (angle.abs() < 5) return const Color(0xFF16A34A);
+    if (angle.abs() < 15) return const Color(0xFFD97706);
+    return const Color(0xFFDC2626);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // REVISI: light mode → kartu putih bersih dengan border/shadow tipis,
-    // garis chart & label dibuat lebih gelap/pekat supaya tetap kontras
-    // di atas background putih. Dark mode tetap navy glass seperti semula.
-    final cardBg = isLight ? Colors.white : AppColors.glassSurface;
-    final cardBorderClr = isLight
-        ? const Color(0xFFDDE3EC)
-        : AppColors.glassBlueBorder.withValues(alpha: 0.35);
-    final cardShadowClr = isLight
-        ? Colors.black.withValues(alpha: 0.06)
-        : AppColors.glassBlueGlow.withValues(alpha: 0.08);
-    final headerIconClr = isLight
-        ? const Color(0xFF1565C0)
-        : AppColors.glassBlueBorder;
-    final titleClr = isLight
-        ? const Color(0xFF1A2331)
-        : AppColors.glassTextPrimary;
-    final gridLineClr = isLight
-        ? const Color(0xFFE3E7EE)
-        : AppColors.glassDivider;
-    final axisTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
-    final lineClr = isLight
-        ? const Color(0xFF1565C0)
-        : AppColors.glassBlueBorder;
-    final tooltipBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
-    final tooltipTextClr = isLight
-        ? const Color(0xFF1A2331)
-        : AppColors.glassTextPrimary;
-    final waitingTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
+    final gridLineClr = isLight ? const Color(0xFFF1F5F9) : AppColors.glassDivider;
+    final axisTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
+    final lineClr = isLight ? const Color(0xFF2563EB) : const Color(0xFF7DB4FF);
+    final waitingTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
 
-    return Container(
-      height: 200,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorderClr, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: cardShadowClr,
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.turn_right, color: headerIconClr, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Steering Angle',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: titleClr,
-                ),
+    return ChartContainer(
+      icon: LucideIcons.cornerUpRight,
+      title: 'Steering Angle Analysis',
+      iconBadgeBg: isLight ? const Color(0xFFEFF6FF) : const Color(0x1A7DB4FF),
+      iconColor: isLight ? const Color(0xFF2563EB) : const Color(0xFF7DB4FF),
+      trailing: StreamBuilder<double>(
+        stream: _rosService.steeringAngleStream,
+        initialData: _rosService.currentSteeringAngle,
+        builder: (context, snapshot) {
+          final currentValue = snapshot.data ?? 0.0;
+          final clr = _getSteeringColor(currentValue);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: clr.withValues(alpha: isLight ? 0.10 : 0.20),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: clr.withValues(alpha: 0.4),
+                width: 1,
               ),
-              const Spacer(),
-              StreamBuilder<double>(
-                stream: _rosService.steeringAngleStream,
-                initialData: _rosService.currentSteeringAngle,
-                builder: (context, snapshot) {
-                  final currentValue = snapshot.data ?? 0.0;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
+            ),
+            child: Text(
+              '${currentValue.toStringAsFixed(1)}°',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: clr,
+                fontSize: 12,
+              ),
+            ),
+          );
+        },
+      ),
+      child: _steeringHistory.isNotEmpty
+          ? LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 5,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: gridLineClr,
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      interval: 10,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}°',
+                          style: TextStyle(
+                            color: axisTextClr,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (_steeringHistory.length - 1).toDouble(),
+                minY: -30,
+                maxY: 30,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: _steeringHistory.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.value);
+                    }).toList(),
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    color: lineClr,
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: lineClr.withValues(alpha: isLight ? 0.08 : 0.15),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (spot) => isLight
+                        ? const Color(0xFFF1F5F9)
+                        : const Color(0xFF1E293B),
+                    tooltipBorder: BorderSide(
+                      color: isLight
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF334155),
+                      width: 1.0,
+                    ),
+                    tooltipBorderRadius: BorderRadius.circular(8),
+                    tooltipPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 4,
                     ),
-                    decoration: BoxDecoration(
-                      color: _getSteeringColor(
-                        currentValue,
-                      ).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _getSteeringColor(currentValue),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '${currentValue.toStringAsFixed(1)}°',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _getSteeringColor(currentValue),
-                        fontSize: 12,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _steeringHistory.isNotEmpty
-                ? LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: 10,
-                        getDrawingHorizontalLine: (value) {
-                          return FlLine(color: gridLineClr, strokeWidth: 1);
-                        },
-                      ),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 40,
-                            interval: 15,
-                            getTitlesWidget: (value, meta) {
-                              return Text(
-                                '${value.toInt()}°',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: axisTextClr,
-                                ),
-                              );
-                            },
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        return LineTooltipItem(
+                          '${spot.y.toStringAsFixed(1)}°',
+                          TextStyle(
+                            color: isLight
+                                ? const Color(0xFF0F172A)
+                                : Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
                           ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        topTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                      ),
-                      borderData: FlBorderData(
-                        show: true,
-                        border: Border.all(color: gridLineClr, width: 1),
-                      ),
-                      minX: 0,
-                      maxX: (_maxDataPoints - 1).toDouble(),
-                      minY: -45,
-                      maxY: 45,
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: _steeringHistory
-                              .asMap()
-                              .entries
-                              .map(
-                                (entry) => FlSpot(
-                                  entry.key.toDouble(),
-                                  entry.value.value,
-                                ),
-                              )
-                              .toList(),
-                          isCurved: true,
-                          color: lineClr,
-                          barWidth: 3,
-                          isStrokeCapRound: true,
-                          dotData: FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: lineClr.withValues(alpha: 0.12),
-                          ),
-                        ),
-                      ],
-                      lineTouchData: LineTouchData(
-                        enabled: true,
-                        touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (touchedSpot) => tooltipBg,
-                          getTooltipItems: (touchedSpots) {
-                            return touchedSpots.map((LineBarSpot touchedSpot) {
-                              return LineTooltipItem(
-                                '${touchedSpot.y.toStringAsFixed(1)}°',
-                                TextStyle(
-                                  color: tooltipTextClr,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              );
-                            }).toList();
-                          },
-                        ),
-                      ),
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      'Waiting for steering data...',
-                      style: TextStyle(color: waitingTextClr, fontSize: 14),
-                    ),
+                        );
+                      }).toList();
+                    },
                   ),
-          ),
-        ],
-      ),
+                ),
+              ),
+            )
+          : Center(
+              child: Text(
+                'Waiting for steering data...',
+                style: TextStyle(
+                  color: waitingTextClr,
+                  fontSize: 12,
+                ),
+              ),
+            ),
     );
-  }
-
-  Color _getSteeringColor(double angle) {
-    final absAngle = angle.abs();
-    if (absAngle < 5) return Colors.green;
-    if (absAngle < 15) return Colors.orange;
-    return Colors.red;
   }
 }

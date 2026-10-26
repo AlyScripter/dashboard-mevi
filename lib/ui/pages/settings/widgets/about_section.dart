@@ -16,45 +16,45 @@ class AboutSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    final cardBg = isLight ? Colors.white : AppColors.settingsCardBg;
+    final cardBg = isLight ? Colors.white : AppColors.glassNavyTint;
     final cardBorder = isLight
-        ? const Color(0xFFDDE3EC)
-        : AppColors.glassBlueBorder.withValues(alpha: 0.45);
+        ? const Color(0xFFE2E8F0)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.65);
     final cardShadow = isLight
-        ? Colors.black.withValues(alpha: 0.10)
+        ? const Color(0x0A0F172A)
         : Colors.black.withValues(alpha: 0.35);
     final textPrimary = isLight
-        ? const Color(0xFF1A2331)
+        ? const Color(0xFF0F172A)
         : AppColors.glassTextPrimary;
     final textSecondary = isLight
-        ? const Color(0xFF5B6472)
+        ? const Color(0xFF64748B)
         : AppColors.glassTextSecondary;
     final dividerClr = isLight
-        ? const Color(0xFFE3E7EE)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassDivider;
     final accentBlue = isLight
-        ? const Color(0xFF1565C0)
-        : AppColors.glassTextSecondary;
+        ? const Color(0xFF2563EB)
+        : const Color(0xFF7DB4FF);
     final iconBoxBg = isLight
-        ? const Color(0xFF1A2331).withValues(alpha: 0.05)
-        : Colors.white.withValues(alpha: 0.06);
+        ? const Color(0xFFEFF6FF)
+        : const Color(0x1A7DB4FF);
     final chipBg = isLight
-        ? const Color(0xFFF5F7FA)
+        ? const Color(0xFFF8FAFC)
         : AppColors.glassSurfaceAlt;
     final chipBorder = isLight
-        ? const Color(0xFFE3E7EE)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassDivider;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: cardBorder, width: 1),
         boxShadow: [
           BoxShadow(
             color: cardShadow,
-            blurRadius: 14,
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],

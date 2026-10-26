@@ -26,16 +26,16 @@ class CenterOnCarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // --- THEME-AWARE COLORS ---
+    // --- THEME-AWARE COLORS (Edaca style) ---
     final bgColor = isLight ? Colors.white : AppColors.glassNavyTint;
     final borderColor = isLight
-        ? AppColors.primary.withValues(alpha: 0.35)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.85);
     final shadowColor = isLight
-        ? Colors.black.withValues(alpha: 0.12)
+        ? const Color(0x0C0F172A)
         : Colors.black.withValues(alpha: 0.35);
     final defaultIconColor = isLight
-        ? AppColors.primary
+        ? const Color(0xFF2563EB)
         : const Color(0xFF7DB4FF);
 
     // Responsive sizing for Full HD
@@ -43,10 +43,10 @@ class CenterOnCarButton extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     final isFullHD = screenWidth >= 1900 && screenHeight >= 1000;
 
-    final buttonSize = size ?? (isFullHD ? 46.0 : 40.0);
-    final icon = iconSize ?? (isFullHD ? 20.0 : 18.0);
+    final buttonSize = size ?? (isFullHD ? 44.0 : 40.0);
+    final icon = iconSize ?? (isFullHD ? 19.0 : 17.5);
     final iconColor = color ?? defaultIconColor;
-    final borderRadiusValue = buttonSize / 2.8;
+    final borderRadiusValue = 13.0;
 
     return Tooltip(
       message: tooltip,
@@ -63,12 +63,12 @@ class CenterOnCarButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(borderRadiusValue),
-              border: Border.all(color: borderColor, width: 1.2),
+              border: Border.all(color: borderColor, width: 1.0),
               boxShadow: [
                 BoxShadow(
                   color: shadowColor,
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),

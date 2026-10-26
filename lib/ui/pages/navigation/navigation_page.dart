@@ -12,6 +12,7 @@ import 'navigation_widget.dart';
 /// - All original navigation features from the god widget
 class NavigationPage extends StatelessWidget {
   final void Function(String name, double distanceKm, String eta)? onRouteInfo;
+  final void Function(String name, double distanceKm, String eta)? onRoutePreview;
   final VoidCallback? onClearRouteInfo;
   final VoidCallback? onRouteCompleted;
   final GlobalKey? navigationKey;
@@ -21,6 +22,7 @@ class NavigationPage extends StatelessWidget {
   const NavigationPage({
     super.key,
     this.onRouteInfo,
+    this.onRoutePreview,
     this.onClearRouteInfo,
     this.onRouteCompleted,
     this.navigationKey,
@@ -41,6 +43,7 @@ class NavigationPage extends StatelessWidget {
         destinationLng: 107.61154761359956,
         onMinimizedChanged: _onMinimizedChanged,
         onRouteInfo: onRouteInfo,
+        onRoutePreview: onRoutePreview,
         onClearRouteInfo: onClearRouteInfo,
         onRouteCompleted: onRouteCompleted,
         simulateGps: false,

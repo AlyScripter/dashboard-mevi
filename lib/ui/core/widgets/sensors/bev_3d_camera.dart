@@ -14,10 +14,22 @@ class ProjectedPoint {
   });
 }
 
+/// Mode sudut pandang kamera untuk visualisasi BEV 3D.
+enum BevCameraMode {
+  chase('Kamera ikut'),
+  free('Bebas');
+
+  final String label;
+  const BevCameraMode(this.label);
+}
+
 /// Engine proyeksi kamera perspektif 3D untuk BEV Autonomous Dashboard.
 /// Dikonfigurasi dengan sudut pandang drone / elevated BEV yang sangat luas (seperti visual 9.jpg)
 /// sehingga pemandangan jalan membentang luas dan objek di sekeliling tidak bertumpang tindih.
 class Bev3DCamera {
+  /// Mode kamera saat ini
+  final BevCameraMode mode;
+
   /// Ketinggian kamera dari permukaan jalan (meter)
   final double cameraHeight;
 
@@ -27,23 +39,79 @@ class Bev3DCamera {
   /// Sudut kemiringan kamera ke bawah (derajat, 0 = lurus ke horizon, 90 = top-down)
   final double pitchDeg;
 
-  /// Sudut yaw kamera (derajat, mengikuti belokan)
+  /// Sudut yaw kamera (derajat, rotasi horizontal)
   final double yawDeg;
 
-  /// Posisi horizon relatif terhadap tinggi viewport (0.32 = sepertiga atas viewport)
+  /// Posisi horizon relatif terhadap tinggi viewport (0.52 = sedikit di bawah tengah)
   final double horizonFraction;
 
   /// Faktor skala FOV lensa (nilai lebih rendah = bidang pandang lebih luas / panoramic wide BEV)
   final double fovScale;
 
+  /// Titik target bidikan kamera di ruang dunia (center offset)
+  final double targetX;
+  final double targetY;
+  final double targetZ;
+
   const Bev3DCamera({
+    this.mode = BevCameraMode.chase,
     this.cameraHeight = 10.5,
     this.cameraDistance = -6.5,
     this.pitchDeg = 32.0,
     this.yawDeg = 0.0,
     this.horizonFraction = 0.52,
     this.fovScale = 0.88,
+    this.targetX = 0.0,
+    this.targetY = 0.0,
+    this.targetZ = 0.0,
   });
+
+  /// Factory untuk preset mode Kamera Ikut (Chase Cam - membidik MEVI dari belakang atas)
+  factory Bev3DCamera.chase({
+    double cameraHeight = 10.5,
+    double cameraDistance = -6.5,
+    double pitchDeg = 32.0,
+    double yawDeg = 0.0,
+    double horizonFraction = 0.52,
+    double fovScale = 0.88,
+  }) {
+    return Bev3DCamera(
+      mode: BevCameraMode.chase,
+      cameraHeight: cameraHeight,
+      cameraDistance: cameraDistance,
+      pitchDeg: pitchDeg,
+      yawDeg: yawDeg,
+      horizonFraction: horizonFraction,
+      fovScale: fovScale,
+    );
+  }
+
+  /// Factory untuk mode Kamera Bebas (Orbit Drag & Zoom)
+  factory Bev3DCamera.free({
+    required double orbitYawDeg,
+    required double orbitPitchDeg,
+    required double orbitDistance,
+    double targetZ = 6.0,
+  }) {
+    final pitchRad = (orbitPitchDeg * math.pi) / 180.0;
+    final yawRad = (orbitYawDeg * math.pi) / 180.0;
+    final cp = math.cos(pitchRad);
+    final sp = math.sin(pitchRad);
+
+    final camH = sp * orbitDistance;
+    final camDist = targetZ - (cp * math.cos(yawRad) * orbitDistance);
+
+    return Bev3DCamera(
+      mode: BevCameraMode.free,
+      cameraHeight: camH.clamp(2.0, 90.0),
+      cameraDistance: camDist,
+      pitchDeg: orbitPitchDeg.clamp(5.0, 89.0),
+      yawDeg: orbitYawDeg,
+      horizonFraction: 0.50,
+      fovScale: 0.85,
+      targetZ: targetZ,
+    );
+  }
 
   /// Melakukan proyeksi titik 3D (x, y, z) dunia ke koordinat piksel layar 2D (x_s, y_s).
   ProjectedPoint project(
@@ -57,7 +125,7 @@ class Bev3DCamera {
     final cy = viewportSize.height * horizonFraction;
 
     // Relatif terhadap posisi kamera
-    final dx = x;
+    final dx = x - targetX;
     final dy = y - cameraHeight;
     final dz = z - cameraDistance;
 

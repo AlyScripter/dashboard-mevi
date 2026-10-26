@@ -37,188 +37,162 @@ class _SpeedChartState extends State<SpeedChart> {
     });
   }
 
+  Color _getSpeedColor(double speed) {
+    if (speed < 20) return const Color(0xFF16A34A);
+    if (speed < 40) return const Color(0xFFD97706);
+    return const Color(0xFFDC2626);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // REVISI: tambahkan kartu putih (light mode) / navy glass (dark mode)
-    // di dalam ChartContainer biru, senada dengan pola Steering & CTE
-    // Analysis, supaya chart tidak "tenggelam" di atas background biru.
-    final innerCardBg = isLight ? Colors.white : AppColors.glassSurface;
-    final innerCardBorder = isLight
-        ? const Color(0xFFDDE3EC)
-        : AppColors.glassBlueBorder.withValues(alpha: 0.35);
-    final innerCardShadow = isLight
-        ? Colors.black.withValues(alpha: 0.06)
-        : AppColors.glassBlueGlow.withValues(alpha: 0.08);
-    final gridLineClr = isLight
-        ? const Color(0xFFE3E7EE)
-        : AppColors.glassDivider;
-    final axisTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
-    final lineClr = isLight ? const Color(0xFF7B1FA2) : Colors.purple;
-    final waitingTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
+    final gridLineClr = isLight ? const Color(0xFFF1F5F9) : AppColors.glassDivider;
+    final axisTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
+    final lineClr = isLight ? const Color(0xFF7C3AED) : const Color(0xFFA78BFA);
+    final waitingTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
 
     return ChartContainer(
       icon: LucideIcons.gauge,
       title: 'Speed Analysis',
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: innerCardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: innerCardBorder, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: innerCardShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+      iconBadgeBg: isLight ? const Color(0xFFF5F3FF) : const Color(0x1A8B5CF6),
+      iconColor: isLight ? const Color(0xFF7C3AED) : const Color(0xFFA78BFA),
+      trailing: StreamBuilder<double>(
+        stream: _rosService.speedometerRosStream,
+        builder: (context, snapshot) {
+          final currentValue = snapshot.data ?? 0.0;
+          final clr = _getSpeedColor(currentValue);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: clr.withValues(alpha: isLight ? 0.10 : 0.20),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: clr.withValues(alpha: 0.4),
+                width: 1,
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StreamBuilder<double>(
-              stream: _rosService.speedometerRosStream,
-              builder: (context, snapshot) {
-                final currentValue = snapshot.data ?? 0.0;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getSpeedColor(currentValue).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _getSpeedColor(currentValue),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '${currentValue.toStringAsFixed(1)} km/h',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: _getSpeedColor(currentValue),
-                      fontSize: 11,
-                    ),
-                  ),
-                );
-              },
+            child: Text(
+              '${currentValue.toStringAsFixed(1)} km/h',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: clr,
+                fontSize: 12,
+              ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _speedHistory.isNotEmpty
-                  ? LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 10,
-                          getDrawingHorizontalLine: (value) {
-                            return FlLine(color: gridLineClr, strokeWidth: 1);
-                          },
-                        ),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              interval: 20,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  '${value.toInt()}',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: axisTextClr,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(
-                          show: true,
-                          border: Border.all(color: gridLineClr, width: 1),
-                        ),
-                        minX: 0,
-                        maxX: (_maxDataPoints - 1).toDouble(),
-                        minY: 0,
-                        maxY: 60,
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: _speedHistory
-                                .asMap()
-                                .entries
-                                .map(
-                                  (entry) => FlSpot(
-                                    entry.key.toDouble(),
-                                    entry.value.value,
-                                  ),
-                                )
-                                .toList(),
-                            isCurved: true,
-                            color: lineClr,
-                            barWidth: 3,
-                            isStrokeCapRound: true,
-                            dotData: FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: lineClr.withValues(alpha: 0.1),
-                            ),
-                          ),
-                        ],
-                        lineTouchData: LineTouchData(
-                          enabled: true,
-                          touchTooltipData: LineTouchTooltipData(
-                            getTooltipItems: (touchedSpots) {
-                              return touchedSpots.map((
-                                LineBarSpot touchedSpot,
-                              ) {
-                                return LineTooltipItem(
-                                  '${touchedSpot.y.toStringAsFixed(1)} km/h',
-                                  const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                );
-                              }).toList();
-                            },
-                          ),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        'Waiting for speed data...',
-                        style: TextStyle(color: waitingTextClr, fontSize: 14),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+      child: _speedHistory.isNotEmpty
+          ? LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 10,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: gridLineClr,
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      interval: 10,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}',
+                          style: TextStyle(
+                            color: axisTextClr,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (_speedHistory.length - 1).toDouble(),
+                minY: 0,
+                maxY: 60,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: _speedHistory.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.value);
+                    }).toList(),
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    color: lineClr,
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: lineClr.withValues(alpha: isLight ? 0.08 : 0.15),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (spot) => isLight
+                        ? const Color(0xFFF1F5F9)
+                        : const Color(0xFF1E293B),
+                    tooltipBorder: BorderSide(
+                      color: isLight
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF334155),
+                      width: 1.0,
+                    ),
+                    tooltipBorderRadius: BorderRadius.circular(8),
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        return LineTooltipItem(
+                          '${spot.y.toStringAsFixed(1)} km/h',
+                          TextStyle(
+                            color: isLight
+                                ? const Color(0xFF0F172A)
+                                : Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+              ),
+            )
+          : Center(
+              child: Text(
+                'Waiting for speed data...',
+                style: TextStyle(
+                  color: waitingTextClr,
+                  fontSize: 12,
+                ),
+              ),
+            ),
     );
-  }
-
-  Color _getSpeedColor(double speed) {
-    if (speed < 10) return Colors.green;
-    if (speed < 30) return Colors.blue;
-    if (speed < 45) return Colors.orange;
-    return Colors.red;
   }
 }

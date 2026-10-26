@@ -25,6 +25,7 @@ class MapView extends StatelessWidget {
   final LatLng? currentPosition;
   final LatLng? destinationLocation;
   final List<LatLng> polylinePoints;
+  final List<LatLng> waypointNodes;
   // Stable placeholder position to prevent marker drift when GPS unavailable
   final LatLng? placeholderPosition;
   // Dynamic vehicle heading aligned with road/travel path
@@ -44,6 +45,7 @@ class MapView extends StatelessWidget {
     this.currentPosition,
     this.destinationLocation,
     this.polylinePoints = const [],
+    this.waypointNodes = const [],
     this.placeholderPosition,
     this.vehicleHeading,
   });
@@ -96,6 +98,71 @@ class MapView extends StatelessWidget {
                     0xFFBDBDBD,
                   ), // Light gray for traveled
                   traveledStrokeWidth: 3.0,
+                ),
+
+              // Waypoint markers along the route (Google Maps style nodes)
+              if (waypointNodes.isNotEmpty)
+                MarkerLayer(
+                  markers: [
+                    for (int i = 0; i < waypointNodes.length; i++)
+                      Marker(
+                        width: i == 0 ? 22 : 12,
+                        height: i == 0 ? 22 : 12,
+                        point: waypointNodes[i],
+                        child: i == 0
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2E7D32),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.play_arrow,
+                                    size: 11,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFF1976D2),
+                                    width: 2.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF1976D2).withValues(alpha: 0.35),
+                                      blurRadius: 3,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 3.5,
+                                    height: 3.5,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF1976D2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                  ],
                 ),
 
               // Current location marker (car) with heading - Clean light style

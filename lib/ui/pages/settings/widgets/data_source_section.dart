@@ -52,27 +52,24 @@ class _DataSourceSectionState extends State<DataSourceSection> {
   bool _isLight = false;
 
   Color get _textPrimary =>
-      _isLight ? const Color(0xFF1A2331) : AppColors.glassTextPrimary;
+      _isLight ? const Color(0xFF0F172A) : AppColors.glassTextPrimary;
   Color get _textSecondary =>
-      _isLight ? const Color(0xFF5B6472) : AppColors.glassTextSecondary;
+      _isLight ? const Color(0xFF64748B) : AppColors.glassTextSecondary;
   Color get _surfaceAlt =>
-      _isLight ? const Color(0xFFF5F7FA) : AppColors.glassSurfaceAlt;
+      _isLight ? const Color(0xFFF8FAFC) : AppColors.glassSurfaceAlt;
   Color get _dividerClr =>
-      _isLight ? const Color(0xFFE3E7EE) : AppColors.glassDivider;
+      _isLight ? const Color(0xFFE2E8F0) : AppColors.glassDivider;
   Color get _accentBlue =>
-      _isLight ? const Color(0xFF1565C0) : AppColors.glassBlueBorder;
+      _isLight ? const Color(0xFF2563EB) : const Color(0xFF7DB4FF);
   Color get _inputBg =>
-      _isLight ? const Color(0xFFF5F7FA) : AppColors.glassSurface;
-  Color get _cardBg => _isLight ? Colors.white : AppColors.settingsCardBg;
-  Color get _subtleBg => _isLight
-      ? const Color(0xFF1A2331).withValues(alpha: 0.05)
-      : Colors.white.withValues(alpha: 0.06);
+      _isLight ? const Color(0xFFF8FAFC) : AppColors.glassSurface;
+  Color get _cardBg => _isLight ? Colors.white : AppColors.glassNavyTint;
   Color get _cardShadow => _isLight
-      ? Colors.black.withValues(alpha: 0.10)
+      ? const Color(0x0A0F172A)
       : Colors.black.withValues(alpha: 0.35);
   Color get _cardBorder => _isLight
-      ? const Color(0xFFDDE3EC)
-      : AppColors.glassBlueBorder.withValues(alpha: 0.45);
+      ? const Color(0xFFE2E8F0)
+      : AppColors.glassBlueBorder.withValues(alpha: 0.65);
 
   @override
   void initState() {
@@ -187,12 +184,12 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: _cardBg,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _cardBorder, width: 1),
             boxShadow: [
               BoxShadow(
                 color: _cardShadow,
-                blurRadius: 14,
+                blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -200,9 +197,9 @@ class _DataSourceSectionState extends State<DataSourceSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              _buildHeader(),
-              const SizedBox(height: 16),
+              // Top Action Bar with Reconnect Button (Data Source title is now outside the card as "Settings")
+              _buildTopActionBar(),
+              const SizedBox(height: 12),
 
               // Status Badge
               _buildStatusBadge(),
@@ -226,28 +223,11 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildTopActionBar() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _accentBlue.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(LucideIcons.database, size: 18, color: _accentBlue),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Data Source',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: _textPrimary,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const Spacer(),
+        _buildSectionLabel('CONNECTION STATUS'),
         _buildReconnectButton(),
       ],
     );
@@ -258,24 +238,32 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _reconnect,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: _subtleBg,
-            borderRadius: BorderRadius.circular(6),
+            color: _isLight
+                ? const Color(0xFFEFF6FF)
+                : _accentBlue.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _isLight
+                  ? const Color(0xFFBFDBFE)
+                  : _accentBlue.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(LucideIcons.refreshCw, size: 14, color: _textSecondary),
+              Icon(LucideIcons.refreshCw, size: 13, color: _accentBlue),
               const SizedBox(width: 6),
               Text(
                 'Reconnect',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: _textSecondary,
+                  fontWeight: FontWeight.w600,
+                  color: _accentBlue,
                 ),
               ),
             ],
@@ -299,14 +287,24 @@ class _DataSourceSectionState extends State<DataSourceSection> {
 
     if (isConnected) {
       statusText = 'Connected';
-      statusColor = Colors.greenAccent.shade400;
-      bgColor = Colors.greenAccent.shade400.withValues(alpha: 0.08);
-      borderColor = Colors.greenAccent.shade400.withValues(alpha: 0.35);
+      statusColor =
+          _isLight ? const Color(0xFF16A34A) : Colors.greenAccent.shade400;
+      bgColor = _isLight
+          ? const Color(0xFFF0FDF4)
+          : Colors.greenAccent.shade400.withValues(alpha: 0.08);
+      borderColor = _isLight
+          ? const Color(0xFFBBF7D0)
+          : Colors.greenAccent.shade400.withValues(alpha: 0.35);
     } else {
       statusText = 'Disconnected';
-      statusColor = Colors.orange.shade300;
-      bgColor = Colors.orange.shade400.withValues(alpha: 0.12);
-      borderColor = Colors.orange.shade400.withValues(alpha: 0.4);
+      statusColor =
+          _isLight ? const Color(0xFFEA580C) : Colors.orange.shade300;
+      bgColor = _isLight
+          ? const Color(0xFFFFFBEB)
+          : Colors.orange.shade400.withValues(alpha: 0.12);
+      borderColor = _isLight
+          ? const Color(0xFFFDE68A)
+          : Colors.orange.shade400.withValues(alpha: 0.4);
     }
 
     return Container(

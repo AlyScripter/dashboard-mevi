@@ -133,7 +133,14 @@ class RoutePolyline extends StatelessWidget {
             strokeWidth: traveledStrokeWidth,
             color: traveledColor.withValues(alpha: 0.6),
           ),
-        // Remaining route (normal color)
+        // Remaining route - Outer darker blue casing (Google Maps look)
+        if (remainingPoints.length >= 2)
+          Polyline(
+            points: remainingPoints,
+            strokeWidth: strokeWidth + 3.0,
+            color: const Color(0xFF0D47A1).withValues(alpha: 0.45),
+          ),
+        // Remaining route (primary vibrant blue line)
         if (remainingPoints.length >= 2)
           Polyline(
             points: remainingPoints,

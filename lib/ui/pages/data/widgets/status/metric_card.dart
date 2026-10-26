@@ -12,73 +12,82 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // REVISI: light mode → gradient biru nav rail (0xFF1565C0 → 0xFF1976D2),
-    // border 0xFF1E88E5, icon & semua teks putih.
-    // Dark mode → navy gelap + neon blue border seperti semula.
-    final cardGradient = isLight
-        ? const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
-          )
-        : null;
-    final cardColor = isLight ? null : AppColors.glassNavyTint;
+    // ── Edaca / Modern Autonomous Dashboard Style ──
+    final cardColor = isLight ? Colors.white : AppColors.glassNavyTint;
     final cardBorderColor = isLight
-        ? const Color(0xFF1E88E5)
-        : AppColors.glassBlueBorder.withValues(alpha: 0.55);
+        ? const Color(0xFFE2E8F0)
+        : AppColors.glassBlueBorder.withValues(alpha: 0.65);
     final cardShadowColor = isLight
-        ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+        ? const Color(0x0A0F172A)
         : Colors.black.withValues(alpha: 0.35);
 
-    // Icon & teks: putih di light mode, warna bawaan di dark mode
     final iconBg = isLight
-        ? Colors.white.withValues(alpha: 0.18)
-        : metric.color.withValues(alpha: 0.16);
-    final iconClr = isLight ? Colors.white : metric.color;
-    final labelClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
-    final valueClr = isLight ? Colors.white : AppColors.glassTextPrimary;
-    final unitClr = isLight ? Colors.white70 : AppColors.glassTextSecondary;
+        ? (metric.badgeBg ?? const Color(0xFFEFF6FF))
+        : (metric.color.withValues(alpha: 0.16));
+    final iconClr = isLight
+        ? (metric.iconColor ?? metric.color)
+        : (metric.iconColor ?? AppColors.glassBlueBorder);
+
+    final labelClr = isLight
+        ? const Color(0xFF64748B)
+        : AppColors.glassTextSecondary;
+    final valueClr = isLight
+        ? const Color(0xFF0F172A)
+        : AppColors.glassTextPrimary;
+    final unitClr = isLight
+        ? const Color(0xFF94A3B8)
+        : AppColors.glassTextSecondary;
 
     return Container(
-      width: 140,
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: cardColor,
-        gradient: cardGradient,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cardBorderColor, width: 1.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardBorderColor, width: 1.0),
         boxShadow: [
           BoxShadow(
             color: cardShadowColor,
-            blurRadius: 12,
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: iconBg,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(metric.icon, color: iconClr, size: 16),
               ),
-              _buildTrendIndicator(metric.trend, isLight),
+              _buildLiveIndicator(isLight),
             ],
           ),
+          const SizedBox(height: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 metric.label,
-                style: TextStyle(color: labelClr, fontSize: 10),
+                style: TextStyle(
+                  color: labelClr,
+                  fontSize: 11.0,
+                  height: 1.1,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Row(
@@ -89,14 +98,20 @@ class MetricCard extends StatelessWidget {
                     metric.value,
                     style: TextStyle(
                       color: valueClr,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     metric.unit,
-                    style: TextStyle(color: unitClr, fontSize: 10),
+                    style: TextStyle(
+                      color: unitClr,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -107,32 +122,40 @@ class MetricCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTrendIndicator(TrendDirection trend, bool isLight) {
-    IconData icon;
-    Color color;
-
-    switch (trend) {
-      case TrendDirection.up:
-        icon = Icons.trending_up;
-        color = isLight ? Colors.white : Colors.green;
-        break;
-      case TrendDirection.down:
-        icon = Icons.trending_down;
-        color = isLight ? Colors.white : Colors.red;
-        break;
-      case TrendDirection.stable:
-        icon = Icons.remove;
-        color = isLight ? Colors.white70 : Colors.grey;
-        break;
-    }
-
+  Widget _buildLiveIndicator(bool isLight) {
     return Container(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isLight ? 0.20 : 0.12),
-        borderRadius: BorderRadius.circular(3),
+        color: isLight ? const Color(0xFFF0FDF4) : const Color(0x1A10B981),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isLight ? const Color(0xFFDCFCE7) : const Color(0x3310B981),
+          width: 0.8,
+        ),
       ),
-      child: Icon(icon, color: color, size: 14),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: Color(0xFF16A34A),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'LIVE',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: isLight ? const Color(0xFF16A34A) : const Color(0xFF34D399),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

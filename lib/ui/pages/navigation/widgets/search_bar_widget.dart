@@ -4,7 +4,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../model/location.dart';
 import '../../../../data/locations_data.dart';
 import '../../../../services/trip_service.dart';
-import '../../../../core/theme/glass_container.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/theme/theme_controller.dart';
 import 'search_results_widget.dart';
@@ -78,38 +77,40 @@ class _NavTheme {
     chipTextColor: AppColors.glassTextSecondary,
   );
 
-  // ── Mode terang: biru-putih senada dengan nav rail light ──────────────────
+  // ── Mode terang: clean white + subtle border + slate typography (Edaca style) ──
   static const light = _NavTheme(
     containerBg: Colors.white,
-    containerBorder: Color(0xFF1976D2),
-    iconColor: Color(0xFF1565C0),
-    hintColor: Color(0xFF78909C),
-    textColor: Color(0xFF1A237E),
-    clearBtnBg: Color(0x1A1565C0),
-    clearBtnIcon: Color(0xFF1565C0),
-    shadow: Color(0x26000000),
+    containerBorder: Color(0xFFE2E8F0),
+    iconColor: Color(0xFF64748B),
+    hintColor: Color(0xFF94A3B8),
+    textColor: Color(0xFF0F172A),
+    clearBtnBg: Color(0xFFF1F5F9),
+    clearBtnIcon: Color(0xFF64748B),
+    shadow: Color(0x0F0F172A),
     dialogBg: Colors.white,
-    dialogBorder: Color(0xFF1976D2),
-    dialogTitleColor: Color(0xFF1A237E),
-    dialogBodyColor: Color(0xFF1A237E),
-    dialogSubColor: Color(0xFF546E7A),
-    dialogDetailBg: Color(0xFFE3F2FD),
-    dialogDetailBorder: Color(0xFF90CAF9),
-    chipBg: Color(0xFFE3F2FD),
-    chipBorder: Color(0xFF90CAF9),
-    chipIconColor: Color(0xFF1565C0),
-    chipTextColor: Color(0xFF37474F),
+    dialogBorder: Color(0xFFE2E8F0),
+    dialogTitleColor: Color(0xFF0F172A),
+    dialogBodyColor: Color(0xFF1E293B),
+    dialogSubColor: Color(0xFF64748B),
+    dialogDetailBg: Color(0xFFF8FAFC),
+    dialogDetailBorder: Color(0xFFE2E8F0),
+    chipBg: Color(0xFFF1F5F9),
+    chipBorder: Color(0xFFE2E8F0),
+    chipIconColor: Color(0xFF2563EB),
+    chipTextColor: Color(0xFF334155),
   );
 }
 
 class SearchBarWidget extends StatefulWidget {
   final Function(Location) onLocationSelected;
   final void Function(Location)? onPreviewLocation;
+  final void Function(TripData)? onPreviewTrip;
 
   const SearchBarWidget({
     super.key,
     required this.onLocationSelected,
     this.onPreviewLocation,
+    this.onPreviewTrip,
   });
 
   @override
@@ -118,7 +119,6 @@ class SearchBarWidget extends StatefulWidget {
 
 class _SearchBarWidgetState extends State<SearchBarWidget> {
   final TextEditingController _searchController = TextEditingController();
-  final LayerLink _layerLink = LayerLink();
 
   List<TripData> _searchResults = [];
   bool _showSearchResults = false;
@@ -126,19 +126,14 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
   bool _disposed = false;
 
   Timer? _searchTimer;
-  Timer? _overlayAutoHide;
-  OverlayEntry? _overlayEntry;
 
   static const _searchDebounce = Duration(milliseconds: 350);
-  static const _overlayHideDelay = Duration(seconds: 10);
 
   @override
   void dispose() {
     _disposed = true;
     _searchController.dispose();
     _searchTimer?.cancel();
-    _overlayAutoHide?.cancel();
-    _removeOverlay();
     super.dispose();
   }
 
@@ -149,70 +144,23 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       _showSearchResults = true;
       _isSearching = false;
     });
-    _showOverlay();
   }
 
-  void _showOverlay() {
-    try {
-      _removeOverlay();
-      _overlayEntry = _createOverlayEntry();
-      Overlay.of(context).insert(_overlayEntry!);
-      _overlayAutoHide?.cancel();
-      _overlayAutoHide = Timer(_overlayHideDelay, () {
-        if (!_disposed) _removeOverlay();
-      });
-    } catch (_) {}
-  }
+  void _handlePreview(TripData trip) {
+    if (_disposed || !mounted) return;
+    setState(() {
+      _showSearchResults = false;
+      _searchResults = [];
+      _isSearching = false;
+    });
+    _searchController.text = trip.name;
+    FocusScope.of(context).unfocus();
 
-  void _removeOverlay() {
-    try {
-      _overlayEntry?.remove();
-    } catch (_) {}
-    _overlayEntry = null;
-  }
-
-  OverlayEntry _createOverlayEntry() {
-    // Ambil ukuran layar saat overlay dibuat agar lebar dropdown
-    // selalu sama dengan barWidth search bar.
-    final screenSize = MediaQuery.of(context).size;
-    final isFullHD = screenSize.width >= 1900 && screenSize.height >= 1000;
-    final overlayWidth = isFullHD ? 420.0 : 360.0;
-
-    return OverlayEntry(
-      builder: (context) {
-        return Positioned(
-          width: overlayWidth,
-          child: CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            offset: const Offset(0, 56),
-            child: Material(
-              color: Colors.transparent,
-              elevation: 0,
-              child: SearchResultsWidget(
-                searchResults: _searchResults,
-                showSearchResults: _showSearchResults || _isSearching,
-                isLoading: _isSearching,
-                onSelectResult: _selectSearchResult,
-                onPreview: (trip) {
-                  _removeOverlay();
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (_disposed || !mounted) return;
-                    widget.onPreviewLocation?.call(trip.destination);
-                    CenterNotification.show(
-                      this.context,
-                      message: 'Preview: ${trip.name}',
-                      kind: NotificationKind.info,
-                      duration: const Duration(seconds: 3),
-                    );
-                  });
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    if (widget.onPreviewTrip != null) {
+      widget.onPreviewTrip!(trip);
+    } else if (widget.onPreviewLocation != null) {
+      widget.onPreviewLocation!(trip.destination);
+    }
   }
 
   void _onSearchChanged(String query) {
@@ -221,8 +169,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       _showTripSuggestions();
       return;
     }
-    setState(() => _isSearching = true);
-    _showOverlay();
+    setState(() {
+      _isSearching = true;
+      _showSearchResults = true;
+    });
     _searchTimer = Timer(_searchDebounce, () {
       if (_disposed) return;
       final lower = query.toLowerCase();
@@ -239,16 +189,10 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
         _showSearchResults = true;
         _isSearching = false;
       });
-      if (_showSearchResults) {
-        _showOverlay();
-      } else {
-        _removeOverlay();
-      }
     });
   }
 
   Future<void> _selectSearchResult(TripData trip) async {
-    _removeOverlay();
     if (mounted) {
       setState(() {
         _showSearchResults = false;
@@ -318,11 +262,11 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
     final screenHeight = MediaQuery.of(context).size.height;
     final isFullHD = screenWidth >= 1900 && screenHeight >= 1000;
 
-    final barHeight = isFullHD ? 50.0 : 44.0;
+    final barHeight = isFullHD ? 48.0 : 44.0;
     final barWidth = isFullHD ? 420.0 : 360.0;
-    final iconSize = isFullHD ? 20.0 : 18.0;
-    final fontSize = isFullHD ? 14.0 : 13.0;
-    final borderRadius = isFullHD ? 14.0 : 12.0;
+    final iconSize = isFullHD ? 19.0 : 17.5;
+    final fontSize = isFullHD ? 13.5 : 12.5;
+    final borderRadius = 16.0;
 
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: appThemeMode,
@@ -330,96 +274,137 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
         final isDark = themeMode == ThemeMode.dark;
         final t = isDark ? _NavTheme.dark : _NavTheme.light;
 
-        return CompositedTransformTarget(
-          link: _layerLink,
-          child: GlassContainer(
-            height: barHeight,
-            width: barWidth,
-            borderRadius: borderRadius,
-            padding: EdgeInsets.zero,
-            blurSigma: 0,
-            tint: t.containerBg,
-            tintOpacity: 1.0,
-            borderColor: t.containerBorder,
-            borderOpacity: 0.7,
-            borderWidth: 1.2,
-            boxShadow: [
-              BoxShadow(
-                color: t.shadow,
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(width: 14),
-                Icon(LucideIcons.search, color: t.iconColor, size: iconSize),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _onSearchChanged,
-                    onTap: () {
-                      if (_searchController.text.isEmpty) {
-                        _showTripSuggestions();
-                      }
-                    },
-                    cursorColor: t.containerBorder,
-                    textAlignVertical: TextAlignVertical.center,
-                    decoration: InputDecoration(
-                      hintText: 'Cari tujuan perjalanan...',
-                      hintStyle: TextStyle(
-                        color: t.hintColor,
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: -0.2,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: TextStyle(
-                      color: t.textColor,
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.2,
-                    ),
+        final showDropdown = (_showSearchResults || _isSearching) &&
+            (_searchResults.isNotEmpty || _isSearching || _searchController.text.isNotEmpty);
+
+        return TapRegion(
+          onTapOutside: (_) {
+            if (_showSearchResults || _isSearching) {
+              setState(() {
+                _showSearchResults = false;
+                _isSearching = false;
+              });
+              FocusScope.of(context).unfocus();
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: barHeight,
+                width: barWidth,
+                decoration: BoxDecoration(
+                  color: t.containerBg,
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  border: Border.all(
+                    color: t.containerBorder,
+                    width: 1.0,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? const Color(0x33000000) : const Color(0x0C0F172A),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                if (_searchController.text.isNotEmpty ||
-                    _showSearchResults ||
-                    _isSearching)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      _removeOverlay();
-                      setState(() {
-                        _searchResults = [];
-                        _showSearchResults = false;
-                        _isSearching = false;
-                      });
-                      FocusScope.of(context).unfocus();
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: t.clearBtnBg,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          LucideIcons.x,
-                          color: t.clearBtnIcon,
-                          size: 12,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 14, right: 10),
+                      child: Icon(
+                        LucideIcons.search,
+                        color: t.iconColor,
+                        size: iconSize,
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: _onSearchChanged,
+                          onTap: () {
+                            if (_searchController.text.isEmpty) {
+                              _showTripSuggestions();
+                            } else {
+                              setState(() => _showSearchResults = true);
+                            }
+                          },
+                          cursorColor: isDark ? const Color(0xFF7DB4FF) : const Color(0xFF2563EB),
+                          textAlignVertical: TextAlignVertical.center,
+                          strutStyle: StrutStyle(
+                            fontSize: fontSize,
+                            height: 1.2,
+                            forceStrutHeight: true,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Cari tujuan perjalanan...',
+                            hintStyle: TextStyle(
+                              color: t.hintColor,
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w400,
+                              letterSpacing: -0.2,
+                              height: 1.2,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          style: TextStyle(
+                            color: t.textColor,
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.2,
+                            height: 1.2,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                const SizedBox(width: 6),
+                    if (_searchController.text.isNotEmpty ||
+                        _showSearchResults ||
+                        _isSearching)
+                      GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchResults = [];
+                            _showSearchResults = false;
+                            _isSearching = false;
+                          });
+                          FocusScope.of(context).unfocus();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6, right: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: t.clearBtnBg,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              LucideIcons.x,
+                              color: t.clearBtnIcon,
+                              size: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (showDropdown) ...[
+                const SizedBox(height: 8),
+                SearchResultsWidget(
+                  searchResults: _searchResults,
+                  showSearchResults: true,
+                  isLoading: _isSearching,
+                  onSelectResult: _selectSearchResult,
+                  onPreview: _handlePreview,
+                ),
               ],
-            ),
+            ],
           ),
         );
       },
@@ -603,7 +588,7 @@ class _TripDetailCard extends StatelessWidget {
               const SizedBox(width: 12),
               _InfoChip(
                 icon: LucideIcons.clock,
-                label: '${trip.estimatedDuration.toInt()} menit',
+                label: trip.formattedDurationLong,
                 t: t,
               ),
             ],

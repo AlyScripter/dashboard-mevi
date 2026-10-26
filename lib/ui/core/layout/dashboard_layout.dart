@@ -9,6 +9,7 @@ import '../../pages/navigation/bloc/navigation_cubit.dart';
 import '../widgets/dashboard/weather_time_widget.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
+import '../../pages/lidar/lidar_bev_page.dart';
 import '../../pages/settings/settings_index.dart';
 import '../../pages/bev/bev_page.dart';
 import '../widgets/navigation/side_nav_rail.dart';
@@ -22,6 +23,7 @@ import '../../../core/theme/theme_controller.dart';
 // Enhanced Route State Management
 enum RouteState {
   noDestination,
+  preview,
   destinationSet,
   routePlanning,
   navigating,
@@ -31,8 +33,8 @@ enum RouteState {
 // Menu items with better structure. `settings` is a normal DashboardMenu
 // value — like every other nav entry it swaps into the content area
 // directly (no slide/fade overlay), so the side nav rail stays visible
-// and selectable the whole time, same as Maps/Camera/Data/BEV.
-enum DashboardMenu { home, camera, data, bev, settings }
+// and selectable the whole time, same as Maps/Camera/LiDAR/Data/BEV.
+enum DashboardMenu { home, camera, lidar, data, bev, settings }
 
 class LayoutDashboard extends StatefulWidget {
   const LayoutDashboard({super.key});
@@ -62,19 +64,24 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   String _routeName = '';
   String _destinationName = '';
 
-  // Items rendered by the new side nav rail — maps, camera, data, BEV,
-  // and settings (5 total, per the updated design). Each id maps 1:1 to
-  // a DashboardMenu value, so selecting any of them — including
-  // settings — is a plain content swap with the rail staying put.
+  // Items rendered by the new side nav rail — maps, camera, LiDAR 3D BEV,
+  // data, BEV, and settings (6 total, per the updated design). Each id maps 1:1
+  // to a DashboardMenu value, so selecting any of them — including settings —
+  // is a plain content swap with the rail staying put.
   static const List<SideNavItem> _navItems = [
     SideNavItem(id: 'maps', icon: LucideIcons.map, label: 'Peta'),
     SideNavItem(id: 'camera', icon: LucideIcons.camera, label: 'Kamera'),
+    SideNavItem(
+      id: 'lidar',
+      icon: LucideIcons.radar,
+      label: 'LiDAR 3D BEV',
+    ),
     SideNavItem(id: 'data', icon: LucideIcons.database, label: 'Data'),
     SideNavItem(id: 'bev', icon: LucideIcons.layoutDashboard, label: 'BEV'),
     SideNavItem(
       id: 'settings',
       icon: LucideIcons.settings,
-      label: 'Pengaturan',
+      label: 'Settings',
     ),
   ];
 
@@ -84,6 +91,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         return 'maps';
       case DashboardMenu.camera:
         return 'camera';
+      case DashboardMenu.lidar:
+        return 'lidar';
       case DashboardMenu.data:
         return 'data';
       case DashboardMenu.bev:
@@ -105,6 +114,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           break;
         case 'camera':
           _activeMenu = DashboardMenu.camera;
+          break;
+        case 'lidar':
+          _activeMenu = DashboardMenu.lidar;
           break;
         case 'data':
           _activeMenu = DashboardMenu.data;
@@ -158,6 +170,18 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   }
 
   // Enhanced route management methods
+  void _handleRoutePreview(String name, double distanceKm, String eta) {
+    _cancelAutoReset();
+    _destinationName = name;
+
+    setState(() {
+      _routeState = RouteState.preview;
+      _routeName = 'Rute: $name';
+      _routeDistanceKm = distanceKm;
+      _routeEta = eta;
+    });
+  }
+
   void _handleRouteInfo(String name, double distanceKm, String eta) {
     _cancelAutoReset();
     _destinationName = name;
@@ -209,6 +233,14 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   /// Cancel navigation and stop the vehicle
   Future<void> _cancelNavigation() async {
+    // Jika masih dalam status preview rute, langsung batalkan tanpa dialog konfirmasi
+    if (_routeState == RouteState.preview) {
+      navigationWidgetKey.currentState?.clearNavigation();
+      _cancelAutoReset();
+      _resetToInitialState();
+      return;
+    }
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -333,6 +365,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   /// Check if cancel button should be visible
   bool get _showCancelButton =>
+      _routeState == RouteState.preview ||
       _routeState == RouteState.destinationSet ||
       _routeState == RouteState.navigating ||
       _routeState == RouteState.routePlanning;
@@ -368,6 +401,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     switch (_routeState) {
       case RouteState.noDestination:
         return '-';
+      case RouteState.preview:
       case RouteState.destinationSet:
       case RouteState.navigating:
         return _routeDistanceKm != null
@@ -384,6 +418,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     switch (_routeState) {
       case RouteState.noDestination:
         return '-';
+      case RouteState.preview:
       case RouteState.destinationSet:
       case RouteState.navigating:
         return _routeEta ?? '-';
@@ -398,6 +433,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     switch (_routeState) {
       case RouteState.noDestination:
         return LucideIcons.mapPin;
+      case RouteState.preview:
+        return LucideIcons.route;
       case RouteState.destinationSet:
         return LucideIcons.play;
       case RouteState.routePlanning:
@@ -413,6 +450,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     switch (_routeState) {
       case RouteState.noDestination:
         return Colors.grey.shade600;
+      case RouteState.preview:
+        return const Color(0xFF1976D2);
       case RouteState.destinationSet:
         return Colors.blue.shade600;
       case RouteState.routePlanning:
@@ -468,11 +507,11 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     final horizontalPadding = isLargeScreen ? 16.0 : 14.0;
     final verticalPadding = isLargeScreen ? 12.0 : 10.0;
     final maxWidth = isFullHD ? 420.0 : 360.0;
-    final cardBorderRadius = isLargeScreen ? 16.0 : 14.0;
-    final iconSize = isLargeScreen ? 20.0 : 18.0;
-    // Light mode: teks biru tua senada dengan nav rail & search bar terang
-    final textColor = dark ? Colors.white : const Color(0xFF1A237E);
-    final subTextColor = dark ? Colors.white70 : const Color(0xFF546E7A);
+    final cardBorderRadius = 18.0;
+    final iconSize = isLargeScreen ? 18.0 : 16.5;
+    // Light mode: teks slate-900 & slate-500 modern ala Edaca
+    final textColor = dark ? Colors.white : const Color(0xFF0F172A);
+    final subTextColor = dark ? Colors.white70 : const Color(0xFF64748B);
 
     return GlassContainer(
       width: maxWidth,
@@ -481,30 +520,30 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         horizontal: horizontalPadding,
         vertical: verticalPadding,
       ),
-      // Rounded rectangle — radius disamakan dengan widget lain
+      // Rounded rectangle modern 18px
       borderRadius: cardBorderRadius,
       blurSigma: 0,
-      // Light mode: putih solid + border biru, senada dengan search bar & dropdown
+      // Light mode: putih solid + border halus #E2E8F0
       tint: dark ? AppColors.glassNavyTint : Colors.white,
       tintOpacity: 1.0,
-      borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFF1976D2),
-      borderOpacity: 0.7,
-      borderWidth: 1.2,
+      borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFFE2E8F0),
+      borderOpacity: 1.0,
+      borderWidth: 1.0,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: dark ? 0.3 : 0.12),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
+          color: dark ? const Color(0x40000000) : const Color(0x0C0F172A),
+          blurRadius: 16,
+          offset: const Offset(0, 4),
         ),
       ],
       child: Row(
         children: [
           Container(
-            width: isLargeScreen ? 44 : 38,
-            height: isLargeScreen ? 44 : 38,
+            width: isLargeScreen ? 42 : 38,
+            height: isLargeScreen ? 42 : 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(12),
               gradient: dark
                   ? LinearGradient(
                       colors: [
@@ -533,15 +572,15 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                 Text(
                   _routeName,
                   style: TextStyle(
-                    fontSize: isLargeScreen ? 14.0 : 12.5,
-                    fontWeight: FontWeight.w500,
+                    fontSize: isLargeScreen ? 13.5 : 12.5,
+                    fontWeight: FontWeight.w600,
                     color: textColor,
                     letterSpacing: -0.2,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                SizedBox(height: isLargeScreen ? 5 : 4),
+                SizedBox(height: isLargeScreen ? 4 : 3),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -549,7 +588,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                       icon: LucideIcons.car,
                       value: _getDisplayDistance(),
                       isLargeScreen: isLargeScreen,
-                      iconSize: iconSize,
+                      iconSize: iconSize - 3,
                       color: subTextColor,
                       valueColor: textColor,
                     ),
@@ -558,7 +597,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
                       icon: LucideIcons.clock,
                       value: _getDisplayEta(),
                       isLargeScreen: isLargeScreen,
-                      iconSize: iconSize,
+                      iconSize: iconSize - 3,
                       color: subTextColor,
                       valueColor: textColor,
                     ),
@@ -688,12 +727,10 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     final double rightPadding;
 
     if (cameraMode) {
-      // REVISI: disejajarkan dengan top bar kamera.
-      // CameraPage outer padding = 6px → weather mulai dari top=6.
-      // Height weather = 38px (sama dengan dropdown) → keduanya setara.
-      // right = 10px agar tidak mepet tepi frame.
-      topPadding = 6.0;
-      rightPadding = 10.0;
+      // REVISI: disejajarkan presisi dengan top bar kamera dan lidar.
+      // Outer padding = 8.0, left/right margin = 12.0, height = 38.0.
+      topPadding = 8.0;
+      rightPadding = 12.0;
     } else if (compactMode) {
       // For DataPage - position higher to avoid collision with DataPageHeader
       topPadding = isLargeScreen ? 16.0 : (isTablet ? 10.0 : 8.0);
@@ -757,6 +794,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   Widget _buildDefaultLayoutWithFloatingNavbar() {
     final isCameraActive = _activeMenu == DashboardMenu.camera;
+    final isLidarActive = _activeMenu == DashboardMenu.lidar;
     final isBevActive = _activeMenu == DashboardMenu.bev;
     final isMapsActive = _activeMenu == DashboardMenu.home;
     return Stack(
@@ -766,6 +804,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         // search bar & overlay dropdown muncul di Camera/BEV.
         NavigationPage(
           onRouteInfo: _handleRouteInfo,
+          onRoutePreview: _handleRoutePreview,
           onClearRouteInfo: _clearRouteInfo,
           onRouteCompleted: _completeRoute,
           navigationKey: navigationWidgetKey,
@@ -779,14 +818,37 @@ class _LayoutDashboardState extends State<LayoutDashboard>
             builder: (context, themeMode, _) {
               final isDark = themeMode == ThemeMode.dark;
               return Container(
-                // REVISI: Light: putih bersih, Dark: hitam
-                color: isDark ? Colors.black : Colors.white,
+                color: isDark ? Colors.black : const Color(0xFFF8FAFC),
                 child: const CameraPage(),
               );
             },
           ),
-        if (isBevActive) Container(color: Colors.black, child: const BevPage()),
-        _buildTopOverlay(bevMode: isBevActive, cameraMode: isCameraActive),
+        if (isLidarActive)
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: appThemeMode,
+            builder: (context, themeMode, _) {
+              final isDark = themeMode == ThemeMode.dark;
+              return Container(
+                color: isDark ? Colors.black : const Color(0xFFF8FAFC),
+                child: const LidarBevPage(),
+              );
+            },
+          ),
+        if (isBevActive)
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: appThemeMode,
+            builder: (context, themeMode, _) {
+              final isDark = themeMode == ThemeMode.dark;
+              return Container(
+                color: isDark ? Colors.black : const Color(0xFFF8FAFC),
+                child: const BevPage(),
+              );
+            },
+          ),
+        _buildTopOverlay(
+          bevMode: isBevActive,
+          compactMode: isCameraActive || isLidarActive,
+        ),
         // _buildBottomOverlay sekarang theme-aware (tidak perlu arg dark)
         if (isMapsActive) _buildBottomOverlay(),
       ],
@@ -800,6 +862,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         // biarkan search bar & dropdown tembus ke halaman Data.
         NavigationPage(
           onRouteInfo: _handleRouteInfo,
+          onRoutePreview: _handleRoutePreview,
           onClearRouteInfo: _clearRouteInfo,
           onRouteCompleted: _completeRoute,
           navigationKey: navigationWidgetKey,

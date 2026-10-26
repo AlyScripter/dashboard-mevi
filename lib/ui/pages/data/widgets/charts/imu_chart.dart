@@ -27,8 +27,7 @@ class _ImuChartState extends State<ImuChart> {
   void _setupImuListener() {
     _rosService.imuStream.listen((imuData) {
       if (mounted) {
-        // Extract yaw from IMU data, same as heading_hud
-        double yaw = imuData['yaw'] ?? 0.0;
+        final yaw = imuData['yaw'] ?? 0.0;
         setState(() {
           _yawHistory.add(DataPoint(DateTime.now(), yaw));
           if (_yawHistory.length > _maxDataPoints) {
@@ -43,174 +42,151 @@ class _ImuChartState extends State<ImuChart> {
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // REVISI: tambahkan kartu putih (light mode) / navy glass (dark mode)
-    // di dalam ChartContainer biru, senada dengan pola Steering & CTE
-    // Analysis, supaya chart tidak "tenggelam" di atas background biru.
-    final innerCardBg = isLight ? Colors.white : AppColors.glassSurface;
-    final innerCardBorder = isLight
-        ? const Color(0xFFDDE3EC)
-        : AppColors.glassBlueBorder.withValues(alpha: 0.35);
-    final innerCardShadow = isLight
-        ? Colors.black.withValues(alpha: 0.06)
-        : AppColors.glassBlueGlow.withValues(alpha: 0.08);
-    final gridLineClr = isLight
-        ? const Color(0xFFE3E7EE)
-        : AppColors.glassDivider;
-    final axisTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
-    final lineClr = isLight ? const Color(0xFF00796B) : Colors.teal;
-    final waitingTextClr = isLight
-        ? const Color(0xFF5B6472)
-        : AppColors.glassTextSecondary;
+    final gridLineClr = isLight ? const Color(0xFFF1F5F9) : AppColors.glassDivider;
+    final axisTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
+    final lineClr = isLight ? const Color(0xFF0D9488) : const Color(0xFF2DD4BF);
+    final waitingTextClr = isLight ? const Color(0xFF94A3B8) : AppColors.glassTextSecondary;
 
     return ChartContainer(
       icon: LucideIcons.compass,
       title: 'IMU Yaw Analysis',
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: innerCardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: innerCardBorder, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: innerCardShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+      iconBadgeBg: isLight ? const Color(0xFFF0FDFA) : const Color(0x1A14B8A6),
+      iconColor: isLight ? const Color(0xFF0D9488) : const Color(0xFF2DD4BF),
+      trailing: StreamBuilder<Map<String, double>>(
+        stream: _rosService.imuStream,
+        builder: (context, snapshot) {
+          final currentValue = snapshot.data?['yaw'] ?? 0.0;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: lineClr.withValues(alpha: isLight ? 0.10 : 0.20),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: lineClr.withValues(alpha: 0.4),
+                width: 1,
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StreamBuilder<Map<String, double>>(
-              stream: _rosService.imuStream,
-              builder: (context, snapshot) {
-                final currentValue = snapshot.data?['yaw'] ?? 0.0;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: lineClr.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: lineClr, width: 1),
-                  ),
-                  child: Text(
-                    '${currentValue.toStringAsFixed(1)}°',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: lineClr,
-                      fontSize: 11,
-                    ),
-                  ),
-                );
-              },
+            child: Text(
+              '${currentValue.toStringAsFixed(1)}°',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: lineClr,
+                fontSize: 12,
+              ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _yawHistory.isNotEmpty
-                  ? LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 90,
-                          getDrawingHorizontalLine: (value) {
-                            return FlLine(color: gridLineClr, strokeWidth: 1);
-                          },
-                        ),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              interval: 90,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  '${value.toInt()}°',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: axisTextClr,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(
-                          show: true,
-                          border: Border.all(color: gridLineClr, width: 1),
-                        ),
-                        minX: 0,
-                        maxX: (_maxDataPoints - 1).toDouble(),
-                        minY: -180,
-                        maxY: 180,
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: _yawHistory
-                                .asMap()
-                                .entries
-                                .map(
-                                  (entry) => FlSpot(
-                                    entry.key.toDouble(),
-                                    entry.value.value,
-                                  ),
-                                )
-                                .toList(),
-                            isCurved: true,
-                            color: lineClr,
-                            barWidth: 3,
-                            isStrokeCapRound: true,
-                            dotData: FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: lineClr.withValues(alpha: 0.1),
-                            ),
-                          ),
-                        ],
-                        lineTouchData: LineTouchData(
-                          enabled: true,
-                          touchTooltipData: LineTouchTooltipData(
-                            getTooltipItems: (touchedSpots) {
-                              return touchedSpots.map((
-                                LineBarSpot touchedSpot,
-                              ) {
-                                return LineTooltipItem(
-                                  '${touchedSpot.y.toStringAsFixed(1)}°',
-                                  const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                );
-                              }).toList();
-                            },
-                          ),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        'Waiting for IMU data...',
-                        style: TextStyle(color: waitingTextClr, fontSize: 14),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+      child: _yawHistory.isNotEmpty
+          ? LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 45,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: gridLineClr,
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 36,
+                      interval: 45,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}°',
+                          style: TextStyle(
+                            color: axisTextClr,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (_yawHistory.length - 1).toDouble(),
+                minY: -180,
+                maxY: 180,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: _yawHistory.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.value);
+                    }).toList(),
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    color: lineClr,
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: lineClr.withValues(alpha: isLight ? 0.08 : 0.15),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (spot) => isLight
+                        ? const Color(0xFFF1F5F9)
+                        : const Color(0xFF1E293B),
+                    tooltipBorder: BorderSide(
+                      color: isLight
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF334155),
+                      width: 1.0,
+                    ),
+                    tooltipBorderRadius: BorderRadius.circular(8),
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        return LineTooltipItem(
+                          '${spot.y.toStringAsFixed(1)}°',
+                          TextStyle(
+                            color: isLight
+                                ? const Color(0xFF0F172A)
+                                : Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+              ),
+            )
+          : Center(
+              child: Text(
+                'Waiting for IMU data...',
+                style: TextStyle(
+                  color: waitingTextClr,
+                  fontSize: 12,
+                ),
+              ),
+            ),
     );
   }
 }

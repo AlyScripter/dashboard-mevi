@@ -31,7 +31,6 @@ class _BevPageState extends State<BevPage> {
   bool _indicatorLampOn = true;
   bool _engineOn = true;
   bool _hazardOn = false;
-  double _batteryPercent = 0.6;
   String _gear = 'P';
 
   @override
@@ -44,7 +43,7 @@ class _BevPageState extends State<BevPage> {
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final pageBg = isLight ? Colors.white : Colors.black;
+    final pageBg = isLight ? const Color(0xFFF8FAFC) : Colors.black;
 
     return Container(
       color: pageBg,
@@ -92,33 +91,24 @@ class _BevPageState extends State<BevPage> {
             ),
           ),
 
-          // 3. Battery + range — top-left, no surrounding box.
+          // 3. Battery + range card — top-left modern cockpit card.
+          // Nilai statis sesuai spesifikasi dan sisa daya mobil saat perekaman rosbag:
+          // Baterai 85%, estimasi jarak tempuh 51 km (48V × 100Ah = 4.800 Wh; 85% = 4.080 Wh / 80 Wh/km = 51 km).
           Positioned(
             top: AppDimensions.spacingL,
             left: AppDimensions.spacingL,
-            child: SizedBox(
-              width: 268,
-              child: StreamBuilder<double>(
-                stream: RosService().vehicleDistanceStream,
-                builder: (context, distSnap) {
-                  return BatteryIndicatorWidget(
-                    batteryPercent: _batteryPercent,
-                    distanceMeters: distSnap.data,
-                    onTap: () {
-                      setState(() {
-                        _batteryPercent = _batteryPercent > 0.95
-                            ? 0.35
-                            : (_batteryPercent + 0.1).clamp(0.0, 1.0);
-                      });
-                    },
-                  );
-                },
+            child: const SizedBox(
+              width: 320,
+              child: BatteryIndicatorWidget(
+                batteryPercent: 0.85,
+                distanceKm: 51.0,
+                asCard: true,
               ),
             ),
           ),
 
-          // 4. Gear selector (P R N D) — vertical rail on the LEFT edge,
-          // no surrounding box, vertically CENTERED on the page.
+          // 4. Gear selector card rail (P R N D) — vertical rail on the LEFT edge,
+          // styled as compact modern squircle cards.
           Positioned(
             top: 0,
             bottom: 0,
@@ -127,9 +117,11 @@ class _BevPageState extends State<BevPage> {
               child: GearSelectorWidget(
                 selectedGear: _gear,
                 onGearChanged: (gear) => setState(() => _gear = gear),
-                circleSize: 34,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                useCard: true,
+                cardSize: 42,
+                cardBorderRadius: 11,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
                 direction: Axis.vertical,
               ),
             ),

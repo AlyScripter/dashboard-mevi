@@ -21,21 +21,21 @@ class HeadingHUD extends StatelessWidget {
 
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // --- THEME-AWARE COLORS ---
+    // --- THEME-AWARE COLORS (Edaca Style) ---
     final bgColor = isLight ? Colors.white : AppColors.glassNavyTint;
     final borderColor = isLight
-        ? AppColors.primary.withValues(alpha: 0.35)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.85);
     final shadowColor = isLight
-        ? Colors.black.withValues(alpha: 0.12)
+        ? const Color(0x0C0F172A)
         : Colors.black.withValues(alpha: 0.35);
     final textPrimary = isLight
-        ? const Color(0xFF1A1A2E)
+        ? const Color(0xFF0F172A)
         : AppColors.glassTextPrimary;
     final textSecondary = isLight
-        ? const Color(0xFF555577)
+        ? const Color(0xFF64748B)
         : AppColors.glassTextSecondary;
-    final iconColor = isLight ? AppColors.primary : const Color(0xFF7DB4FF);
+    final iconColor = isLight ? const Color(0xFF2563EB) : const Color(0xFF7DB4FF);
 
     final data = MediaQuery.of(context);
     final screenWidth = data.size.width;
@@ -83,16 +83,16 @@ class HeadingHUD extends StatelessWidget {
             constraints: BoxConstraints(
               minWidth: containerWidth,
             ),
-            // THEME-AWARE: putih bersih di light mode, navy gelap di dark mode
+            // THEME-AWARE: putih bersih di light mode, navy gelap di dark mode (Edaca style)
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(borderRadiusValue),
-              border: Border.all(color: borderColor, width: 1.2),
+              border: Border.all(color: borderColor, width: 1.0),
               boxShadow: [
                 BoxShadow(
                   color: shadowColor,
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -118,6 +118,7 @@ class HeadingHUD extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: textPrimary,
                         fontSize: fontSizeHeading,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     Text(
@@ -125,6 +126,7 @@ class HeadingHUD extends StatelessWidget {
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: fontSizeCardinal,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],

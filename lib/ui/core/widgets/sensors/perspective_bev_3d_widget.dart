@@ -45,15 +45,25 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
   bool _isVoiceMuted = false;
   StreamSubscription<bool>? _muteSub;
 
-  // Live WebSocket ROS Stream Integration (Metode 1: Waypoint-Corridor)
+  // Live WebSocket ROS Stream Integration (Metode 1: Waypoint-Corridor + Fase 6: Scene)
   StreamSubscription<Map<String, dynamic>>? _bevFrameSub;
+  StreamSubscription<Map<String, dynamic>>? _bevSceneSub;
   bool _isLiveMode = true;
   List<Offset>? _liveWaypoints;
   double? _liveWaypointsEndDistance;
   List<Detected3DObject>? _liveObjects;
+  Map<String, dynamic>? _liveRoadScene;
+  int _roadHoldCount = 0;
   int? _liveFrameIdx;
   int _livePointCount = 0;
   DateTime? _lastLiveFrameTime;
+
+  // Camera Mode State (Chase, Top, Free)
+  BevCameraMode _cameraMode = BevCameraMode.chase;
+  double _freeYaw = 0.0;
+  double _freePitch = 32.0;
+  double _freeDist = 20.0;
+  Offset? _lastPanPos;
 
   // Dynamic Live Voice Navigation Assistant & Destination Tracking
   String? _lastAnnouncedManeuverKey;
@@ -65,7 +75,7 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
   void initState() {
     super.initState();
     _currentScenario = widget.initialScenario;
-    _camera = const Bev3DCamera();
+    _camera = Bev3DCamera.chase();
     _isVoiceMuted = VoiceNavigationService().isMuted;
     _muteSub = VoiceNavigationService().muteStream.listen((muted) {
       if (mounted) {
@@ -74,6 +84,7 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
     });
 
     _bevFrameSub = RosService().bevFrameStream.listen(_onLiveBevFrame);
+    _bevSceneSub = RosService().bevSceneStream.listen(_onLiveBevScene);
 
     _animController = AnimationController(
       vsync: this,
@@ -155,10 +166,41 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
     VoiceNavigationService().clearInstruction();
 
     _bevFrameSub?.cancel();
+    _bevSceneSub?.cancel();
     _muteSub?.cancel();
     _autoCycleTimer?.cancel();
     _animController.dispose();
     super.dispose();
+  }
+
+  void _onLiveBevScene(Map<String, dynamic> scene) {
+    try {
+      final sv = scene['sv'];
+      if (sv != 4) return; // Guard: Hanya kontrak sv:4 (road-only)
+
+      final frameIdx = (scene['i'] as num?)?.toInt();
+      final road = scene['road'] as Map<String, dynamic>?;
+
+      if (mounted) {
+        setState(() {
+          if (road != null && road['p'] is List && (road['p'] as List).isNotEmpty) {
+            _liveRoadScene = scene;
+            _roadHoldCount = 0; // reset hitungan tahan frame
+          } else {
+            // Frame tanpa jalan (road: null) -> Tahan jalan terakhir <= 4 frame
+            if (_roadHoldCount < 4) {
+              _roadHoldCount++;
+            } else {
+              _liveRoadScene = null;
+            }
+          }
+          if (frameIdx != null) _liveFrameIdx = frameIdx;
+          _lastLiveFrameTime = DateTime.now();
+        });
+      }
+    } catch (e) {
+      debugPrint('PerspectiveBev3DWidget: gagal parse live scene: $e');
+    }
   }
 
   void _onLiveBevFrame(Map<String, dynamic> msg) {
@@ -813,29 +855,72 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
 
+        // Update instance kamera berdasarkan mode aktif
+        switch (_cameraMode) {
+          case BevCameraMode.chase:
+            _camera = Bev3DCamera.chase();
+            break;
+          case BevCameraMode.free:
+            _camera = Bev3DCamera.free(
+              orbitYawDeg: _freeYaw,
+              orbitPitchDeg: _freePitch,
+              orbitDistance: _freeDist,
+            );
+            break;
+        }
+
         return AnimatedBuilder(
           animation: _animController,
           builder: (context, child) {
             return Stack(
               clipBehavior: Clip.none,
               children: [
+                // Layer interaksi gesture untuk mode Kamera Bebas
+                if (_cameraMode == BevCameraMode.free)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (details) {
+                        _lastPanPos = details.localPosition;
+                      },
+                      onPanUpdate: (details) {
+                        if (_lastPanPos == null) {
+                          _lastPanPos = details.localPosition;
+                          return;
+                        }
+                        final dx = details.localPosition.dx - _lastPanPos!.dx;
+                        final dy = details.localPosition.dy - _lastPanPos!.dy;
+                        _lastPanPos = details.localPosition;
+                        setState(() {
+                          _freeYaw = (_freeYaw + dx * 0.45) % 360.0;
+                          _freePitch = (_freePitch + dy * 0.35).clamp(8.0, 88.0);
+                        });
+                      },
+                      onPanEnd: (_) => _lastPanPos = null,
+                    ),
+                  ),
+
                 // 1. Background 3D Ground, Road Mesh, Trajectory Ribbon, & 3D Bounding Boxes
                 Positioned.fill(
                   key: const ValueKey('bev-3d-ground-mesh'),
-                  child: CustomPaint(
-                    painter: Bev3DPainter(
-                      camera: _camera,
-                      scenario: _isLiveMode
-                          ? BevScenarioType.straight
-                          : _currentScenario,
-                      steeringAngle: effectiveSteering,
-                      speed: effectiveSpeed,
-                      animationValue: _animController.value,
-                      detectedObjects: effectiveObjects,
-                      isLight: isLight,
-                      liveWaypoints: effectiveWaypoints,
-                      isLiveMode: _isLiveMode && isLiveConnected,
-                      liveWaypointsEndDistance: _liveWaypointsEndDistance,
+                  child: IgnorePointer(
+                    ignoring: _cameraMode == BevCameraMode.free,
+                    child: CustomPaint(
+                      painter: Bev3DPainter(
+                        camera: _camera,
+                        scenario: _isLiveMode
+                            ? BevScenarioType.straight
+                            : _currentScenario,
+                        steeringAngle: effectiveSteering,
+                        speed: effectiveSpeed,
+                        animationValue: _animController.value,
+                        detectedObjects: effectiveObjects,
+                        isLight: isLight,
+                        liveWaypoints: effectiveWaypoints,
+                        isLiveMode: _isLiveMode && isLiveConnected,
+                        liveWaypointsEndDistance: _liveWaypointsEndDistance,
+                        liveRoadScene: _liveRoadScene,
+                      ),
                     ),
                   ),
                 ),
@@ -858,6 +943,9 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
 
                 // 4. Panel Tombol Switcher Skenario Jalan / Live Control di Bawah Mobil MEVI
                 _buildScenarioControlBar(size, isLight, isLiveConnected),
+
+                // 5. Selector Mode Kamera Drop-up di Pojok Kanan Bawah (Kamera Ikut / Atas / Bebas)
+                _buildCameraModeSelector(isLight),
               ],
             );
           },
@@ -1094,21 +1182,21 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
       child: Center(
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
-            color: isLight
-                ? Colors.white.withValues(alpha: 0.92)
-                : const Color(0xFF141C2A).withValues(alpha: 0.90),
-            borderRadius: BorderRadius.circular(30),
+            color: isLight ? Colors.white : const Color(0xFF131B2B),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isLight
-                  ? const Color(0xFFB0BEC5).withValues(alpha: 0.4)
-                  : const Color(0xFF37474F).withValues(alpha: 0.6),
-              width: 1.2,
+                  ? const Color(0xFFE2E8F0)
+                  : const Color(0xFF1E293B),
+              width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.4),
+                color: isLight
+                    ? const Color(0x0A0F172A)
+                    : Colors.black.withValues(alpha: 0.35),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -1119,13 +1207,15 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
             children: [
               // Tombol LIVE ROS (Metode 1: Waypoint-Corridor)
               _buildLiveRosButton(isLight, isLiveConnected),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
 
               // Divider Vertikal
               Container(
                 width: 1,
-                height: 22,
-                color: isLight ? Colors.black12 : Colors.white24,
+                height: 20,
+                color: isLight
+                    ? const Color(0xFFE2E8F0)
+                    : Colors.white.withValues(alpha: 0.12),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
               ),
               const SizedBox(width: 4),
@@ -1147,9 +1237,22 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
 
   Widget _buildLiveRosButton(bool isLight, bool isLiveConnected) {
     final isSelected = _isLiveMode;
-    final Color activeColor = isLiveConnected
-        ? const Color(0xFF00E676)
-        : const Color(0xFF00B0FF);
+    final Color dotColor = isLiveConnected
+        ? const Color(0xFF10B981)
+        : const Color(0xFFF59E0B);
+    final Color textColor = isLiveConnected
+        ? (isLight ? const Color(0xFF15803D) : const Color(0xFF4ADE80))
+        : (isLight ? const Color(0xFFB45309) : const Color(0xFFFBBF24));
+    final Color bgColor = isLiveConnected
+        ? (isLight ? const Color(0xFFF0FDF4) : const Color(0x1A10B981))
+        : (isLight ? const Color(0xFFFFFBEB) : const Color(0x1AF59E0B));
+    final Color borderColor = isLiveConnected
+        ? (isLight
+            ? const Color(0xFFBBF7D0)
+            : const Color(0xFF10B981).withValues(alpha: 0.4))
+        : (isLight
+            ? const Color(0xFFFDE68A)
+            : const Color(0xFFF59E0B).withValues(alpha: 0.4));
 
     return Material(
       color: Colors.transparent,
@@ -1173,77 +1276,67 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
             playVoice: true,
           );
         },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected
-                ? (isLiveConnected
-                    ? const Color(0xFF004D40).withValues(alpha: 0.90)
-                    : const Color(0xFF0288D1))
-                : (isLight ? const Color(0xFFF0F4F8) : const Color(0xFF1E2838)),
-            borderRadius: BorderRadius.circular(20),
+            color: isSelected ? bgColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? activeColor : Colors.transparent,
-              width: 1.5,
+              color: isSelected ? borderColor : Colors.transparent,
+              width: 1.0,
             ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.45),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isLiveConnected ? const Color(0xFF00E676) : Colors.orangeAccent,
-                  boxShadow: isLiveConnected
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF00E676).withValues(alpha: 0.8),
-                            blurRadius: 6,
-                            spreadRadius: 1.5,
-                          ),
-                        ]
-                      : null,
+                  color: dotColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: dotColor.withValues(alpha: 0.6),
+                      blurRadius: 5,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
                 'LIVE ROS',
                 style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                   color: isSelected
-                      ? Colors.white
-                      : (isLight ? const Color(0xFF1A2331) : Colors.white70),
-                  letterSpacing: 0.4,
+                      ? textColor
+                      : (isLight ? const Color(0xFF64748B) : Colors.white70),
+                  letterSpacing: 0.3,
                 ),
               ),
               if (isSelected && isLiveConnected) ...[
-                const SizedBox(width: 5),
+                const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black38,
-                    borderRadius: BorderRadius.circular(10),
+                    color: isLight
+                        ? const Color(0xFFDCFCE7)
+                        : const Color(0x2A10B981),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '${_liveFrameIdx != null ? "#$_liveFrameIdx " : ""}${_liveWaypoints?.length ?? 14}wp${_livePointCount > 0 ? " • ${_livePointCount}pts" : ""}',
-                    style: const TextStyle(
+                    '${_liveFrameIdx != null ? "#$_liveFrameIdx " : ""}${_liveWaypoints?.length ?? 0}wp${_livePointCount > 0 ? " • ${_livePointCount}pts" : ""} • ${_liveRoadScene != null ? (_roadHoldCount > 0 ? "jalan tahan ${_roadHoldCount}f" : "jalan ada") : "tanpa jalan"}',
+                    style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF00E676),
+                      color: isLight
+                          ? const Color(0xFF15803D)
+                          : const Color(0xFF4ADE80),
                     ),
                   ),
                 ),
@@ -1379,6 +1472,22 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
   Widget _buildSpeakerButton(bool isLight) {
     final isMuted = _isVoiceMuted;
 
+    final Color activeColor =
+        isMuted ? const Color(0xFFEF4444) : const Color(0xFF2563EB);
+    final Color bgColor = isMuted
+        ? (isLight ? const Color(0xFFFEF2F2) : const Color(0x1AEF4444))
+        : (isLight ? const Color(0xFFEFF6FF) : const Color(0x1A2563EB));
+    final Color borderColor = isMuted
+        ? (isLight
+            ? const Color(0xFFFECACA)
+            : const Color(0xFFEF4444).withValues(alpha: 0.4))
+        : (isLight
+            ? const Color(0xFFBFDBFE)
+            : const Color(0xFF2563EB).withValues(alpha: 0.4));
+    final Color textColor = isMuted
+        ? (isLight ? const Color(0xFFDC2626) : const Color(0xFFF87171))
+        : (isLight ? const Color(0xFF2563EB) : const Color(0xFF60A5FA));
+
     return Tooltip(
       message: isMuted ? 'Unmute Navigation Voice' : 'Mute Navigation Voice',
       child: Material(
@@ -1390,35 +1499,17 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
               _isVoiceMuted = VoiceNavigationService().isMuted;
             });
           },
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: isMuted
-                  ? (isLight
-                      ? const Color(0xFFFFEBEE)
-                      : const Color(0xFF2C161A))
-                  : (isLight
-                      ? const Color(0xFFE1F5FE)
-                      : const Color(0xFF142436)),
-              borderRadius: BorderRadius.circular(20),
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isMuted
-                    ? const Color(0xFFEF5350).withValues(alpha: 0.7)
-                    : const Color(0xFF0288D1).withValues(alpha: 0.7),
-                width: 1.4,
+                color: borderColor,
+                width: 1.0,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: (isMuted
-                          ? const Color(0xFFEF5350)
-                          : const Color(0xFF0288D1))
-                      .withValues(alpha: 0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1426,19 +1517,136 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
                 Icon(
                   isMuted ? LucideIcons.volumeX : LucideIcons.volume2,
                   size: 14,
-                  color: isMuted
-                      ? const Color(0xFFE53935)
-                      : (isLight ? const Color(0xFF0288D1) : const Color(0xFF40C4FF)),
+                  color: activeColor,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 5),
                 Text(
-                  isMuted ? 'MUTE' : 'VOICE',
+                  isMuted ? 'MUTED' : 'VOICE',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
-                    color: isMuted
-                        ? const Color(0xFFE53935)
-                        : (isLight ? const Color(0xFF0288D1) : const Color(0xFF40C4FF)),
+                    color: textColor,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 5. Switch Mode Kamera di Pojok Kanan Bawah
+  /// Mengganti mode secara instan antara Kamera Ikut (Chase) dan Kamera Bebas (Free Orbit).
+  Widget _buildCameraModeSelector(bool isLight) {
+    final isFree = _cameraMode == BevCameraMode.free;
+
+    return Positioned(
+      bottom: 12,
+      right: 18,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              if (_cameraMode == BevCameraMode.chase) {
+                _cameraMode = BevCameraMode.free;
+                _freeYaw = 0.0;
+                _freePitch = 32.0;
+                _freeDist = 20.0;
+              } else {
+                _cameraMode = BevCameraMode.chase;
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: isLight ? Colors.white : const Color(0xFF131B2B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isLight
+                    ? const Color(0xFFE2E8F0)
+                    : const Color(0xFF1E293B),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isLight
+                      ? const Color(0x0A0F172A)
+                      : Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Micro Icon Box
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: isLight
+                        ? const Color(0xFFEFF6FF)
+                        : const Color(0x1A2563EB),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Icon(
+                    isFree ? LucideIcons.orbit : LucideIcons.video,
+                    size: 14,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _cameraMode.label,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isLight ? const Color(0xFF0F172A) : Colors.white,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Pill switch toggle indicator
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 34,
+                  height: 20,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: isFree
+                        ? const Color(0xFF2563EB)
+                        : (isLight
+                            ? const Color(0xFFE2E8F0)
+                            : const Color(0xFF334155)),
+                  ),
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    alignment:
+                        isFree ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 3,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1449,3 +1657,4 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
     );
   }
 }
+

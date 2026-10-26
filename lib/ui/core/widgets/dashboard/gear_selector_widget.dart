@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:dashboardmevi/core/theme/colors.dart';
 
-/// Circular gear pills (P R N D), styled after the reference dashboard's
-/// gear row: a solid blue glowing circle behind the active gear, plain
-/// white/60 text for the rest.
+/// Gear selector widget (P R N D), styled as a unified luxury EV console rail.
+///
+/// REVISI: Mengadopsi visual style & hierarki cockpit EV modern:
+/// - Light mode: Unified white card capsule, border (0xFFE2E8F0), soft shadow (0x0A0F172A).
+/// - Dark mode: Dark navy tint, glass blue border, deep shadow.
+/// - Gear aktif: Tech-blue vibrant gradient dengan subtle glow.
+/// - Gear inaktif: Slate text yang lembut, transparan dan responsif saat ditekan.
 class GearSelectorWidget extends StatelessWidget {
   final String selectedGear;
   final Function(String) onGearChanged;
   final List<String> gears;
 
-  /// Diameter of each circle. Defaults to 44 (the original size); pass a
-  /// smaller value (e.g. 30) for a more compact row, such as when placed
-  /// next to the Settings/Collapse icons at the bottom of the panel.
+  /// Diameter of each circle or card size.
   final double circleSize;
 
-  /// Font size for the gear letter. Defaults to 16; pass something
-  /// smaller (e.g. 11) to match a smaller [circleSize].
+  /// Font size for the gear letter.
   final double fontSize;
 
-  /// Font weight for the gear letter. Defaults to w800 (bold); pass a
-  /// lighter weight (e.g. FontWeight.w500) for a "thinner" look.
+  /// Font weight for the gear letter.
   final FontWeight fontWeight;
 
-  /// Layout direction for the gear pills. Defaults to [Axis.horizontal]
-  /// (the original P R N D row). Pass [Axis.vertical] to stack them
-  /// top-to-bottom instead — used by the BEV page's left-side rail so
-  /// the selector reads as a descending column rather than a row.
+  /// Layout direction for the gear items.
   final Axis direction;
+
+  /// Whether to render as squircle cards / unified console card.
+  final bool useCard;
+
+  /// Explicit size for card mode (defaults to 42 for compact modern squircle)
+  final double? cardSize;
+
+  /// Border radius for card mode (defaults to 12)
+  final double? cardBorderRadius;
 
   const GearSelectorWidget({
     super.key,
@@ -33,30 +40,82 @@ class GearSelectorWidget extends StatelessWidget {
     required this.onGearChanged,
     this.gears = const ['P', 'R', 'N', 'D'],
     this.circleSize = 44,
-    this.fontSize = 16,
-    this.fontWeight = FontWeight.w800,
+    this.fontSize = 15,
+    this.fontWeight = FontWeight.w700,
     this.direction = Axis.horizontal,
+    this.useCard = false,
+    this.cardSize,
+    this.cardBorderRadius,
   });
+
+  static const _activeGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+  );
 
   @override
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    // REVISI: light mode → pill non-aktif jadi abu-abu terang dengan
-    // teks gelap (bukan putih transparan) supaya kebaca di atas
-    // background putih halaman BEV. Pill aktif (biru solid) tidak perlu
-    // diubah, sudah kontras di kedua mode.
-    final inactiveFill = isLight
-        ? const Color(0xFF1A2331).withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.06);
-    final inactiveTextClr = isLight
-        ? const Color(0xFF1A2331).withValues(alpha: 0.55)
-        : Colors.white.withValues(alpha: 0.45);
+    final itemSize = useCard ? (cardSize ?? 42.0) : circleSize;
+    final innerRadius = BorderRadius.circular(cardBorderRadius ?? 12.0);
 
-    return Flex(
-      direction: direction,
-      mainAxisSize: MainAxisSize.min,
-      children: gears.map((gear) {
-        final isActive = gear == selectedGear;
+    final gearItems = gears.map((gear) {
+      final isActive = gear == selectedGear;
+
+      final textClr = isActive
+          ? Colors.white
+          : (isLight ? const Color(0xFF64748B) : AppColors.glassTextSecondary);
+
+      if (useCard) {
+        return Padding(
+          padding: direction == Axis.horizontal
+              ? const EdgeInsets.symmetric(horizontal: 2)
+              : const EdgeInsets.symmetric(vertical: 2),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onGearChanged(gear),
+              borderRadius: innerRadius,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                width: itemSize,
+                height: itemSize,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: innerRadius,
+                  gradient: isActive ? _activeGradient : null,
+                  color: isActive ? null : Colors.transparent,
+                  boxShadow: isActive
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  gear,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: isActive ? FontWeight.w800 : fontWeight,
+                    color: textClr,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      } else {
+        // Circular pills mode (backward-compatible)
+        final inactiveFill = isLight
+            ? const Color(0xFF1A2331).withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.06);
+
         return Padding(
           padding: direction == Axis.horizontal
               ? EdgeInsets.symmetric(horizontal: circleSize * 0.09)
@@ -64,41 +123,73 @@ class GearSelectorWidget extends StatelessWidget {
           child: GestureDetector(
             onTap: () => onGearChanged(gear),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-              width: circleSize,
-              height: circleSize,
+              duration: const Duration(milliseconds: 200),
+              width: itemSize,
+              height: itemSize,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isActive ? const Color(0xFF2196F3) : inactiveFill,
+                gradient: isActive ? _activeGradient : null,
+                color: isActive ? null : inactiveFill,
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: const Color(
-                            0xFF2196F3,
-                          ).withValues(alpha: 0.45),
-                          blurRadius: 16,
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.40),
+                          blurRadius: 12,
                           spreadRadius: 1,
                         ),
                       ]
                     : null,
               ),
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
+              child: Text(
+                gear,
                 style: TextStyle(
                   fontSize: fontSize,
-                  fontWeight: fontWeight,
-                  color: isActive ? Colors.white : inactiveTextClr,
-                  letterSpacing: -0.5,
+                  fontWeight: isActive ? FontWeight.w800 : fontWeight,
+                  color: textClr,
                 ),
-                child: Text(gear),
               ),
             ),
           ),
         );
-      }).toList(),
+      }
+    }).toList();
+
+    if (useCard) {
+      // Unified outer card rail for luxury cockpit look
+      return Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isLight ? Colors.white : AppColors.glassNavyTint,
+          border: Border.all(
+            color: isLight
+                ? const Color(0xFFE2E8F0)
+                : AppColors.glassBlueBorder.withValues(alpha: 0.65),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isLight
+                  ? const Color(0x0A0F172A)
+                  : Colors.black.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Flex(
+          direction: direction,
+          mainAxisSize: MainAxisSize.min,
+          children: gearItems,
+        ),
+      );
+    }
+
+    return Flex(
+      direction: direction,
+      mainAxisSize: MainAxisSize.min,
+      children: gearItems,
     );
   }
 }

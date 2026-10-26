@@ -15,6 +15,7 @@ class _ResultTheme {
   final Color itemTitleColor;
   final Color itemSubColor;
   final Color chevronColor;
+  final Color previewIconColor;
   final Color inkSplashColor;
 
   const _ResultTheme({
@@ -27,6 +28,7 @@ class _ResultTheme {
     required this.itemTitleColor,
     required this.itemSubColor,
     required this.chevronColor,
+    required this.previewIconColor,
     required this.inkSplashColor,
   });
 
@@ -41,21 +43,23 @@ class _ResultTheme {
     itemTitleColor: AppColors.glassTextPrimary,
     itemSubColor: AppColors.glassTextSecondary,
     chevronColor: AppColors.glassTextSecondary,
+    previewIconColor: Color(0xFF7DB4FF),
     inkSplashColor: Color(0x0FFFFFFF),
   );
 
-  // ── Terang: putih bersih + border biru ─────────────────────────────────────
+  // ── Terang: clean white + subtle border + slate typography (Edaca style) ──
   static const light = _ResultTheme(
     containerBg: Colors.white,
-    containerBorder: Color(0xFF1976D2),
-    shadow: Color(0x33000000),
-    divider: Color(0xFFBBDEFB),
-    emptyIconColor: Color(0xFF90A4AE),
-    emptyTextColor: Color(0xFF546E7A),
-    itemTitleColor: Color(0xFF1A237E),
-    itemSubColor: Color(0xFF546E7A),
-    chevronColor: Color(0xFF90A4AE),
-    inkSplashColor: Color(0x0F1565C0),
+    containerBorder: Color(0xFFE2E8F0),
+    shadow: Color(0x140F172A),
+    divider: Color(0xFFF1F5F9),
+    emptyIconColor: Color(0xFF94A3B8),
+    emptyTextColor: Color(0xFF64748B),
+    itemTitleColor: Color(0xFF0F172A),
+    itemSubColor: Color(0xFF64748B),
+    chevronColor: Color(0xFF94A3B8),
+    previewIconColor: Color(0xFF2563EB),
+    inkSplashColor: Color(0x0A2563EB),
   );
 }
 
@@ -163,32 +167,29 @@ class SearchResultsWidget extends StatelessWidget {
         WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
     final isFullHD = screen.width >= 1900 && screen.height >= 1000;
     final dropdownWidth = isFullHD ? 420.0 : 360.0;
+    final isDark = appThemeMode.value == ThemeMode.dark;
 
     return Container(
       width: dropdownWidth,
-      constraints: const BoxConstraints(maxHeight: 360),
+      constraints: const BoxConstraints(maxHeight: 380),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        color: t.containerBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: t.containerBorder,
+          width: 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: t.shadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: isDark ? const Color(0x40000000) : const Color(0x140F172A),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: t.containerBg,
-            border: Border.all(
-              color: t.containerBorder.withValues(alpha: 0.7),
-              width: 1.2,
-            ),
-          ),
-          child: child,
-        ),
+        borderRadius: BorderRadius.circular(16),
+        child: child,
       ),
     );
   }
@@ -214,25 +215,52 @@ class _TripResultItem extends StatelessWidget {
     if (name.contains('gedung')) return LucideIcons.building2;
     if (name.contains('lab')) return LucideIcons.flaskConical;
     if (name.contains('taman')) return LucideIcons.trees;
-    if (name.contains('satpam') || name.contains('pos'))
+    if (name.contains('satpam') || name.contains('pos')) {
       return LucideIcons.shield;
+    }
     return LucideIcons.mapPin;
   }
 
-  Color _getTripColor() {
+  Color _getTripIconColor() {
     final name = trip.name.toLowerCase();
-    if (name.contains('keliling')) return Colors.purple.shade600;
-    if (name.contains('gedung')) return Colors.blue.shade600;
-    if (name.contains('lab')) return Colors.teal.shade600;
-    if (name.contains('taman')) return Colors.green.shade600;
-    if (name.contains('satpam') || name.contains('pos'))
-      return Colors.orange.shade600;
-    return Colors.grey.shade600;
+    if (name.contains('keliling')) return const Color(0xFF9333EA); // purple-600
+    if (name.contains('gedung')) return const Color(0xFF2563EB); // blue-600
+    if (name.contains('lab')) return const Color(0xFF0D9488); // teal-600
+    if (name.contains('taman')) return const Color(0xFF16A34A); // green-600
+    if (name.contains('satpam') || name.contains('pos')) {
+      return const Color(0xFFD97706); // amber-600
+    }
+    return const Color(0xFF64748B); // slate-500
+  }
+
+  Color _getTripBgColor() {
+    final isDark = appThemeMode.value == ThemeMode.dark;
+    if (isDark) {
+      final name = trip.name.toLowerCase();
+      if (name.contains('keliling')) return const Color(0x289333EA);
+      if (name.contains('gedung')) return const Color(0x282563EB);
+      if (name.contains('lab')) return const Color(0x280D9488);
+      if (name.contains('taman')) return const Color(0x2816A34A);
+      if (name.contains('satpam') || name.contains('pos')) {
+        return const Color(0x28D97706);
+      }
+      return const Color(0x2864748B);
+    }
+    final name = trip.name.toLowerCase();
+    if (name.contains('keliling')) return const Color(0xFFF3E8FF); // soft purple
+    if (name.contains('gedung')) return const Color(0xFFEFF6FF); // soft blue
+    if (name.contains('lab')) return const Color(0xFFF0FDFA); // soft teal
+    if (name.contains('taman')) return const Color(0xFFECFDF5); // soft green
+    if (name.contains('satpam') || name.contains('pos')) {
+      return const Color(0xFFFEF3C7); // soft amber
+    }
+    return const Color(0xFFF1F5F9);
   }
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = _getTripColor();
+    final iconColor = _getTripIconColor();
+    final bgColor = _getTripBgColor();
 
     return InkWell(
       onTap: onTap,
@@ -242,20 +270,22 @@ class _TripResultItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            // Icon badge — compact proportional size
+            // Icon squircle badge — modern pastel container ala Edaca
             Container(
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.14),
+                color: bgColor,
                 borderRadius: BorderRadius.circular(10),
               ),
+              alignment: Alignment.center,
               child: Icon(_getTripIcon(), size: 18, color: iconColor),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     trip.name,
@@ -272,21 +302,27 @@ class _TripResultItem extends StatelessWidget {
                   Row(
                     children: [
                       Icon(LucideIcons.mapPin,
-                          size: 11, color: t.itemSubColor),
-                      const SizedBox(width: 3),
+                          size: 11.5, color: t.itemSubColor),
+                      const SizedBox(width: 4),
                       Text(
                         '${trip.waypoints.length} titik',
-                        style:
-                            TextStyle(fontSize: 11.5, color: t.itemSubColor),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: t.itemSubColor,
+                        ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Icon(LucideIcons.clock,
-                          size: 11, color: t.itemSubColor),
-                      const SizedBox(width: 3),
+                          size: 11.5, color: t.itemSubColor),
+                      const SizedBox(width: 4),
                       Text(
-                        '${trip.estimatedDuration.toInt()} mnt',
-                        style:
-                            TextStyle(fontSize: 11.5, color: t.itemSubColor),
+                        trip.formattedDuration,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: t.itemSubColor,
+                        ),
                       ),
                     ],
                   ),
@@ -294,18 +330,23 @@ class _TripResultItem extends StatelessWidget {
               ),
             ),
             if (onPreview != null)
-              IconButton(
-                icon:
-                    Icon(LucideIcons.eye, size: 17, color: t.chevronColor),
-                splashRadius: 18,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: () {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
+              Tooltip(
+                message: 'Lihat rute & waypoint jalur',
+                child: IconButton(
+                  icon: Icon(
+                    LucideIcons.eye,
+                    size: 17,
+                    color: t.previewIconColor,
+                  ),
+                  splashRadius: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () {
                     onPreview!();
-                  });
-                },
+                  },
+                ),
               ),
+            const SizedBox(width: 2),
             Icon(LucideIcons.chevronRight,
                 size: 16, color: t.chevronColor),
           ],

@@ -1139,32 +1139,23 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    // REVISI: light mode → gradient biru nav, dark → navy glass seperti semula
-    final outerGradient = isLight
-        ? const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
-          )
-        : null;
-    final outerColor = isLight ? null : AppColors.glassSurface;
+    final outerColor = isLight ? Colors.white : AppColors.glassSurface;
     final outerBorder = isLight
-        ? const Color(0xFF1E88E5)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.35);
     final outerShadow = isLight
-        ? const Color(0xFF1565C0).withValues(alpha: 0.30)
+        ? const Color(0x0A0F172A)
         : AppColors.glassBlueGlow.withValues(alpha: 0.08);
 
     return Container(
       decoration: BoxDecoration(
         color: outerColor,
-        gradient: outerGradient,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: outerBorder, width: 1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: outerBorder, width: 1.0),
         boxShadow: [
           BoxShadow(
             color: outerShadow,
-            blurRadius: 20,
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1172,20 +1163,16 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Main visualization
           Expanded(
             child: Stack(
               children: [
-                // Canvas untuk trajectory — selalu gelap agar jalur terbaca
                 _useMapView ? _buildMapView() : _buildCustomView(isLight),
-                // Status panels
                 Positioned(
                   bottom: 16,
                   left: 16,
                   child: _buildControlPanel(isLight),
                 ),
                 Positioned(bottom: 16, right: 16, child: _buildLegend(isLight)),
-                // Zoom controls for custom view only
                 if (!_useMapView)
                   Positioned(
                     bottom: 16,
@@ -1205,28 +1192,26 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
   }
 
   Widget _buildControlPanel(bool isLight) {
-    final panelBg = isLight
-        ? const Color(0xFF1565C0).withValues(alpha: 0.92)
-        : AppColors.glassSurfaceAlt;
+    final panelBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
     final panelBorder = isLight
-        ? const Color(0xFF1E88E5)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.35);
-    final iconClr = isLight ? Colors.white : AppColors.glassBlueBorder;
-    final textClr = isLight ? Colors.white : AppColors.glassTextPrimary;
+    final iconClr = isLight ? const Color(0xFF2563EB) : AppColors.glassBlueBorder;
+    final textClr = isLight ? const Color(0xFF0F172A) : AppColors.glassTextPrimary;
 
     return GestureDetector(
       onTap: _toggleMapView,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: panelBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: panelBorder, width: 1),
           boxShadow: [
             BoxShadow(
-              color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
+              color: isLight ? const Color(0x0C0F172A) : AppColors.glassBlueGlow.withValues(alpha: 0.1),
               blurRadius: 12,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -1235,14 +1220,14 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
           children: [
             Icon(
               _useMapView ? LucideIcons.radar : LucideIcons.map,
-              size: 18,
+              size: 17,
               color: iconClr,
             ),
             const SizedBox(width: 8),
             Text(
               _useMapView ? 'Custom View' : 'Map View',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: textClr,
               ),
@@ -1254,24 +1239,22 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
   }
 
   Widget _buildLegend(bool isLight) {
-    final panelBg = isLight
-        ? const Color(0xFF1565C0).withValues(alpha: 0.92)
-        : AppColors.glassSurfaceAlt;
+    final panelBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
     final panelBorder = isLight
-        ? const Color(0xFF1E88E5)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.35);
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: panelBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: panelBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
+            color: isLight ? const Color(0x0C0F172A) : AppColors.glassBlueGlow.withValues(alpha: 0.1),
             blurRadius: 12,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1279,15 +1262,15 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildLegendItem('Reference', const Color(0xFF34C759), isLight),
-          const SizedBox(height: 6),
-          _buildLegendItem('Actual', const Color(0xFF007AFF), isLight),
-          const SizedBox(height: 6),
-          _buildLegendItem('Deviation', const Color(0xFFFF9500), isLight),
-          const SizedBox(height: 6),
+          _buildLegendItem('Reference', const Color(0xFF16A34A), isLight),
+          const SizedBox(height: 5),
+          _buildLegendItem('Actual', const Color(0xFF2563EB), isLight),
+          const SizedBox(height: 5),
+          _buildLegendItem('Deviation', const Color(0xFFD97706), isLight),
+          const SizedBox(height: 5),
           _buildLegendItem(
             'Vehicle',
-            isLight ? Colors.white70 : AppColors.glassTextSecondary,
+            isLight ? const Color(0xFF64748B) : AppColors.glassTextSecondary,
             isLight,
           ),
         ],
@@ -1296,26 +1279,24 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
   }
 
   Widget _buildZoomControls(bool isLight) {
-    final panelBg = isLight
-        ? const Color(0xFF1565C0).withValues(alpha: 0.92)
-        : AppColors.glassSurfaceAlt;
+    final panelBg = isLight ? Colors.white : AppColors.glassSurfaceAlt;
     final panelBorder = isLight
-        ? const Color(0xFF1E88E5)
+        ? const Color(0xFFE2E8F0)
         : AppColors.glassBlueBorder.withValues(alpha: 0.35);
-    final textClr = isLight ? Colors.white : AppColors.glassTextPrimary;
-    final dividerClr = isLight ? Colors.white30 : AppColors.glassDivider;
+    final textClr = isLight ? const Color(0xFF0F172A) : AppColors.glassTextPrimary;
+    final dividerClr = isLight ? const Color(0xFFE2E8F0) : AppColors.glassDivider;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: panelBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: panelBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.glassBlueGlow.withValues(alpha: 0.1),
+            color: isLight ? const Color(0x0C0F172A) : AppColors.glassBlueGlow.withValues(alpha: 0.1),
             blurRadius: 12,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1324,20 +1305,20 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
         children: [
           _buildZoomButton(LucideIcons.minus, _zoomOut, isLight),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               '${_zoomLevel.toStringAsFixed(1)}x',
               style: TextStyle(
                 color: textClr,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
           _buildZoomButton(LucideIcons.plus, _zoomIn, isLight),
-          const SizedBox(width: 8),
-          Container(width: 1, height: 20, color: dividerClr),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          Container(width: 1, height: 18, color: dividerClr),
+          const SizedBox(width: 6),
           _buildZoomButton(LucideIcons.maximize2, _resetZoom, isLight),
         ],
       ),
@@ -1348,22 +1329,26 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         decoration: BoxDecoration(
           color: isLight
-              ? Colors.white.withValues(alpha: 0.18)
-              : AppColors.glassSurface,
+              ? const Color(0xFFF1F5F9)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isLight ? Colors.white30 : AppColors.glassDivider,
+            color: isLight
+                ? const Color(0xFFE2E8F0)
+                : AppColors.glassBlueBorder.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
         child: Icon(
           icon,
-          size: 16,
-          color: isLight ? Colors.white : AppColors.glassTextSecondary,
+          size: 14,
+          color: isLight
+              ? const Color(0xFF334155)
+              : AppColors.glassTextPrimary,
         ),
       ),
     );
@@ -1382,7 +1367,7 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
         Text(
           label,
           style: TextStyle(
-            color: isLight ? Colors.white : AppColors.glassTextSecondary,
+            color: isLight ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
@@ -1755,26 +1740,35 @@ class ROSTrajectoryPainter extends CustomPainter {
   /// Draw MPC performance metrics
   void _drawMPCMetrics(Canvas canvas) {
     final metricsBg = Paint()
-      ..color = Colors.black.withAlpha(204)
+      ..color = isLight
+          ? Colors.white.withValues(alpha: 0.94)
+          : Colors.black.withAlpha(204)
       ..style = PaintingStyle.fill;
 
-    // Position at top-left to avoid collision with bottom widgets
-    final metricsRect = Rect.fromLTWH(10, 10, 180, 100);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(metricsRect, const Radius.circular(8)),
-      metricsBg,
+    final metricsBorder = Paint()
+      ..color = isLight
+          ? const Color(0xFFE2E8F0)
+          : const Color(0x407DB4FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // Position at top-left with modern rounded card
+    final metricsRect = Rect.fromLTWH(12, 12, 190, 106);
+    final rrect = RRect.fromRectAndRadius(metricsRect, const Radius.circular(12));
+    canvas.drawRRect(rrect, metricsBg);
+    canvas.drawRRect(rrect, metricsBorder);
+
+    final headerStyle = TextStyle(
+      color: isLight ? const Color(0xFF2563EB) : Colors.cyan,
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.2,
     );
 
-    final textStyle = const TextStyle(
-      color: Colors.white,
-      fontSize: 10,
-      fontWeight: FontWeight.bold,
-    );
-
-    final headerStyle = const TextStyle(
-      color: Colors.cyan,
-      fontSize: 11,
-      fontWeight: FontWeight.bold,
+    final labelStyle = TextStyle(
+      color: isLight ? const Color(0xFF64748B) : Colors.white70,
+      fontSize: 10.5,
+      fontWeight: FontWeight.w500,
     );
 
     // Header
@@ -1783,7 +1777,7 @@ class ROSTrajectoryPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     );
     headerPainter.layout();
-    headerPainter.paint(canvas, Offset(20, 20));
+    headerPainter.paint(canvas, const Offset(24, 22));
 
     // Metrics - compact version
     final metrics = [
@@ -1796,12 +1790,12 @@ class ROSTrajectoryPainter extends CustomPainter {
 
     for (int i = 0; i < metrics.length; i++) {
       final textPainter = TextPainter(
-        text: TextSpan(text: metrics[i], style: textStyle),
+        text: TextSpan(text: metrics[i], style: labelStyle),
         textDirection: TextDirection.ltr,
       );
 
       textPainter.layout();
-      textPainter.paint(canvas, Offset(20, 40 + i * 12));
+      textPainter.paint(canvas, Offset(24, 42 + i * 13));
     }
   }
 
