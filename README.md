@@ -7,6 +7,10 @@
 
 Aplikasi dashboard modern berbasis **Flutter** untuk memantau telemetri *real-time*, visualisasi **Bird's Eye View (BEV) 3D**, *sensor fusion*, streaming kamera stereo, navigasi GPS otonom, dan antarmuka kontrol platform kendaraan listrik otonom **MEVI**.
 
+<p align="center">
+  <img src="docs/Tampilan%20Dashboard.png" alt="Tampilan MEVI Dashboard" width="100%">
+</p>
+
 ---
 
 ## 📋 Daftar Isi
@@ -224,6 +228,12 @@ Fitur recording memungkinkan pengguna mengumpulkan dan mengekspor seluruh rekama
 
 - **Author**: **Muhammad Haidar Aly**
 - **GitHub**: [@AlyScripter](https://github.com/AlyScripter)
+- **LinkedIn**: [Muhammad Haidar Aly](https://linkedin.com/in/muhammad-haidar-aly)
+- **Instagram**: [@alyyyys_](https://instagram.com/alyyyys_)
 - **Repository**: [https://github.com/AlyScripter/dashboard-mevi](https://github.com/AlyScripter/dashboard-mevi)
+
+[![GitHub](https://img.shields.io/badge/GitHub-AlyScripter-181717?logo=github&logoColor=white)](https://github.com/AlyScripter)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Muhammad_Haidar_Aly-0A66C2?logo=linkedin&logoColor=white)](https://linkedin.com/in/muhammad-haidar-aly)
+[![Instagram](https://img.shields.io/badge/Instagram-@alyyyys__-E4405F?logo=instagram&logoColor=white)](https://instagram.com/alyyyys_)
 
 Proyek ini dilisensikan di bawah perlindungan lisensi **[MIT License](LICENSE)**.

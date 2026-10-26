@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagram Arsitektur Sistem MEVI - Autonomous Electric Vehicle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg-main: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --primary-blue: #2563EB;
+      --primary-dark: #1D4ED8;
+      --primary-light: #EFF6FF;
+      --border-blue: #DBEAFE;
+      --border-subtle: #E2E8F0;
+      --navy-900: #0F172A;
+      --navy-800: #1E293B;
+      --slate-600: #475569;
+      --slate-500: #64748B;
+      --slate-400: #94A3B8;
+      --emerald-500: #10B981;
+      --cyan-500: #06B6D4;
+      --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 8px 20px rgba(37, 99, 235, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+      --shadow-lg: 0 16px 32px rgba(37, 99, 235, 0.08), 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.03) 0%, transparent 20%),
+        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.03) 0%, transparent 25%),
+        linear-gradient(to right, #EDF2F7 1px, transparent 1px),
+        linear-gradient(to bottom, #EDF2F7 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+      color: var(--navy-900);
+      min-height: 100vh;
+      padding: 40px 20px 80px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* HEADER */
+    .header-bar {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 9999px;
+      color: var(--primary-blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--navy-900);
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .header-subtitle {
+      font-size: 14px;
+      color: var(--slate-500);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* SECTION CONTAINERS */
+    .architecture-tier {
+      position: relative;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1.5px solid var(--border-blue);
+      border-radius: 20px;
+      padding: 24px 28px;
+      margin-bottom: 42px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.25s ease;
+    }
+
+    .architecture-tier:hover {
+      box-shadow: var(--shadow-lg);
+      border-color: #93C5FD;
+    }
+
+    .tier-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .tier-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tier-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      color: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    }
+
+    .tier-name {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: var(--navy-900);
+      text-transform: uppercase;
+    }
+
+    .tier-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #F1F5F9;
+      color: var(--slate-600);
+      border: 1px solid #E2E8F0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* CARDS INSIDE TIERS */
+    .card-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .node-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .node-card:hover {
+      transform: translateY(-2px);
+      border-color: #93C5FD;
+    }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .node-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--navy-800);
+    }
+
+    .node-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .sensor-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #F0F9FF;
+      border: 1px solid #BAE6FD;
+      color: #0369A1;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 12px 16px;
+      transition: all 0.2s ease;
+    }
+
+    .step-item:hover {
+      background: #F8FAFC;
+      border-color: #93C5FD;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #EFF6FF;
+      color: var(--primary-blue);
+      border: 1.5px solid #BFDBFE;
+      font-weight: 800;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy-900);
+      margin-bottom: 2px;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--slate-500);
+      line-height: 1.4;
+    }
+
+    /* STEP CONNECTOR ARROWS */
+    .step-arrow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 12px;
+      color: #93C5FD;
+    }
+
+    /* DUAL COLUMNS FOR ROS ENVIRONMENT */
+    .dual-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 680px) {
+      .dual-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .server-card {
+      background: #FFFFFF;
+      border: 1.5px solid var(--border-blue);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .server-card.dashed-style {
+      border-style: dashed;
+      border-color: #94A3B8;
+      background: #FAFCFF;
+    }
+
+    .server-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .server-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--navy-900);
+    }
+
+    .port-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      background: #EFF6FF;
+      color: #1D4ED8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #BFDBFE;
+    }
+
+    .server-desc {
+      font-size: 12px;
+      color: var(--slate-500);
+    }
+
+    /* UI DASHBOARD SPECIFIC */
+    .dashboard-modules {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .module-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--navy-800);
+      transition: all 0.2s ease;
+    }
+
+    .module-pill:hover {
+      background: #FFFFFF;
+      border-color: #93C5FD;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.06);
+      transform: translateY(-2px);
+    }
+
+    .module-icon {
+      color: var(--primary-blue);
+      display: flex;
+      align-items: center;
+    }
+
+    /* PIPELINE INTER-TIER CONNECTORS */
+    .pipeline-connector {
+      position: absolute;
+      left: 50%;
+      bottom: -36px;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .connector-line {
+      width: 2px;
+      height: 18px;
+      background: #93C5FD;
+    }
+
+    .connector-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      background: #FFFFFF;
+      color: #1D4ED8;
+      padding: 3px 12px;
+      border-radius: 20px;
+      border: 1.5px solid #93C5FD;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .connector-arrow {
+      color: #2563EB;
+      font-size: 12px;
+      line-height: 1;
+      margin-top: -2px;
+    }
+
+    /* LATERAL DASHED CONNECTOR (Camera stream bypass) */
+    .stream-bypass-note {
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #FFFFFF;
+      border: 1px dashed #64748B;
+      color: #475569;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ACTION BAR */
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: #FFFFFF;
+      color: var(--navy-800);
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-action:hover {
+      border-color: var(--primary-blue);
+      color: var(--primary-blue);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      color: white;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #1D4ED8, #1E40AF);
+      color: white;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .action-bar {
+        display: none;
+      }
+      .architecture-tier {
+        box-shadow: none !important;
+        border: 1px solid #CBD5E1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- HEADER -->
+    <div class="header-bar">
+      <div class="header-badge">
+        <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
+        Sistem Telemetri & Otonom MEVI
+      </div>
+      <h1 class="header-title">Arsitektur Pipeline & Data Flow</h1>
+      <p class="header-subtitle">
+        Alur transmisi data dari sensor hardware onboard mobil MEVI, pemrosesan sensor fusion Python, hingga visualisasi real-time pada Dashboard Flutter.
+      </p>
+    </div>
+
+    <!-- TIER 1: MOBIL MEVI -->
+    <div class="architecture-tier">
+      <div class="tier-header">
+        <div class="tier-title-wrap">
+          <div class="tier-icon">
+            <i data-lucide="car" style="width: 20px; height: 20px;"></i>
+          </div>
+          <div>
+            <div class="tier-name">1. Mobil MEVI (Hardware & Onboard)</div>
+            <div style="font-size: 12px; color: var(--slate-500);">Perangkat fisik & unit komputasi di dalam kendaraan</div>
+          </div>
+        </div>
+        <span class="tier-badge">Physical Layer</span>
+      </div>
+
+      <div class="card-grid">
+        <!-- Sensor Node -->
+        <div class="node-card">
+          <div class="node-header">
+            <i data-lucide="radar" style="width: 18px; height: 18px; color: #2563EB;"></i>
+            <div class="node-title">Sistem Sensor Terintegrasi</div>
+          </div>
+          <div style="font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
+            Akuisisi data spasial lingkungan, dinamika gerak, dan posisi geografis kendaraan.
+          </div>
+          <div class="node-pills">
+            <span class="sensor-pill"><i data-lucide="scan" style="width: 14px; height: 14px;"></i> LiDAR 3D</span>
+            <span class="sensor-pill"><i data-lucide="video" style="width: 14px; height: 14px;"></i> Kamera ZED 2i (RGB + Depth)</span>
+            <span class="sensor-pill"><i data-lucide="compass" style="width: 14px; height: 14px;"></i> IMU (Inertial Unit)</span>
+            <span class="sensor-pill"><i data-lucide="map-pin" style="width: 14px; height: 14px;"></i> GPS GNSS</span>
+            <span class="sensor-pill"><i data-lucide="gauge" style="width: 14px; height: 14px;"></i> Odometri</span>
+          </div>
+        </div>
+
+        <!-- Connector between Sensor and Jetson -->
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; color: #3B82F6; font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace;">
+          <i data-lucide="arrow-down" style="width: 16px; height: 16px;"></i>
+          topik ROS (/camera/image_raw, /velodyne_points, /imu, dll)
+        </div>
+
+        <!-- Jetson Node -->
+        <div class="node-card" style="background: #F8FAFC; border: 1.5px solid #BFDBFE;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i data-lucide="box" style="width: 18px; height: 18px; color: #1D4ED8;"></i>
+              <div>
+                <div class="node-title">Komputer Onboard (NVIDIA Jetson)</div>
+                <div style="font-size: 12px; color: var(--slate-600);">Perekaman sinkron data telemetri ke berkas Rosbag & publikasi citra kamera</div>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; background: #DBEAFE; color: #1E40AF; padding: 4px 8px; border-radius: 6px;">Jetson Edge AI</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Outgoing Connector to Python -->
+      <div class="pipeline-connector">
+        <div class="connector-line"></div>
+        <div class="connector-badge">
+          <i data-lucide="file-archive" style="width: 14px; height: 14px;"></i>
+          berkas rosbag (.bag)
+          <i data-lucide="arrow-down" style="width: 12px; height: 12px;"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 2: PEMROSESAN DATA (PYTHON) -->
+    <div class="architecture-tier">
+      <div class="tier-header">
+        <div class="tier-title-wrap">
+          <div class="tier-icon" style="background: linear-gradient(135deg, #0284C7, #0369A1);">
+            <i data-lucide="binary" style="width: 20px; height: 20px;"></i>
+          </div>
+          <div>
+            <div class="tier-name">2. Pemrosesan Data & Sensor Fusion (Python)</div>
+            <div style="font-size: 12px; color: var(--slate-500);">High-level pipeline algoritma persepsi & navigasi otonom</div>
+          </div>
+        </div>
+        <span class="tier-badge">Perception Layer</span>
+      </div>
+
+      <div class="step-list">
+        
+        <!-- Step 1 -->
+        <div class="step-item">
+          <div class="step-number">01</div>
+          <div class="step-content">
+            <div class="step-title">Ekstraksi & Sinkronisasi Rosbag</div>
+            <div class="step-desc">Sinkronisasi stempel waktu (timestamps) antar sensor & pembentukan waypoint lintasan ego-frame.</div>
+          </div>
+        </div>
+
+        <div class="step-arrow"><i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i></div>
+
+        <!-- Step 2 -->
+        <div class="step-item">
+          <div class="step-number">02</div>
+          <div class="step-content">
+            <div class="step-title">Kalibrasi LiDAR – Kamera</div>
+            <div class="step-desc">Proyeksi koordinat 3D LiDAR ke bidang 2D piksel citra (transformasi matriks intrinsik & ekstrinsik).</div>
+          </div>
+        </div>
+
+        <div class="step-arrow"><i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i></div>
+
+        <!-- Step 3 -->
+        <div class="step-item">
+          <div class="step-number">03</div>
+          <div class="step-content">
+            <div class="step-title">Deteksi Objek & Sensor Fusion</div>
+            <div class="step-desc">Inferensi YOLO-seg (segmentasi instance) + fusi spasial RGB, peta Depth ZED 2i, dan point cloud LiDAR.</div>
+          </div>
+        </div>
+
+        <div class="step-arrow"><i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i></div>
+
+        <!-- Step 4 -->
+        <div class="step-item">
+          <div class="step-number">04</div>
+          <div class="step-content">
+            <div class="step-title">Segmentasi LiDAR 3D Berbasis Geometri</div>
+            <div class="step-desc">Pemisahan bidang tanah (ground plane removal) dan clustering rintangan objek di sekitar jalur kendaraan.</div>
+          </div>
+        </div>
+
+        <div class="step-arrow"><i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i></div>
+
+        <!-- Step 5 -->
+        <div class="step-item">
+          <div class="step-number">05</div>
+          <div class="step-content">
+            <div class="step-title">Penyusunan Payload BEV & Geometri Jalan</div>
+            <div class="step-desc">Agregasi koordinat titik (points), 3D bounding box rintangan, waypoints, serta batas marka jalan.</div>
+          </div>
+        </div>
+
+        <div class="step-arrow"><i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i></div>
+
+        <!-- Step 6 -->
+        <div class="step-item" style="background: #F0F9FF; border-color: #BAE6FD;">
+          <div class="step-number" style="background: #2563EB; color: white; border-color: #2563EB;">06</div>
+          <div class="step-content">
+            <div class="step-title" style="color: #0369A1;">Streaming Per Frame (roslibpy)</div>
+            <div class="step-desc">Publikasi data frame-by-frame ke jaringan ROS dalam format JSON berseri tinggi.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Outgoing Connector to ROS Environment -->
+      <div class="pipeline-connector">
+        <div class="connector-line"></div>
+        <div class="connector-badge">
+          <i data-lucide="radio" style="width: 14px; height: 14px;"></i>
+          topik /bev/*, /vehicle/* (JSON)
+          <i data-lucide="arrow-down" style="width: 12px; height: 12px;"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 3: ROS1 NOETIC ENVIRONMENT -->
+    <div class="architecture-tier">
+      <div class="tier-header">
+        <div class="tier-title-wrap">
+          <div class="tier-icon" style="background: linear-gradient(135deg, #4F46E5, #4338CA);">
+            <i data-lucide="server" style="width: 20px; height: 20px;"></i>
+          </div>
+          <div>
+            <div class="tier-name">3. ROS1 Noetic Environment (Bridge & Streaming)</div>
+            <div style="font-size: 12px; color: var(--slate-500);">Server jembatan protokol komunikasi jaringan</div>
+          </div>
+        </div>
+        <span class="tier-badge">Transport Layer</span>
+      </div>
+
+      <div class="dual-col">
+        <!-- Rosbridge Server -->
+        <div class="server-card">
+          <div class="server-top">
+            <div class="server-name">Rosbridge Server</div>
+            <span class="port-badge">PORT 9090</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #2563EB; margin-bottom: 6px;">
+            <i data-lucide="wifi" style="width: 14px; height: 14px;"></i>
+            Protokol WebSocket
+          </div>
+          <div class="server-desc">
+            Mengonversi topik ROS internal menjadi paket JSON dua arah untuk konsumsi aplikasi web/Flutter.
+          </div>
+        </div>
+
+        <!-- Web Video Server -->
+        <div class="server-card dashed-style">
+          <div class="server-top">
+            <div class="server-name">Web Video Server</div>
+            <span class="port-badge" style="background: #F1F5F9; color: #475569; border-color: #CBD5E1;">PORT 8080</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">
+            <i data-lucide="clapperboard" style="width: 14px; height: 14px;"></i>
+            HTTP Video Stream (MJPEG)
+          </div>
+          <div class="server-desc">
+            Streaming visual kamera ZED 2i langsung dari topik citra onboard Jetson tanpa lag frame rate.
+          </div>
+        </div>
+      </div>
+
+      <!-- Outgoing Connector to Flutter -->
+      <div class="pipeline-connector">
+        <div class="connector-line"></div>
+        <div class="connector-badge">
+          <span>WebSocket (9090) & HTTP Stream (8080)</span>
+          <i data-lucide="arrow-down" style="width: 12px; height: 12px;"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 4: DASHBOARD APP (FLUTTER) -->
+    <div class="architecture-tier" style="margin-bottom: 0;">
+      <div class="tier-header">
+        <div class="tier-title-wrap">
+          <div class="tier-icon" style="background: linear-gradient(135deg, #0284C7, #2563EB);">
+            <i data-lucide="layout-dashboard" style="width: 20px; height: 20px;"></i>
+          </div>
+          <div>
+            <div class="tier-name">4. Dashboard App (Flutter Desktop / UI)</div>
+            <div style="font-size: 12px; color: var(--slate-500);">Antarmuka pengguna grafis & visualisasi telemetri 3D real-time</div>
+          </div>
+        </div>
+        <span class="tier-badge">Application Layer</span>
+      </div>
+
+      <div class="node-card" style="border: 1.5px solid #BFDBFE;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--navy-900); margin-bottom: 8px;">
+          Modul Visualisasi & Kontrol
+        </div>
+        <div style="font-size: 12px; color: var(--slate-600); margin-bottom: 14px;">
+          Menerima data telemetri berkecepatan tinggi, merender 3D view, serta memantau kesehatan operasional MEVI.
+        </div>
+
+        <div class="dashboard-modules">
+          <div class="module-pill">
+            <span class="module-icon"><i data-lucide="layers" style="width: 16px; height: 16px;"></i></span>
+            <span>BEV 3D Animasi</span>
+          </div>
+
+          <div class="module-pill">
+            <span class="module-icon"><i data-lucide="sparkles" style="width: 16px; height: 16px;"></i></span>
+            <span>BEV Point Cloud</span>
+          </div>
+
+          <div class="module-pill">
+            <span class="module-icon"><i data-lucide="map" style="width: 16px; height: 16px;"></i></span>
+            <span>Peta & Navigasi</span>
+          </div>
+
+          <div class="module-pill">
+            <span class="module-icon"><i data-lucide="line-chart" style="width: 16px; height: 16px;"></i></span>
+            <span>Grafik & Telemetri</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTION BUTTONS -->
+    <div class="action-bar">
+      <button class="btn-action btn-primary" onclick="window.print()">
+        <i data-lucide="printer" style="width: 16px; height: 16px;"></i>
+        Cetak / Simpan ke PDF
+      </button>
+      <a class="btn-action" href="#container" onclick="navigator.clipboard.writeText(window.location.href); alert('Link siap dibagikan!');">
+        <i data-lucide="share-2" style="width: 16px; height: 16px;"></i>
+        Salin Tautan
+      </a>
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

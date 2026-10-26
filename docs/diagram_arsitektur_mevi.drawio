@@ -1,0 +1,142 @@
+<mxfile host="app.diagrams.net" modified="2026-10-26T15:28:00.000Z" agent="Antigravity" version="22.1.0" type="device">
+  <diagram id="mevi-flow-simple" name="Alur Sistem MEVI">
+    <mxGraphModel dx="1100" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== 1. MOBIL MEVI ==================== -->
+        <mxCell id="box_mobil_mevi" value="MOBIL MEVI" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fillColor=#FFFFFF;strokeColor=#BFDBFE;strokeWidth=1.5;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;fontStyle=1;fontSize=12;fontColor=#1E3A8A;" vertex="1" parent="1">
+          <mxGeometry x="120" y="40" width="460" height="190" as="geometry" />
+        </mxCell>
+
+        <!-- Sensor Node -->
+        <mxCell id="node_sensor" value="&lt;b&gt;Sensor&lt;/b&gt;&lt;br&gt;LiDAR 3D &amp;bull; Kamera ZED 2i (RGB + Depth)&lt;br&gt;IMU &amp;bull; GPS &amp;bull; Odometri" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#F8FAFC;strokeColor=#3B82F6;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="135" y="70" width="430" height="52" as="geometry" />
+        </mxCell>
+
+        <!-- Jetson Node -->
+        <mxCell id="node_jetson" value="&lt;b&gt;Komputer Onboard (Jetson)&lt;/b&gt;&lt;br&gt;Perekaman data ke berkas rosbag" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#FFFFFF;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="165" y="160" width="370" height="48" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Sensor -> Jetson -->
+        <mxCell id="edge_sensor_jetson" value="topik ROS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#2563EB;fontSize=11;" edge="1" parent="1" source="node_sensor" target="node_jetson">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+
+        <!-- ==================== 2. PEMROSESAN DATA (Python) ==================== -->
+        <mxCell id="box_pemrosesan" value="PEMROSESAN DATA (Python)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=#FFFFFF;strokeColor=#BFDBFE;strokeWidth=1.5;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;fontStyle=1;fontSize=12;fontColor=#1E3A8A;" vertex="1" parent="1">
+          <mxGeometry x="90" y="260" width="520" height="510" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Jetson -> Step 1 -->
+        <mxCell id="edge_jetson_step1" value="berkas rosbag" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#2563EB;fontSize=11;" edge="1" parent="1" source="node_jetson" target="node_step1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Step 1 -->
+        <mxCell id="node_step1" value="1. Ekstraksi &amp;amp; sinkronisasi rosbag&lt;br&gt;+ pembentukan waypoint (ego-frame)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="145" y="292" width="410" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Step 2 -->
+        <mxCell id="node_step2" value="2. Kalibrasi LiDAR&amp;ndash;kamera" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="195" y="366" width="310" height="42" as="geometry" />
+        </mxCell>
+
+        <!-- Step 3 -->
+        <mxCell id="node_step3" value="&lt;b&gt;3. Deteksi objek&lt;/b&gt;&lt;br&gt;YOLO-seg + sensor fusion (RGB, depth, LiDAR)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="105" y="436" width="490" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Step 4 -->
+        <mxCell id="node_step4" value="4. Segmentasi LiDAR 3D&lt;br&gt;(berbasis geometri)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="205" y="510" width="290" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- Step 5 -->
+        <mxCell id="node_step5" value="&lt;b&gt;5. Payload BEV&lt;/b&gt;&lt;br&gt;(titik, objek, waypoint) + geometri jalan" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="140" y="582" width="420" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Step 6 -->
+        <mxCell id="node_step6" value="6. Streaming per frame&lt;br&gt;(roslibpy)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#1D4ED8;fontSize=11.5;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="656" width="260" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- Steps Connectors -->
+        <mxCell id="edge_s1_s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=1.5;" edge="1" parent="1" source="node_step1" target="node_step2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_s2_s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=1.5;" edge="1" parent="1" source="node_step2" target="node_step3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_s3_s4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=1.5;" edge="1" parent="1" source="node_step3" target="node_step4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_s4_s5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=1.5;" edge="1" parent="1" source="node_step4" target="node_step5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_s5_s6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563EB;strokeWidth=1.5;" edge="1" parent="1" source="node_step5" target="node_step6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+
+        <!-- ==================== 3. ROS1 NOETIC ENVIRONMENT ==================== -->
+        <mxCell id="box_ros" value="ROS1 NOETIC ENVIRONMENT" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fillColor=#FFFFFF;strokeColor=#BFDBFE;strokeWidth=1.5;verticalAlign=top;align=right;spacingTop=8;spacingRight=12;fontStyle=1;fontSize=11;fontColor=#1E3A8A;" vertex="1" parent="1">
+          <mxGeometry x="180" y="805" width="480" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Rosbridge Server -->
+        <mxCell id="node_rosbridge" value="&lt;b&gt;Rosbridge Server&lt;/b&gt;&lt;br&gt;(WebSocket, port 9090)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="195" y="830" width="220" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Web Video Server (dashed) -->
+        <mxCell id="node_videoserver" value="&lt;b&gt;Web Video Server&lt;/b&gt;&lt;br&gt;(HTTP, port 8080)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;dashed=1;dashPattern=4 4;fillColor=#FFFFFF;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="430" y="830" width="215" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Step 6 -> Rosbridge -->
+        <mxCell id="edge_step6_ros" value="topik /bev/*, /vehicle/*&lt;br&gt;(JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#2563EB;fontSize=10.5;align=center;" edge="1" parent="1" source="node_step6" target="node_rosbridge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Dashed Curved Arrow: Jetson -> Web Video Server -->
+        <mxCell id="edge_jetson_video" value="topik citra" style="edgeStyle=curved;rounded=1;dashed=1;dashPattern=5 5;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#64748B;strokeWidth=1.5;fontColor=#475569;fontSize=11;" edge="1" parent="1" source="node_jetson" target="node_videoserver">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="240" />
+              <mxPoint x="730" y="540" />
+              <mxPoint x="690" y="770" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+
+        <!-- ==================== 4. DASHBOARD APP ==================== -->
+        <mxCell id="box_dashboard" value="DASHBOARD APP" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fillColor=#FFFFFF;strokeColor=#BFDBFE;strokeWidth=1.5;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;fontStyle=1;fontSize=12;fontColor=#1E3A8A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="930" width="620" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Flutter UI Node -->
+        <mxCell id="node_flutter" value="&lt;b&gt;Flutter UI&lt;/b&gt;&lt;br&gt;BEV 3D animasi &amp;bull; BEV point cloud &amp;bull; Peta &amp;amp; navigasi &amp;bull; Grafik" style="rounded=1;whiteSpace=wrap;html=1;arcSize=28;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#0F172A;fontSize=11.5;align=center;" vertex="1" parent="1">
+          <mxGeometry x="75" y="955" width="590" height="46" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Rosbridge -> Flutter UI -->
+        <mxCell id="edge_ros_flutter" value="WebSocket" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=1.5;fontColor=#2563EB;fontSize=11;" edge="1" parent="1" source="node_rosbridge" target="node_flutter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Web Video Server -> Flutter UI -->
+        <mxCell id="edge_video_flutter" value="HTTP video stream" style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;dashPattern=4 4;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;strokeColor=#64748B;strokeWidth=1.5;fontColor=#475569;fontSize=11;" edge="1" parent="1" source="node_videoserver" target="node_flutter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
