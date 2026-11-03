@@ -6,6 +6,7 @@ import '../../../../services/data_source_service.dart';
 import '../../../../services/ros_service.dart';
 import '../../../../services/rosbag_player_service.dart';
 import '../../../../core/theme/colors.dart';
+import '../../navigation/widgets/in_app_notification_widget.dart';
 
 /// Purple accent tuned for the dark glass theme (Rosbag mode / playback
 /// loop) — brighter than Material `Colors.purple` so it stays legible on
@@ -237,7 +238,7 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _reconnect,
+        onTap: _handleManualReconnect,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1168,7 +1169,11 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       await _rosbagPlayerService.stop();
     } else {
       if (_selectedRosbag == null || _selectedRosbag!.isEmpty) {
-        _showSnackBar('Please select a rosbag file first');
+        _showSnackBar(
+          'Silakan pilih file rosbag terlebih dahulu',
+          title: 'Rosbag Belum Dipilih',
+          kind: NotificationKind.warning,
+        );
         return;
       }
 
@@ -1179,16 +1184,28 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       );
 
       if (success) {
-        _showSnackBar('Playing: $_selectedRosbag');
+        _showSnackBar(
+          'Memutar rosbag: $_selectedRosbag',
+          title: 'Rosbag Playback',
+          kind: NotificationKind.success,
+        );
       } else {
-        _showSnackBar('Failed: ${_rosbagPlayerService.lastError}');
+        _showSnackBar(
+          'Gagal memutar: ${_rosbagPlayerService.lastError}',
+          title: 'Playback Gagal',
+          kind: NotificationKind.error,
+        );
       }
     }
   }
 
   Future<void> _handleStop() async {
     await _rosbagPlayerService.stop();
-    _showSnackBar('Playback stopped');
+    _showSnackBar(
+      'Pemutaran rosbag dihentikan',
+      title: 'Playback Berhenti',
+      kind: NotificationKind.info,
+    );
   }
 
   Widget _buildCompactTextField({
@@ -1438,18 +1455,49 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     });
   }
 
+  Future<void> _handleManualReconnect() async {
+    _showSnackBar(
+      'Menghubungkan ke ${_dataSourceService.currentRosUrl}...',
+      title: 'Menghubungkan ke ROS',
+      kind: NotificationKind.info,
+    );
+    _reconnect();
+    await Future.delayed(const Duration(seconds: 2));
+    if (_rosService.isConnected) {
+      _showSnackBar(
+        'Terhubung ke ROS Bridge successfully!',
+        title: 'Koneksi Berhasil',
+        kind: NotificationKind.success,
+      );
+    } else {
+      _showSnackBar(
+        'Koneksi gagal. Periksa apakah rosbridge sedang berjalan.',
+        title: 'Koneksi Gagal',
+        kind: NotificationKind.error,
+      );
+    }
+  }
+
   Future<void> _saveLiveSettings() async {
     // Validate IPs
     final jetsonIp = _liveIpController.text.trim();
     final cameraIp = _liveCameraIpController.text.trim();
 
     if (jetsonIp.isEmpty) {
-      _showSnackBar('⚠️ Please enter Jetson IP address');
+      _showSnackBar(
+        'Harap masukkan alamat IP Jetson',
+        title: 'Input Tidak Lengkap',
+        kind: NotificationKind.warning,
+      );
       return;
     }
 
     if (cameraIp.isEmpty) {
-      _showSnackBar('⚠️ Please enter Camera IP address');
+      _showSnackBar(
+        'Harap masukkan alamat IP Camera',
+        title: 'Input Tidak Lengkap',
+        kind: NotificationKind.warning,
+      );
       return;
     }
 
@@ -1459,16 +1507,32 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     await _dataSourceService.setLiveUrls(rosUrl: rosUrl, cameraIp: cameraIp);
 
     if (_dataSourceService.mode == DataSourceMode.live) {
-      _showSnackBar('Reconnecting to Jetson ($jetsonIp)...');
+      _showSnackBar(
+        'Menghubungkan ke Jetson ($jetsonIp)...',
+        title: 'Menghubungkan ke ROS',
+        kind: NotificationKind.info,
+      );
       _reconnect();
       await Future.delayed(const Duration(seconds: 2));
       if (_rosService.isConnected) {
-        _showSnackBar('✅ Connected! ROS: $jetsonIp, Camera: $cameraIp');
+        _showSnackBar(
+          'Terhubung! ROS: $jetsonIp, Camera: $cameraIp',
+          title: 'Koneksi Berhasil',
+          kind: NotificationKind.success,
+        );
       } else {
-        _showSnackBar('⚠️ Connection failed. Check Jetson IP and port.');
+        _showSnackBar(
+          'Koneksi gagal. Periksa IP dan port Jetson.',
+          title: 'Koneksi Gagal',
+          kind: NotificationKind.error,
+        );
       }
     } else {
-      _showSnackBar('Live settings saved');
+      _showSnackBar(
+        'Pengaturan Live stream berhasil disimpan',
+        title: 'Pengaturan Disimpan',
+        kind: NotificationKind.success,
+      );
     }
   }
 
@@ -1477,23 +1541,43 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     final rosUrl = _rosbagRosUrlController.text.trim();
 
     if (rosUrl.isEmpty || !rosUrl.startsWith('ws://')) {
-      _showSnackBar('⚠️ Invalid ROS URL. Must start with ws://');
+      _showSnackBar(
+        'URL ROS tidak valid. Harus diawali dengan ws://',
+        title: 'Format URL Salah',
+        kind: NotificationKind.warning,
+      );
       return;
     }
 
     await _dataSourceService.setRosbagSettings(rosUrl: rosUrl);
 
     if (_dataSourceService.mode == DataSourceMode.rosbag) {
-      _showSnackBar('Reconnecting to $rosUrl...');
+      _showSnackBar(
+        'Menghubungkan ke $rosUrl...',
+        title: 'Menghubungkan ke ROS',
+        kind: NotificationKind.info,
+      );
       _reconnect();
       await Future.delayed(const Duration(seconds: 2));
       if (_rosService.isConnected) {
-        _showSnackBar('✅ Connected successfully!');
+        _showSnackBar(
+          'Terhubung ke ROS Bridge successfully!',
+          title: 'Koneksi Berhasil',
+          kind: NotificationKind.success,
+        );
       } else {
-        _showSnackBar('⚠️ Connection failed. Check if rosbridge is running.');
+        _showSnackBar(
+          'Koneksi gagal. Periksa apakah rosbridge sedang berjalan.',
+          title: 'Koneksi Gagal',
+          kind: NotificationKind.error,
+        );
       }
     } else {
-      _showSnackBar('Rosbag settings saved');
+      _showSnackBar(
+        'Pengaturan Rosbag berhasil disimpan',
+        title: 'Pengaturan Disimpan',
+        kind: NotificationKind.success,
+      );
     }
   }
 
@@ -1532,14 +1616,22 @@ class _DataSourceSectionState extends State<DataSourceSection> {
         final path = result.files.first.path;
         if (path != null) {
           // Show loading
-          _showSnackBar('Uploading rosbag to container...');
+          _showSnackBar(
+            'Sedang mengunggah file rosbag ke Docker container...',
+            title: 'Mengunggah File',
+            kind: NotificationKind.info,
+          );
 
           final success = await _rosbagPlayerService.copyRosbagToContainer(
             path,
           );
 
           if (success) {
-            _showSnackBar('✅ Rosbag uploaded successfully!');
+            _showSnackBar(
+              'File rosbag berhasil diunggah ke container!',
+              title: 'Upload Berhasil',
+              kind: NotificationKind.success,
+            );
             // Reload the list
             await _loadAvailableRosbags();
             // Select the newly uploaded file
@@ -1548,7 +1640,9 @@ class _DataSourceSectionState extends State<DataSourceSection> {
             _dataSourceService.setRosbagSettings(rosbagFile: filename);
           } else {
             _showSnackBar(
-              '❌ Failed to upload: ${_rosbagPlayerService.lastError}',
+              'Gagal mengunggah: ${_rosbagPlayerService.lastError}',
+              title: 'Upload Gagal',
+              kind: NotificationKind.error,
             );
           }
         }
@@ -1558,15 +1652,68 @@ class _DataSourceSectionState extends State<DataSourceSection> {
     }
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(
+    String message, {
+    String? title,
+    NotificationKind? kind,
+    Duration duration = const Duration(seconds: 3),
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(fontSize: 12)),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+
+    // Automatic inference if title/kind are not explicitly provided
+    final lower = message.toLowerCase();
+    NotificationKind resolvedKind = kind ?? NotificationKind.info;
+    String? resolvedTitle = title;
+
+    if (kind == null) {
+      if (message.contains('❌') ||
+          lower.contains('fail') ||
+          lower.contains('failed') ||
+          lower.contains('gagal') ||
+          lower.contains('error') ||
+          lower.contains('connection failed') ||
+          lower.contains('tidak dapat terhubung')) {
+        resolvedKind = NotificationKind.error;
+        resolvedTitle ??= 'Koneksi Gagal';
+      } else if (message.contains('✅') ||
+          message.contains('✔') ||
+          lower.contains('success') ||
+          lower.contains('connected!') ||
+          lower.contains('connected successfully') ||
+          lower.contains('berhasil') ||
+          lower.contains('terhubung')) {
+        resolvedKind = NotificationKind.success;
+        resolvedTitle ??= 'Koneksi Berhasil';
+      } else if (message.contains('⚠️') ||
+          lower.contains('warning') ||
+          lower.contains('please enter') ||
+          lower.contains('invalid') ||
+          lower.contains('belum') ||
+          lower.contains('harap')) {
+        resolvedKind = NotificationKind.warning;
+        resolvedTitle ??= 'Peringatan';
+      } else if (lower.contains('reconnecting') ||
+          lower.contains('menghubungkan') ||
+          lower.contains('playing') ||
+          lower.contains('stopped') ||
+          lower.contains('uploading') ||
+          lower.contains('preset')) {
+        resolvedKind = NotificationKind.info;
+        resolvedTitle ??= 'Informasi';
+      }
+    }
+
+    // Bersihkan emoji di awal pesan agar tampilan kartu rapi berdampingan dengan icon badge
+    final cleanMessage = message
+        .replaceAll(RegExp(r'^[❌⚠️✅✔?]+\s*'), '')
+        .trim();
+
+    CenterNotification.show(
+      context,
+      title: resolvedTitle,
+      message: cleanMessage.isNotEmpty ? cleanMessage : message,
+      kind: resolvedKind,
+      duration: duration,
     );
   }
 }

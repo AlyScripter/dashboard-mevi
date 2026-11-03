@@ -56,21 +56,14 @@ class MetricCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(metric.icon, color: iconClr, size: 16),
-              ),
-              _buildLiveIndicator(isLight),
-            ],
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(metric.icon, color: iconClr, size: 16),
           ),
           const SizedBox(height: 6),
           Column(
@@ -116,43 +109,6 @@ class MetricCard extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveIndicator(bool isLight) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-      decoration: BoxDecoration(
-        color: isLight ? const Color(0xFFF0FDF4) : const Color(0x1A10B981),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isLight ? const Color(0xFFDCFCE7) : const Color(0x3310B981),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: const BoxDecoration(
-              color: Color(0xFF16A34A),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            'LIVE',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: isLight ? const Color(0xFF16A34A) : const Color(0xFF34D399),
-              letterSpacing: 0.3,
-            ),
           ),
         ],
       ),

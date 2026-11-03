@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../../services/data_recorder_service.dart';
 import '../../../../../core/theme/colors.dart';
+import '../../../navigation/widgets/in_app_notification_widget.dart';
 
 class DataPageHeader extends StatefulWidget {
   final bool isConnected;
@@ -64,44 +65,24 @@ class _DataPageHeaderState extends State<DataPageHeader>
     if (_recorderService.isRecording) {
       final path = await _recorderService.stopRecording();
       if (path != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Recording saved: ${_recorderService.currentFileName ?? "trip.csv"}',
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Location: $path',
-                  style: const TextStyle(fontSize: 11, color: Colors.white70),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 5),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+        final filename = _recorderService.currentFileName ?? 'trip.csv';
+        CenterNotification.show(
+          context,
+          title: 'Rekaman Disimpan',
+          message: '$filename\nLokasi: $path',
+          kind: NotificationKind.success,
+          duration: const Duration(seconds: 4),
         );
       }
     } else {
       final success = await _recorderService.startRecording();
       if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Failed to start recording. Check storage permission.',
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+        CenterNotification.show(
+          context,
+          title: 'Gagal Merekam',
+          message: 'Gagal memulai perekaman. Periksa izin penyimpanan.',
+          kind: NotificationKind.error,
+          duration: const Duration(seconds: 4),
         );
       }
     }
@@ -624,6 +605,12 @@ class _RecordingOptionsDialogState extends State<_RecordingOptionsDialog> {
             widget.recorderService.setRecordingInterval(_selectedInterval);
             widget.onModeChanged();
             Navigator.of(context).pop();
+            CenterNotification.show(
+              context,
+              title: 'Pengaturan Disimpan',
+              message: 'Mode dan interval perekaman berhasil diperbarui',
+              kind: NotificationKind.success,
+            );
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: accentClr,

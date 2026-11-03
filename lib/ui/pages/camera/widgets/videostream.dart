@@ -350,11 +350,21 @@ class _LocalUvcWidgetState extends State<LocalUvcWidget> {
                 child: Center(child: _buildStatus()),
               ),
 
-            // Source toggle (ROS/USB) - positioned at bottom left when enabled
-            if (widget.showSourceToggle)
-              Positioned(bottom: 10, left: 10, child: _buildSourceToggle()),
-
-            Positioned(bottom: 10, right: 10, child: _buildBadge()),
+            // Source toggle (ROS/USB) & Badge - positioned at bottom right
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.showSourceToggle) ...[
+                    _buildSourceToggle(),
+                    const SizedBox(width: 8),
+                  ],
+                  _buildBadge(),
+                ],
+              ),
+            ),
           ],
         ),
       ),

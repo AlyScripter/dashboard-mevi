@@ -19,6 +19,7 @@ import '../../../services/voice_navigation_service.dart';
 import '../../../core/theme/glass_container.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../pages/navigation/widgets/in_app_notification_widget.dart';
 
 // Enhanced Route State Management
 enum RouteState {
@@ -345,20 +346,12 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
     // Show feedback
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.stop_circle, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Navigasi dibatalkan, kendaraan berhenti'),
-            ],
-          ),
-          backgroundColor: Colors.red.shade600,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
+      CenterNotification.show(
+        context,
+        title: 'Navigasi Dibatalkan',
+        message: 'Navigasi dibatalkan, kendaraan berhenti.',
+        kind: NotificationKind.warning,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -513,104 +506,112 @@ class _LayoutDashboardState extends State<LayoutDashboard>
     final textColor = dark ? Colors.white : const Color(0xFF0F172A);
     final subTextColor = dark ? Colors.white70 : const Color(0xFF64748B);
 
-    return GlassContainer(
-      width: maxWidth,
-      height: containerHeight,
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: verticalPadding,
-      ),
-      // Rounded rectangle modern 18px
-      borderRadius: cardBorderRadius,
-      blurSigma: 0,
-      // Light mode: putih solid + border halus #E2E8F0
-      tint: dark ? AppColors.glassNavyTint : Colors.white,
-      tintOpacity: 1.0,
-      borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFFE2E8F0),
-      borderOpacity: 1.0,
-      borderWidth: 1.0,
-      boxShadow: [
-        BoxShadow(
-          color: dark ? const Color(0x40000000) : const Color(0x0C0F172A),
-          blurRadius: 16,
-          offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: () {
+        // Jika sedang di halaman selain Maps (misal Camera), klik akan membawa ke halaman Maps untuk memilih tujuan
+        if (_activeMenu != DashboardMenu.home) {
+          _onNavSelect('maps');
+        }
+      },
+      child: GlassContainer(
+        width: maxWidth,
+        height: containerHeight,
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding,
+          vertical: verticalPadding,
         ),
-      ],
-      child: Row(
-        children: [
-          Container(
-            width: isLargeScreen ? 42 : 38,
-            height: isLargeScreen ? 42 : 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: dark
-                  ? LinearGradient(
-                      colors: [
-                        _getRouteStatusColor().withValues(alpha: 0.9),
-                        _getRouteStatusColor().withValues(alpha: 0.5),
-                      ],
-                    )
-                  : null,
-              color: dark
-                  ? null
-                  : _getRouteStatusColor().withValues(alpha: 0.12),
-            ),
-            child: Icon(
-              _getRouteStatusIcon(),
-              size: iconSize,
-              color: _getRouteStatusColor(),
-            ),
+        // Rounded rectangle modern 18px
+        borderRadius: cardBorderRadius,
+        blurSigma: 0,
+        // Light mode: putih solid + border halus #E2E8F0
+        tint: dark ? AppColors.glassNavyTint : Colors.white,
+        tintOpacity: 1.0,
+        borderColor: dark ? AppColors.glassBlueBorder : const Color(0xFFE2E8F0),
+        borderOpacity: 1.0,
+        borderWidth: 1.0,
+        boxShadow: [
+          BoxShadow(
+            color: dark ? const Color(0x40000000) : const Color(0x0C0F172A),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          SizedBox(width: isLargeScreen ? 12 : 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _routeName,
-                  style: TextStyle(
-                    fontSize: isLargeScreen ? 13.5 : 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                    letterSpacing: -0.2,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                SizedBox(height: isLargeScreen ? 4 : 3),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildMetricItem(
-                      icon: LucideIcons.car,
-                      value: _getDisplayDistance(),
-                      isLargeScreen: isLargeScreen,
-                      iconSize: iconSize - 3,
-                      color: subTextColor,
-                      valueColor: textColor,
-                    ),
-                    SizedBox(width: isLargeScreen ? 14.0 : 12.0),
-                    _buildMetricItem(
-                      icon: LucideIcons.clock,
-                      value: _getDisplayEta(),
-                      isLargeScreen: isLargeScreen,
-                      iconSize: iconSize - 3,
-                      color: subTextColor,
-                      valueColor: textColor,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (_showCancelButton) ...[
-            SizedBox(width: isLargeScreen ? 8 : 6),
-            _buildCancelButton(isLargeScreen: isLargeScreen),
-          ],
         ],
+        child: Row(
+          children: [
+            Container(
+              width: isLargeScreen ? 42 : 38,
+              height: isLargeScreen ? 42 : 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: dark
+                    ? LinearGradient(
+                        colors: [
+                          _getRouteStatusColor().withValues(alpha: 0.9),
+                          _getRouteStatusColor().withValues(alpha: 0.5),
+                        ],
+                      )
+                    : null,
+                color: dark
+                    ? null
+                    : _getRouteStatusColor().withValues(alpha: 0.12),
+              ),
+              child: Icon(
+                _getRouteStatusIcon(),
+                size: iconSize,
+                color: _getRouteStatusColor(),
+              ),
+            ),
+            SizedBox(width: isLargeScreen ? 12 : 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _routeName,
+                    style: TextStyle(
+                      fontSize: isLargeScreen ? 13.5 : 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      letterSpacing: -0.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  SizedBox(height: isLargeScreen ? 4 : 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMetricItem(
+                        icon: LucideIcons.car,
+                        value: _getDisplayDistance(),
+                        isLargeScreen: isLargeScreen,
+                        iconSize: iconSize - 3,
+                        color: subTextColor,
+                        valueColor: textColor,
+                      ),
+                      SizedBox(width: isLargeScreen ? 14.0 : 12.0),
+                      _buildMetricItem(
+                        icon: LucideIcons.clock,
+                        value: _getDisplayEta(),
+                        isLargeScreen: isLargeScreen,
+                        iconSize: iconSize - 3,
+                        color: subTextColor,
+                        valueColor: textColor,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (_showCancelButton) ...[
+              SizedBox(width: isLargeScreen ? 8 : 6),
+              _buildCancelButton(isLargeScreen: isLargeScreen),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -849,8 +850,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           bevMode: isBevActive,
           compactMode: isCameraActive || isLidarActive,
         ),
-        // _buildBottomOverlay sekarang theme-aware (tidak perlu arg dark)
-        if (isMapsActive) _buildBottomOverlay(),
+        // _buildBottomOverlay sekarang theme-aware (tampil di halaman Peta dan Kamera)
+        if (isMapsActive || isCameraActive) _buildBottomOverlay(),
       ],
     );
   }

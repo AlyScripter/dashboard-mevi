@@ -15,6 +15,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../../config/map_config.dart';
 import '../../../../shared/fallback_tile_layer.dart';
+import '../../../navigation/widgets/in_app_notification_widget.dart';
 
 /// MPC Trajectory Point dengan metadata lengkap
 class MPCTrajectoryPoint {
@@ -713,13 +714,13 @@ class _ROSTrajectoryWidgetState extends State<ROSTrajectoryWidget>
           // Allow tap to set destination
           // _rosService.publishDestination(point.latitude, point.longitude);
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Destination set: ${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}',
-              ),
-              duration: const Duration(seconds: 2),
-            ),
+          CenterNotification.show(
+            context,
+            title: 'Destinasi Ditentukan',
+            message:
+                'Koordinat: ${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}',
+            kind: NotificationKind.info,
+            duration: const Duration(seconds: 2),
           );
         },
       ),

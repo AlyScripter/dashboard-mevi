@@ -27,6 +27,11 @@ class Bev3DObjectMesh {
     required Detected3DObject obj,
     required bool isLight,
   }) {
+    if (obj.objectClass == Detected3DClass.trafficCone ||
+        obj.objectClass == Detected3DClass.obstacle) {
+      return; // Cukup 3D bounding box saja untuk rintangan generik / cone
+    }
+
     final mesh = AdasMeshService.getMeshForClass(obj.objectClass);
     final rawVerts = mesh.vertices;
     final totalVerts = rawVerts.length ~/ 3;
@@ -60,12 +65,9 @@ class Bev3DObjectMesh {
       projectedPts[i] = camera.project(worldX, worldY, worldZ, size);
     }
 
-    // 2. Siapkan poligon terproyeksi dengan pencahayaan studio clay grey
+    // 2. Siapkan poligon terproyeksi dengan pencahayaan ADAS 3D
     final projectedFaces = <_ProjectedAdasFace>[];
 
-    // Warna dasar abu-abu clay studio (Sesuai referensi '3.0 ADAS 视觉识别模型')
-    // Mode terang: abu-abu perak studio cerah (#CBD5E1 - #E2E8F0)
-    // Mode gelap: abu-abu titanium matte (#8A95A5 - #94A3B8)
     final double baseTone = isLight ? 210.0 : 155.0;
     final double ambient = isLight ? 0.40 : 0.46;
 
@@ -105,31 +107,38 @@ class Bev3DObjectMesh {
       final Color fillColor;
 
       if (face.isWheel) {
-        // Ban / Roda: Matte dark graphite/charcoal (#242B35) dengan shading
-        final v = (42 * intensity).round().clamp(18, 65);
+        // Ban / Roda: Matte dark graphite/charcoal dengan shading
+        final v = (45 * intensity).round().clamp(20, 70);
         fillColor = Color.fromARGB(245, v, v + 2, v + 5);
       } else if (face.isGlass) {
-        // Kaca Film Otomotif: Dark tinted slate (#334155 / #475569)
-        final r = (50 * intensity).round().clamp(25, 80);
-        final g = (65 * intensity).round().clamp(35, 100);
-        final b = (85 * intensity).round().clamp(45, 125);
-        fillColor = Color.fromARGB(225, r, g, b);
+        // Kaca Film Otomotif: Dark tinted dengan sentuhan warna kelas
+        final classColor = obj.objectClass.primaryColor;
+        final r = ((classColor.r * 255.0 * 0.35 + 40) * intensity).round().clamp(20, 90);
+        final g = ((classColor.g * 255.0 * 0.35 + 50) * intensity).round().clamp(25, 110);
+        final b = ((classColor.b * 255.0 * 0.35 + 70) * intensity).round().clamp(35, 130);
+        fillColor = Color.fromARGB(220, r, g, b);
       } else if (face.isLightAccent) {
-        // Aksen Lampu Halus (tidak mencolok, tetap elegan bernuansa studio)
+        // Aksen Lampu Halus (LED Frost White depan / Ruby Red belakang)
         final avgZ = indices.fold<double>(0.0, (acc, idx) => acc + rawVerts[idx * 3 + 2]) / indices.length;
         if (avgZ > 0) {
-          // Lampu Depan: Frost LED White
-          fillColor = const Color(0xFFF1F5F9);
+          fillColor = const Color(0xFFE0F2FE); // Lampu Depan: Frost LED White
         } else {
-          // Lampu Belakang: Dark Ruby Red
-          fillColor = const Color(0xFFE11D48);
+          fillColor = const Color(0xFFF43F5E); // Lampu Belakang: Ruby Red
         }
       } else {
-        // Bodi Studio Clay Grey (Persis gambar referensi abu-abu)
-        final val = (baseTone * intensity).round().clamp(0, 255);
-        final alpha = isLight ? 245 : 225;
-        // Memberi sedikit nuansa perak netral dingin khas CAD
-        fillColor = Color.fromARGB(alpha, val, (val * 1.01).round().clamp(0, 255), (val * 1.03).round().clamp(0, 255));
+        // Bodi 3D Model: Warna berbasis kelas objek dengan pencahayaan Lambertian
+        // Menghasilkan tampilan 3D solid berwarna di dalam balok transparan sesuai gambar referensi
+        final classColor = obj.objectClass.primaryColor;
+        final baseR = (classColor.r * 255.0);
+        final baseG = (classColor.g * 255.0);
+        final baseB = (classColor.b * 255.0);
+
+        final r = ((baseR * 0.82 + baseTone * 0.18) * intensity).round().clamp(0, 255);
+        final g = ((baseG * 0.82 + baseTone * 0.18) * intensity).round().clamp(0, 255);
+        final b = ((baseB * 0.82 + baseTone * 0.18) * intensity).round().clamp(0, 255);
+
+        final alpha = isLight ? 235 : 220;
+        fillColor = Color.fromARGB(alpha, r, g, b);
       }
 
       projectedFaces.add(_ProjectedAdasFace(

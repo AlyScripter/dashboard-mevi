@@ -60,8 +60,9 @@ class _BevPageState extends State<BevPage> {
                     final steeringAngle = steerSnap.data ?? 0.0;
                     return StreamBuilder<double>(
                       stream: RosService().speedometerRosStream,
+                      initialData: RosService().currentSpeed,
                       builder: (context, speedSnap) {
-                        final speed = speedSnap.data ?? 20.0;
+                        final speed = speedSnap.data ?? 0.0;
                         return PerspectiveBev3DWidget(
                           steeringAngle: steeringAngle,
                           speed: speed,

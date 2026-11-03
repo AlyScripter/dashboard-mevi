@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../services/data_source_service.dart';
 import '../../../services/ros_service.dart';
+import '../../pages/navigation/widgets/in_app_notification_widget.dart';
 
 /// Compact Data Source Settings Widget for Left Panel
 /// Switch between Live (Vehicle) and Rosbag modes
@@ -681,12 +682,26 @@ class _DataSourceSettingsWidgetState extends State<DataSourceSettingsWidget> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(fontSize: 12)),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final lower = message.toLowerCase();
+    NotificationKind kind = NotificationKind.info;
+    String title = 'Informasi';
+    if (lower.contains('fail') || lower.contains('not found') || lower.contains('error')) {
+      kind = NotificationKind.error;
+      title = 'Terjadi Kesalahan';
+    } else if (lower.contains('saved') || lower.contains('success')) {
+      kind = NotificationKind.success;
+      title = 'Berhasil';
+    } else if (lower.contains('please')) {
+      kind = NotificationKind.warning;
+      title = 'Peringatan';
+    }
+
+    CenterNotification.show(
+      context,
+      title: title,
+      message: message,
+      kind: kind,
+      duration: const Duration(seconds: 3),
     );
   }
 }

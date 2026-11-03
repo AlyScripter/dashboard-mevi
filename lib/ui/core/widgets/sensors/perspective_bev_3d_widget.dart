@@ -22,7 +22,7 @@ class PerspectiveBev3DWidget extends StatefulWidget {
   const PerspectiveBev3DWidget({
     super.key,
     this.steeringAngle = 0.0,
-    this.speed = 20.0,
+    this.speed = 0.0,
     this.initialScenario = BevScenarioType.straight,
   });
 

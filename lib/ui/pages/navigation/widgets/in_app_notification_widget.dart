@@ -69,8 +69,8 @@ class CenterNotificationCard extends StatelessWidget {
         // Warna kartu sesuai tema
         final cardBg = isDark ? const Color(0xFF121622) : Colors.white;
         final borderColor = isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : const Color(0xFFE2E8F0);
+            ? accentColor.withValues(alpha: 0.45)
+            : accentColor.withValues(alpha: 0.38);
         final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
         final textColor = isDark
             ? (title != null && title!.isNotEmpty
@@ -83,7 +83,7 @@ class CenterNotificationCard extends StatelessWidget {
 
         final screenWidth = MediaQuery.sizeOf(context).width;
         final isFullHD = screenWidth >= 1900;
-        final maxCardWidth = isFullHD ? 420.0 : 360.0;
+        final maxCardWidth = isFullHD ? 460.0 : 400.0;
 
         return GestureDetector(
           onTap: onDismiss,
@@ -97,16 +97,17 @@ class CenterNotificationCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor, width: 1.2),
+              border: Border.all(color: borderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: accentColor.withValues(alpha: isDark ? 0.15 : 0.06),
-                  blurRadius: 16,
+                  color: accentColor.withValues(alpha: isDark ? 0.22 : 0.16),
+                  blurRadius: 18,
+                  spreadRadius: 1,
                   offset: const Offset(0, 3),
                 ),
               ],
@@ -160,7 +161,7 @@ class CenterNotificationCard extends StatelessWidget {
                           color: textColor,
                           height: 1.3,
                         ),
-                        maxLines: 3,
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],

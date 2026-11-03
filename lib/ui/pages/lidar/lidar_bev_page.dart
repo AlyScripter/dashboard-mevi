@@ -125,51 +125,6 @@ class LidarBevPage extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  const SizedBox(width: 8),
-
-                  // Real-time status pill
-                  Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cardBorder, width: 1.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cardShadow,
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF16A34A),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'LIVE 3D SDC',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: isLight
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFF4ADE80),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),

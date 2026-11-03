@@ -21,8 +21,9 @@ class SpeedDisplayWidget extends StatelessWidget {
 
     return StreamBuilder<double>(
       stream: RosService().speedometerRosStream,
+      initialData: RosService().currentSpeed,
       builder: (context, snapshot) {
-        final speed = (snapshot.data ?? 20).clamp(0, maxSpeed).toDouble();
+        final speed = (snapshot.data ?? 0.0).clamp(0.0, maxSpeed).toDouble();
         final progress = (speed / maxSpeed).clamp(0.0, 1.0);
 
         return SizedBox(

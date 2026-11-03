@@ -7,7 +7,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:dashboardmevi/services/ros_service.dart';
+import 'package:dashboardmevi/services/voice_navigation_service.dart';
 import 'package:dashboardmevi/ui/core/widgets/sensors/car_3d_viewer_widget.dart';
+import 'package:dashboardmevi/ui/core/widgets/sensors/navigation_hud_banner.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:dashboardmevi/core/theme/colors.dart';
 
@@ -290,6 +292,12 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   // Hasil snapshot model 3D ego (kalau berhasil, WebView dibuang).
   ui.Image? _egoImage;
 
+  // Voice Navigation Assistant
+  bool _isVoiceMuted = false;
+  StreamSubscription<bool>? _muteSub;
+  String? _lastAnnouncedManeuverKey;
+  DateTime? _lastSpokenTime;
+
   @override
   void initState() {
     super.initState();
@@ -300,10 +308,30 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
     final cached = RosService().bevClassColorMap;
     if (cached != null && cached.isNotEmpty) _classColors = cached;
 
+    _isVoiceMuted = VoiceNavigationService().isMuted;
+    _muteSub = VoiceNavigationService().muteStream.listen((muted) {
+      if (mounted) setState(() => _isVoiceMuted = muted);
+    });
+
     _frameSub = RosService().bevFrameStream.listen(_onFrame);
     _classColorSub = RosService().bevClassColorMapStream.listen((colors) {
       if (!mounted || colors.isEmpty) return;
       setState(() => _classColors = colors);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        VoiceNavigationService().announce(
+          const NavigationInstruction(
+            text: 'Live Autonomous Navigation Active',
+            spokenText: 'Live autonomous navigation active',
+            distanceText: 'Live',
+            icon: LucideIcons.radio,
+            bannerColor: Color(0xFF00C853),
+          ),
+          playVoice: true,
+        );
+      }
     });
   }
 
@@ -311,11 +339,14 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   void dispose() {
     _frameSub?.cancel();
     _classColorSub?.cancel();
+    _muteSub?.cancel();
     _yawAnim.dispose();
     _frame.dispose();
     _cam.dispose();
     _egoYaw.dispose();
     _egoImage?.dispose();
+    VoiceNavigationService().stop();
+    VoiceNavigationService().clearInstruction();
     super.dispose();
   }
 
@@ -329,6 +360,7 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
     if (data == null) return;
     _frame.value = data;
     if (_egoFollowWaypoint) _updateEgoHeading(data.waypoints);
+    _updateLiveVoiceAndInstruction(data.waypoints, data.objects);
   }
 
   /// Parse payload Fase 5 -> struktur siap gambar. Titik dikelompokkan per
@@ -491,6 +523,184 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
   void _tickYaw() {
     final t = Curves.easeOutCubic.transform(_yawAnim.value);
     _egoYaw.value = _yawFrom + (_yawTo - _yawFrom) * t;
+  }
+
+  // -------------------------------------------------------------------
+  // Dynamic Live Voice Navigation & Instruction Tracking
+  // -------------------------------------------------------------------
+
+  void _updateLiveVoiceAndInstruction(
+    Float32List waypoints,
+    List<_BevObject> objects,
+  ) {
+    // 1. Cek rintangan/objek tepat di depan jalur mobil ego (Prioritas Tertinggi)
+    if (objects.isNotEmpty) {
+      _BevObject? hazardAhead;
+      for (final obj in objects) {
+        // center.x adalah jarak maju (+x ke depan mobil), center.y adalah jarak lateral
+        if (obj.center.x > 0.8 &&
+            obj.center.x < 7.5 &&
+            obj.center.y.abs() < 1.4) {
+          hazardAhead = obj;
+          break;
+        }
+      }
+
+      if (hazardAhead != null) {
+        final distStr = hazardAhead.center.x.toStringAsFixed(1);
+        final distInt = math.max(1, hazardAhead.center.x.round());
+        String label = 'Vehicle';
+        if (hazardAhead.kind == _ObjKind.person) {
+          label = 'Pedestrian';
+        } else if (hazardAhead.kind == _ObjKind.cyclist ||
+            hazardAhead.kind == _ObjKind.motorcycle) {
+          label = 'Bicycle';
+        } else if (hazardAhead.className.isNotEmpty &&
+            hazardAhead.className != '?') {
+          label = hazardAhead.className;
+        }
+
+        final instruction = NavigationInstruction(
+          text: 'Warning: $label ahead (${distStr}m)',
+          spokenText: 'Warning, $label ahead in $distInt meters',
+          distanceText: '${distStr}m',
+          icon: LucideIcons.octagonAlert,
+          bannerColor: const Color(0xFFD50000),
+          isWarning: true,
+        );
+        _triggerLiveAnnounce(
+          instruction,
+          'hazard_${hazardAhead.id ?? hazardAhead.center.x.toInt()}',
+        );
+        return;
+      }
+    }
+
+    // 2. Analisis kurvatur lintasan & manuver dari waypoints
+    final n = waypoints.length ~/ 2;
+    if (n < 2) return;
+
+    // Cari titik acuan terdekat dari mobil ego (>= 2.0 meter)
+    int nearIdx = 0;
+    for (int i = 0; i < n; i++) {
+      final x = waypoints[i * 2];
+      final y = waypoints[i * 2 + 1];
+      if (x * x + y * y >= 4.0) {
+        nearIdx = i;
+        break;
+      }
+    }
+    final nearX = waypoints[nearIdx * 2];
+    final nearY = waypoints[nearIdx * 2 + 1];
+    final nearAngle = math.atan2(nearY, nearX);
+
+    double maxDeflectionRad = 0.0;
+    double maneuverDistMeters = 15.0;
+
+    for (int i = nearIdx + 1; i < n; i++) {
+      final x = waypoints[i * 2];
+      final y = waypoints[i * 2 + 1];
+      final dist = math.sqrt(x * x + y * y);
+      if (dist > 28.0) break;
+
+      final angle = math.atan2(y, x);
+      var diff = angle - nearAngle;
+      while (diff > math.pi) {
+        diff -= 2 * math.pi;
+      }
+      while (diff < -math.pi) {
+        diff += 2 * math.pi;
+      }
+
+      if (diff.abs() > maxDeflectionRad.abs()) {
+        maxDeflectionRad = diff;
+        maneuverDistMeters = dist;
+      }
+    }
+
+    final maxDeflectionDeg = maxDeflectionRad * 180.0 / math.pi;
+    final distInt = math.max(2, maneuverDistMeters.round());
+
+    NavigationInstruction instruction;
+    String maneuverKey;
+
+    if (maxDeflectionDeg > 18.0) {
+      // Positif di koordinat ROS (y ke kiri) = Belok Kiri
+      if (maneuverDistMeters > 7.0) {
+        instruction = NavigationInstruction(
+          text: 'In $distInt meters, turn left',
+          spokenText: 'In $distInt meters, turn left',
+          distanceText: '${distInt}m',
+          icon: LucideIcons.cornerUpLeft,
+          bannerColor: const Color(0xFF00B0FF),
+        );
+        maneuverKey = 'turn_left_${(distInt / 5).round() * 5}';
+      } else {
+        instruction = const NavigationInstruction(
+          text: 'Turn left now',
+          spokenText: 'Turn left now',
+          distanceText: 'Turn',
+          icon: LucideIcons.arrowUpLeft,
+          bannerColor: Color(0xFF40C4FF),
+        );
+        maneuverKey = 'turn_left_now';
+      }
+    } else if (maxDeflectionDeg < -18.0) {
+      // Negatif di koordinat ROS (y ke kanan) = Belok Kanan
+      if (maneuverDistMeters > 7.0) {
+        instruction = NavigationInstruction(
+          text: 'In $distInt meters, turn right',
+          spokenText: 'In $distInt meters, turn right',
+          distanceText: '${distInt}m',
+          icon: LucideIcons.cornerUpRight,
+          bannerColor: const Color(0xFF00C853),
+        );
+        maneuverKey = 'turn_right_${(distInt / 5).round() * 5}';
+      } else {
+        instruction = const NavigationInstruction(
+          text: 'Turn right now',
+          spokenText: 'Turn right now',
+          distanceText: 'Turn',
+          icon: LucideIcons.arrowUpRight,
+          bannerColor: Color(0xFF00E676),
+        );
+        maneuverKey = 'turn_right_now';
+      }
+    } else {
+      // Lurus
+      instruction = const NavigationInstruction(
+        text: 'Continue straight on route',
+        spokenText: 'Continue straight on route',
+        distanceText: 'Straight',
+        icon: LucideIcons.arrowUp,
+        bannerColor: Color(0xFF0288D1),
+      );
+      maneuverKey = 'straight';
+    }
+
+    _triggerLiveAnnounce(instruction, maneuverKey);
+  }
+
+  void _triggerLiveAnnounce(NavigationInstruction instruction, String key) {
+    if (!mounted) return;
+
+    // 1. Update visual HUD banner in realtime
+    VoiceNavigationService().announce(instruction, playVoice: false);
+
+    // 2. Audio TTS: Debounce repeat audio announcements to prevent spam
+    final now = DateTime.now();
+    final isNewManeuver = _lastAnnouncedManeuverKey != key;
+    final timeSinceLastSpoken = _lastSpokenTime == null
+        ? 999
+        : now.difference(_lastSpokenTime!).inSeconds;
+
+    if (instruction.isWarning ||
+        (isNewManeuver && timeSinceLastSpoken >= 5) ||
+        timeSinceLastSpoken >= 12) {
+      _lastAnnouncedManeuverKey = key;
+      _lastSpokenTime = now;
+      VoiceNavigationService().announce(instruction, playVoice: true);
+    }
   }
 
   // -------------------------------------------------------------------
@@ -783,6 +993,16 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
                     ),
                   ),
 
+                  // Top Center: Navigation HUD Banner
+                  Positioned(
+                    top: 12,
+                    left: 0,
+                    right: 0,
+                    child: const Center(
+                      child: NavigationHudBanner(),
+                    ),
+                  ),
+
                   // Top Right: Class Legend styled like Data page cards
                   Positioned(
                     right: 12,
@@ -790,6 +1010,16 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
                     child: _ClassLegend(
                       classColors: _classColors,
                       isLight: isLight,
+                    ),
+                  ),
+
+                  // Bottom Center: Live ROS & Voice Assistant Toggle Capsule
+                  Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _buildBottomCapsule(isLight),
                     ),
                   ),
 
@@ -863,6 +1093,174 @@ class _BevPointCloudViewState extends State<BevPointCloudView>
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomCapsule(bool isLight) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      decoration: BoxDecoration(
+        color: isLight ? Colors.white : const Color(0xFF131B2B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isLight
+              ? const Color(0xFFE2E8F0)
+              : const Color(0xFF1E293B),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isLight
+                ? const Color(0x0A0F172A)
+                : Colors.black.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // LIVE ROS status indicator
+          ValueListenableBuilder<_BevFrameData?>(
+            valueListenable: _frame,
+            builder: (context, d, _) {
+              final isConnected = d != null;
+              final Color dotColor = isConnected
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFF59E0B);
+              final Color textColor = isConnected
+                  ? (isLight ? const Color(0xFF15803D) : const Color(0xFF4ADE80))
+                  : (isLight ? const Color(0xFFB45309) : const Color(0xFFFBBF24));
+              final Color bgColor = isConnected
+                  ? (isLight ? const Color(0xFFDCFCE7) : const Color(0x2A10B981))
+                  : (isLight ? const Color(0xFFFEF3C7) : const Color(0x2AF59E0B));
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isConnected ? bgColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: dotColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: dotColor.withValues(alpha: 0.6),
+                            blurRadius: 5,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      'LIVE ROS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: textColor,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+
+          // Divider Vertikal
+          Container(
+            width: 1,
+            height: 20,
+            color: isLight
+                ? const Color(0xFFE2E8F0)
+                : Colors.white.withValues(alpha: 0.12),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          const SizedBox(width: 4),
+
+          // Tombol Speaker (Mute / Unmute Suara Navigasi Otonom)
+          _buildSpeakerButton(isLight),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeakerButton(bool isLight) {
+    final isMuted = _isVoiceMuted;
+
+    final Color activeColor =
+        isMuted ? const Color(0xFFEF4444) : const Color(0xFF2563EB);
+    final Color bgColor = isMuted
+        ? (isLight ? const Color(0xFFFEF2F2) : const Color(0x1AEF4444))
+        : (isLight ? const Color(0xFFEFF6FF) : const Color(0x1A2563EB));
+    final Color borderColor = isMuted
+        ? (isLight
+            ? const Color(0xFFFECACA)
+            : const Color(0xFFEF4444).withValues(alpha: 0.4))
+        : (isLight
+            ? const Color(0xFFBFDBFE)
+            : const Color(0xFF2563EB).withValues(alpha: 0.4));
+    final Color textColor = isMuted
+        ? (isLight ? const Color(0xFFDC2626) : const Color(0xFFF87171))
+        : (isLight ? const Color(0xFF2563EB) : const Color(0xFF60A5FA));
+
+    return Tooltip(
+      message: isMuted ? 'Unmute Navigation Voice' : 'Mute Navigation Voice',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            VoiceNavigationService().toggleMute();
+            setState(() {
+              _isVoiceMuted = VoiceNavigationService().isMuted;
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: borderColor,
+                width: 1.0,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isMuted ? LucideIcons.volumeX : LucideIcons.volume2,
+                  size: 14,
+                  color: activeColor,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  isMuted ? 'MUTED' : 'VOICE',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1249,6 +1647,7 @@ class _PointCloudPainter extends CustomPainter {
 
   /// Garis trajectory (waypoint Fase 1b), z=0.05 supaya tidak tenggelam
   /// di grid. 1x drawPath + 1x drawRawPoints, bukan 1 draw per segmen.
+  /// Visualisasi dipangkas saat dirender menjadi 50% panjang dari data waypoint.
   void _drawWaypointPath(
     Canvas canvas,
     Size size,
@@ -1258,11 +1657,14 @@ class _PointCloudPainter extends CustomPainter {
     final n = wp.length ~/ 2;
     if (n < 2) return;
 
-    final buf = cache.scratchFor(n * 2);
+    // Pangkas visualisasi saat dirender menjadi 50% (setengah) panjang
+    final renderN = math.max(2, n ~/ 2);
+
+    final buf = cache.scratchFor(renderN * 2);
     final path = Path();
     bool pen = false;
     int w = 0;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < renderN; i++) {
       final p = camera.project(wp[i * 2], wp[i * 2 + 1], 0.05, size);
       if (p == null) {
         pen = false;

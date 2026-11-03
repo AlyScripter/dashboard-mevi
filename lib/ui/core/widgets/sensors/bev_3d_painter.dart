@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'bev_3d_camera.dart';
+import 'bev_3d_object_mesh.dart';
 import 'models/detected_3d_object.dart';
 import 'models/bev_scenario_type.dart';
 
@@ -1273,8 +1274,14 @@ class Bev3DPainter extends CustomPainter {
       canvas.drawPath(groundPath, groundShadowPaint);
     }
 
-    // B. Kubus Bounding Box 3D Semi-transparan (Gaya Streetscape.gl / AV 3D Bounding Box)
-    // Sesuai permintaan user: Objek di dalam box ditiadakan, murni 3D Wireframe Box & Badges.
+    // B. Render Model 3D Objek di dalam Balok Bounding Box (Sesuai Referensi ADAS / Pony.ai)
+    Bev3DObjectMesh.drawObjectMesh(
+      canvas: canvas,
+      size: size,
+      camera: camera,
+      obj: obj,
+      isLight: isLight,
+    );
 
     // C. Sisi-Sisi Poligon Kubus Pembungkus (Translucent Bounding Cage)
     const faces = [
