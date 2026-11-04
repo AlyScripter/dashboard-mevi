@@ -1,0 +1,5 @@
+Title: Monochrome Portrait In Black
+Author: restore50 (https://sketchfab.com/restore50)
+Source: https://sketchfab.com/3d-models/monochrome-portrait-in-black-d2ea7b0eab3b4405928354ea2fb9af7a
+License: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+Modifications: Decimated from ~209k to ~30k triangles; textures removed and replaced by flat monochrome grey materials (skin/clothes/hair/shoes); reoriented (front = -Z, Y-up, origin at ground centre).

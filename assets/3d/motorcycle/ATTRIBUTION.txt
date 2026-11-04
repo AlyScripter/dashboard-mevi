@@ -1,0 +1,5 @@
+Model: Three Cylinder Naked Street Bike
+Author: Jamie Hamel-Smith (https://sketchfab.com/jamie3d)
+Source: https://sketchfab.com/3d-models/three-cylinder-naked-street-bike-0897a975845647919728095d117a6255
+License: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+Modifications: decimated from ~566k to ~32k triangles; bolts, cables, hoses and small hidden hardware removed; chain simplified; recoloured to monochrome grey; scaled to metres (front = -Z, Y-up, origin at ground centre).

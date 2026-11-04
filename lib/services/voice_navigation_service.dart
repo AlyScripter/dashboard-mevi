@@ -133,6 +133,22 @@ class VoiceNavigationService {
         }).catchError((e) {
           debugPrint('VoiceNavigationService speak error: $e');
         });
+      } else if (Platform.isLinux) {
+        // Native speech-dispatcher on Ubuntu / Linux
+        Process.start('spd-say', [cleanText]).then((process) {
+          if (generation != _speechGeneration) {
+            _killProcessInstance(process);
+            return;
+          }
+          _activeSpeechProcess = process;
+          process.exitCode.then((_) {
+            if (_activeSpeechProcess == process) {
+              _activeSpeechProcess = null;
+            }
+          });
+        }).catchError((e) {
+          debugPrint('VoiceNavigationService speak error (Linux): $e');
+        });
       }
     } catch (e) {
       debugPrint('VoiceNavigationService failed: $e');
@@ -145,6 +161,9 @@ class VoiceNavigationService {
       process.kill();
       if (Platform.isWindows && pid > 0) {
         Process.run('taskkill', ['/F', '/T', '/PID', '$pid'])
+            .catchError((_) => ProcessResult(pid, -1, '', ''));
+      } else if (Platform.isLinux && pid > 0) {
+        Process.run('kill', ['-9', '$pid'])
             .catchError((_) => ProcessResult(pid, -1, '', ''));
       }
     } catch (_) {}

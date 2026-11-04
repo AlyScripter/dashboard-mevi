@@ -1,9 +1,16 @@
 """
 Generates lib/services/adas_mesh_service.dart with pre-compiled 3D mesh tables
-for Car, Motorcycle, Pedestrian, Bicycle, and Truck.
+for Car (SUV from assets/3d/Suv Mobil/), Motorcycle (assets/3d/motorcycle/), Pedestrian (assets/3d/Pedestrian/), Bicycle, and Truck.
 """
 import os
+import sys
 import math
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from generate_suv_mesh import generate_suv_mesh
+from generate_motorcycle_mesh import generate_motorcycle_mesh
+from generate_pedestrian_mesh import generate_pedestrian_mesh
 
 def parse_obj(filepath):
     verts = []
@@ -36,17 +43,18 @@ def calc_normal(p0, p1, p2):
     return (nx / l, ny / l, nz / l)
 
 def generate_dart_mesh_service():
-    models = {
-        "car": "assets/models/adas/car.obj",
-        "motorcycle": "assets/models/adas/motorcycle.obj",
-        "pedestrian": "assets/models/adas/pedestrian.obj",
+    suv_verts, suv_faces = generate_suv_mesh()
+    moto_verts, moto_faces = generate_motorcycle_mesh()
+    ped_verts, ped_faces = generate_pedestrian_mesh()
+
+    other_models = {
         "truck": "assets/models/adas/truck.obj",
         "bicycle": "assets/models/adas/bicycle.obj",
     }
 
     dart = []
     dart.append("// GENERATED ADAS 3.0 STUDIO CLAY 3D MESH SERVICE -- ZERO LATENCY, 60 FPS")
-    dart.append("// Sesuai referensi resmi '3.0 ADAS 视觉识别模型' (Matte Clay Grey).")
+    dart.append("// Upgraded with authentic high-fidelity SUV, Motorcycle, and Pedestrian models from assets/3d/.")
     dart.append("import 'dart:typed_data';")
     dart.append("import '../ui/core/widgets/sensors/models/detected_3d_object.dart';")
     dart.append("")
@@ -56,6 +64,7 @@ def generate_dart_mesh_service():
     dart.append("  final bool isGlass;")
     dart.append("  final bool isWheel;")
     dart.append("  final bool isLightAccent;")
+    dart.append("  final int matId;")
     dart.append("")
     dart.append("  const AdasMeshFace({")
     dart.append("    required this.indices,")
@@ -65,6 +74,7 @@ def generate_dart_mesh_service():
     dart.append("    this.isGlass = false,")
     dart.append("    this.isWheel = false,")
     dart.append("    this.isLightAccent = false,")
+    dart.append("    this.matId = 0,")
     dart.append("  });")
     dart.append("}")
     dart.append("")
@@ -82,7 +92,92 @@ def generate_dart_mesh_service():
     dart.append("  AdasMeshService._();")
     dart.append("")
 
-    for name, path in models.items():
+    # --- SUV CAR MESH ---
+    dart.append(f"  // ==========================================================================")
+    dart.append(f"  // CAR / SUV MESH DATA ({len(suv_verts)} vertices, {len(suv_faces)} faces)")
+    dart.append(f"  // High-fidelity mesh matching assets/3d/Suv Mobil/suv_model_gray_lite.obj")
+    dart.append(f"  // ==========================================================================")
+    v_str = ", ".join([f"{coord:.4f}" for v in suv_verts for coord in v])
+    dart.append(f"  static final Float32List _carVertices = Float32List.fromList([")
+    dart.append(f"    {v_str}")
+    dart.append("  ]);")
+    dart.append("")
+
+    dart.append(f"  static final List<AdasMeshFace> _carFaces = [")
+    for f in suv_faces:
+        indices_str = ", ".join(map(str, f['indices']))
+        props = []
+        if f['isGlass']: props.append("isGlass: true")
+        if f['isWheel']: props.append("isWheel: true")
+        if f['isLightAccent']: props.append("isLightAccent: true")
+        if f.get('matId', 0) != 0: props.append(f"matId: {f['matId']}")
+        extra = (", " + ", ".join(props)) if props else ""
+        dart.append(f"    AdasMeshFace(indices: [{indices_str}], nx: {f['nx']:.3f}, ny: {f['ny']:.3f}, nz: {f['nz']:.3f}{extra}),")
+    dart.append("  ];")
+    dart.append("")
+    dart.append(f"  static final AdasMeshData carMesh = AdasMeshData(")
+    dart.append(f"    vertices: _carVertices,")
+    dart.append(f"    faces: _carFaces,")
+    dart.append("  );")
+    dart.append("")
+
+    # --- MOTORCYCLE MESH ---
+    dart.append(f"  // ==========================================================================")
+    dart.append(f"  // MOTORCYCLE MESH DATA ({len(moto_verts)} vertices, {len(moto_faces)} faces)")
+    dart.append(f"  // High-fidelity mesh matching assets/3d/motorcycle/motorcycle_model_gray_lite.obj")
+    dart.append(f"  // ==========================================================================")
+    moto_v_str = ", ".join([f"{coord:.4f}" for v in moto_verts for coord in v])
+    dart.append(f"  static final Float32List _motorcycleVertices = Float32List.fromList([")
+    dart.append(f"    {moto_v_str}")
+    dart.append("  ]);")
+    dart.append("")
+
+    dart.append(f"  static final List<AdasMeshFace> _motorcycleFaces = [")
+    for f in moto_faces:
+        indices_str = ", ".join(map(str, f['indices']))
+        props = []
+        if f['isGlass']: props.append("isGlass: true")
+        if f['isWheel']: props.append("isWheel: true")
+        if f['isLightAccent']: props.append("isLightAccent: true")
+        if f.get('matId', 0) != 0: props.append(f"matId: {f['matId']}")
+        extra = (", " + ", ".join(props)) if props else ""
+        dart.append(f"    AdasMeshFace(indices: [{indices_str}], nx: {f['nx']:.3f}, ny: {f['ny']:.3f}, nz: {f['nz']:.3f}{extra}),")
+    dart.append("  ];")
+    dart.append("")
+    dart.append(f"  static final AdasMeshData motorcycleMesh = AdasMeshData(")
+    dart.append(f"    vertices: _motorcycleVertices,")
+    dart.append(f"    faces: _motorcycleFaces,")
+    dart.append("  );")
+    dart.append("")
+
+    # --- PEDESTRIAN MESH ---
+    dart.append(f"  // ==========================================================================")
+    dart.append(f"  // PEDESTRIAN MESH DATA ({len(ped_verts)} vertices, {len(ped_faces)} faces)")
+    dart.append(f"  // High-fidelity mesh matching assets/3d/Pedestrian/pedestrian_model_gray_lite.obj")
+    dart.append(f"  // ==========================================================================")
+    ped_v_str = ", ".join([f"{coord:.4f}" for v in ped_verts for coord in v])
+    dart.append(f"  static final Float32List _pedestrianVertices = Float32List.fromList([")
+    dart.append(f"    {ped_v_str}")
+    dart.append("  ]);")
+    dart.append("")
+
+    dart.append(f"  static final List<AdasMeshFace> _pedestrianFaces = [")
+    for f in ped_faces:
+        indices_str = ", ".join(map(str, f['indices']))
+        props = []
+        if f.get('matId', 0) != 0: props.append(f"matId: {f['matId']}")
+        extra = (", " + ", ".join(props)) if props else ""
+        dart.append(f"    AdasMeshFace(indices: [{indices_str}], nx: {f['nx']:.3f}, ny: {f['ny']:.3f}, nz: {f['nz']:.3f}{extra}),")
+    dart.append("  ];")
+    dart.append("")
+    dart.append(f"  static final AdasMeshData pedestrianMesh = AdasMeshData(")
+    dart.append(f"    vertices: _pedestrianVertices,")
+    dart.append(f"    faces: _pedestrianFaces,")
+    dart.append("  );")
+    dart.append("")
+
+    # --- OTHER MODELS ---
+    for name, path in other_models.items():
         verts, faces = parse_obj(path)
         dart.append(f"  // ==========================================================================")
         dart.append(f"  // {name.upper()} MESH DATA ({len(verts)} vertices, {len(faces)} faces)")
@@ -107,22 +202,8 @@ def generate_dart_mesh_service():
 
             avg_y = sum(verts[i][1] for i in f) / len(f)
             avg_z = sum(verts[i][2] for i in f) / len(f)
-            avg_abs_x = sum(abs(verts[i][0]) for i in f) / len(f)
 
-            if name == "car":
-                # First 96 vertices are wheels
-                if max(f) < 96:
-                    is_wheel = True
-                elif 0.52 < avg_y < 0.98 and -0.34 < avg_z < 0.08 and avg_abs_x < 0.44:
-                    is_glass = True
-                elif avg_z > 0.45 and 0.32 < avg_y < 0.46:
-                    is_light = True
-                elif avg_z < -0.46 and 0.38 < avg_y < 0.50:
-                    is_light = True
-            elif name == "motorcycle":
-                if max(f) < 48:
-                    is_wheel = True
-            elif name == "truck":
+            if name == "truck":
                 if max(f) < 144:
                     is_wheel = True
                 elif 0.50 < avg_y < 0.90 and avg_z > 0.16:
@@ -172,4 +253,5 @@ def generate_dart_mesh_service():
         f.write(content)
     print(f"Generated {out_file}: {len(content)} bytes")
 
-generate_dart_mesh_service()
+if __name__ == '__main__':
+    generate_dart_mesh_service()

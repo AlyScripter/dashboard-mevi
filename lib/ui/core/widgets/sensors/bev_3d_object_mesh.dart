@@ -106,7 +106,76 @@ class Bev3DObjectMesh {
 
       final Color fillColor;
 
-      if (face.isWheel) {
+      if (obj.objectClass == Detected3DClass.car ||
+          obj.objectClass == Detected3DClass.motorcycle ||
+          obj.objectClass == Detected3DClass.pedestrian) {
+        // Material otentik sesuai file .mtl (suv, motorcycle, pedestrian)
+        switch (face.matId) {
+          case 8: // skin (Pedestrian Kulit - Studio Light Grey)
+            final r = (180 * intensity).round().clamp(40, 240);
+            final g = (189 * intensity).round().clamp(40, 245);
+            final b = (194 * intensity).round().clamp(40, 250);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+          case 9: // cloth (Pedestrian Pakaian - Charcoal Fabric)
+            final r = (89 * intensity).round().clamp(25, 140);
+            final g = (98 * intensity).round().clamp(25, 150);
+            final b = (106 * intensity).round().clamp(25, 160);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+          case 10: // hair (Pedestrian Rambut - Dark Graphite)
+            final r = (62 * intensity).round().clamp(18, 100);
+            final g = (68 * intensity).round().clamp(18, 105);
+            final b = (73 * intensity).round().clamp(18, 110);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+          case 11: // shoe (Pedestrian Sepatu - Sneaker Light Grey)
+            final r = (210 * intensity).round().clamp(50, 255);
+            final g = (216 * intensity).round().clamp(50, 255);
+            final b = (219 * intensity).round().clamp(50, 255);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+          case 3: // glass (Kaca Film Otomotif Gelap)
+            final r = (120 * intensity).round().clamp(25, 160);
+            final g = (130 * intensity).round().clamp(30, 170);
+            final b = (140 * intensity).round().clamp(35, 180);
+            fillColor = Color.fromARGB(195, r, g, b);
+            break;
+          case 4: // lamp_lens (Aksen Lampu LED Depan/Belakang)
+            final avgZ = indices.fold<double>(0.0, (acc, idx) => acc + rawVerts[idx * 3 + 2]) / indices.length;
+            if (avgZ > 0) {
+              fillColor = const Color(0xFFF0F9FF); // Lampu Depan: Frost LED White
+            } else {
+              fillColor = const Color(0xFFEF4444); // Lampu Belakang: Ruby Red LED
+            }
+            break;
+          case 5: // tire (Karet Ban Charcoal)
+            final v = (42 * intensity).round().clamp(18, 65);
+            fillColor = Color.fromARGB(255, v, v + 2, v + 4);
+            break;
+          case 6: // rim (Velg Silver Alloy)
+            final v = (185 * intensity).round().clamp(40, 240);
+            fillColor = Color.fromARGB(255, v, v + 2, v + 5);
+            break;
+          case 7: // disc (Piringan Rem)
+            final v = (130 * intensity).round().clamp(30, 180);
+            fillColor = Color.fromARGB(255, v, v + 2, v + 4);
+            break;
+          case 1: // trim (Dark Graphite Trim)
+          case 2: // liner (Inner Wheel Well)
+            final r = (154 * intensity).round().clamp(30, 230);
+            final g = (164 * intensity).round().clamp(30, 230);
+            final b = (170 * intensity).round().clamp(30, 230);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+          default: // body (Studio Silver Grey Metallic - Kd 0.7725, 0.8039, 0.8235)
+            final r = (197 * intensity).round().clamp(45, 255);
+            final g = (205 * intensity).round().clamp(45, 255);
+            final b = (210 * intensity).round().clamp(45, 255);
+            fillColor = Color.fromARGB(255, r, g, b);
+            break;
+        }
+      } else if (face.isWheel) {
         // Ban / Roda: Matte dark graphite/charcoal dengan shading
         final v = (45 * intensity).round().clamp(20, 70);
         fillColor = Color.fromARGB(245, v, v + 2, v + 5);
@@ -126,8 +195,7 @@ class Bev3DObjectMesh {
           fillColor = const Color(0xFFF43F5E); // Lampu Belakang: Ruby Red
         }
       } else {
-        // Bodi 3D Model: Warna berbasis kelas objek dengan pencahayaan Lambertian
-        // Menghasilkan tampilan 3D solid berwarna di dalam balok transparan sesuai gambar referensi
+        // Bodi 3D Model non-mobil
         final classColor = obj.objectClass.primaryColor;
         final baseR = (classColor.r * 255.0);
         final baseG = (classColor.g * 255.0);

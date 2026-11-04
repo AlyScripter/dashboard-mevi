@@ -151,6 +151,9 @@ flutter:
     - assets/images/
     - assets/3d/
     - assets/3d/car_model.glb
+    - assets/3d/Suv Mobil/
+    - assets/3d/motorcycle/
+    - assets/3d/Pedestrian/
     - assets/internal_route.geojson
     - assets/mevi3d.mtl
     - assets/mevi3d.obj
