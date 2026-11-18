@@ -137,6 +137,10 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       if (_dataSourceService.rosbagFile.isNotEmpty) {
         _selectedRosbag = _dataSourceService.rosbagFile.split('/').last;
       }
+
+      // Load loop and rate options
+      _loopPlayback = _dataSourceService.rosbagLoop;
+      _playbackRate = _dataSourceService.rosbagRate;
     });
   }
 
@@ -161,6 +165,12 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       setState(() {
         _availableRosbags = files;
         _loadingRosbags = false;
+        if (_selectedRosbag == null || !_availableRosbags.contains(_selectedRosbag)) {
+          if (_availableRosbags.isNotEmpty) {
+            _selectedRosbag = _availableRosbags.first;
+            _dataSourceService.setRosbagSettings(rosbagFile: _selectedRosbag);
+          }
+        }
       });
     } catch (e) {
       setState(() => _loadingRosbags = false);
@@ -1167,7 +1177,18 @@ class _DataSourceSectionState extends State<DataSourceSection> {
   Future<void> _handlePlayPause() async {
     if (_rosbagPlayerService.isPlaying) {
       await _rosbagPlayerService.stop();
+      _rosService.setStreamingActive(false);
     } else {
+      // 1. Verifikasi koneksi ROS Bridge sebelum play
+      if (!_rosService.isConnected) {
+        _showSnackBar(
+          'ROS Bridge belum terhubung. Pastikan rosbridge aktif dan tekan Save & Apply terlebih dahulu.',
+          title: 'Koneksi Belum Terhubung',
+          kind: NotificationKind.warning,
+        );
+        return;
+      }
+
       if (_selectedRosbag == null || _selectedRosbag!.isEmpty) {
         _showSnackBar(
           'Silakan pilih file rosbag terlebih dahulu',
@@ -1177,6 +1198,13 @@ class _DataSourceSectionState extends State<DataSourceSection> {
         return;
       }
 
+      // 2. Simpan preferensi loop dan rate terkini
+      await _dataSourceService.setRosbagSettings(
+        rosbagFile: _selectedRosbag,
+        loop: _loopPlayback,
+        rate: _playbackRate,
+      );
+
       final success = await _rosbagPlayerService.play(
         rosbagFile: _selectedRosbag!,
         loop: _loopPlayback,
@@ -1184,9 +1212,10 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       );
 
       if (success) {
+        _rosService.setStreamingActive(true);
         _showSnackBar(
-          'Memutar rosbag: $_selectedRosbag',
-          title: 'Rosbag Playback',
+          'Memutar stream: $_selectedRosbag (Loop: ${_loopPlayback ? "On" : "Off"}, Kecepatan: ${_playbackRate}x)',
+          title: 'Stream Playback',
           kind: NotificationKind.success,
         );
       } else {
@@ -1201,8 +1230,9 @@ class _DataSourceSectionState extends State<DataSourceSection> {
 
   Future<void> _handleStop() async {
     await _rosbagPlayerService.stop();
+    _rosService.setStreamingActive(false);
     _showSnackBar(
-      'Pemutaran rosbag dihentikan',
+      'Pemutaran stream dihentikan & visualisasi dashboard dinonaktifkan',
       title: 'Playback Berhenti',
       kind: NotificationKind.info,
     );
@@ -1515,14 +1545,16 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       _reconnect();
       await Future.delayed(const Duration(seconds: 2));
       if (_rosService.isConnected) {
+        _rosService.setStreamingActive(true);
         _showSnackBar(
-          'Terhubung! ROS: $jetsonIp, Camera: $cameraIp',
+          'Terhubung! Stream aktif. ROS: $jetsonIp, Camera: $cameraIp',
           title: 'Koneksi Berhasil',
           kind: NotificationKind.success,
         );
       } else {
+        _rosService.setStreamingActive(false);
         _showSnackBar(
-          'Koneksi gagal. Periksa IP dan port Jetson.',
+          'Koneksi gagal. Periksa IP dan port Jetson. Dashboard tidak akan render data sampai ROS terhubung.',
           title: 'Koneksi Gagal',
           kind: NotificationKind.error,
         );
@@ -1549,25 +1581,33 @@ class _DataSourceSectionState extends State<DataSourceSection> {
       return;
     }
 
-    await _dataSourceService.setRosbagSettings(rosUrl: rosUrl);
+    await _dataSourceService.setRosbagSettings(
+      rosUrl: rosUrl,
+      rosbagFile: _selectedRosbag,
+      loop: _loopPlayback,
+      rate: _playbackRate,
+    );
 
     if (_dataSourceService.mode == DataSourceMode.rosbag) {
       _showSnackBar(
-        'Menghubungkan ke $rosUrl...',
+        'Menghubungkan ke $rosUrl & menerapkan konfigurasi...',
         title: 'Menghubungkan ke ROS',
         kind: NotificationKind.info,
       );
       _reconnect();
       await Future.delayed(const Duration(seconds: 2));
       if (_rosService.isConnected) {
+        // Alur Sesuai Permintaan: Stream dan render di dashboard baru diaktifkan jika ROSBridge terhubung dan Save & Apply ditekan
+        _rosService.setStreamingActive(true);
         _showSnackBar(
-          'Terhubung ke ROS Bridge successfully!',
-          title: 'Koneksi Berhasil',
+          'Terhubung ke ROS Bridge! Stream & render dashboard diaktifkan (Loop: ${_loopPlayback ? "Aktif" : "Mati"}, Kecepatan: ${_playbackRate}x).',
+          title: 'Pengaturan Diterapkan',
           kind: NotificationKind.success,
         );
       } else {
+        _rosService.setStreamingActive(false);
         _showSnackBar(
-          'Koneksi gagal. Periksa apakah rosbridge sedang berjalan.',
+          'Koneksi gagal. ROS Bridge belum terhubung, dashboard tidak akan merender sebelum rosbridge berjalan.',
           title: 'Koneksi Gagal',
           kind: NotificationKind.error,
         );

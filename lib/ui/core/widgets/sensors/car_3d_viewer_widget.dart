@@ -100,6 +100,9 @@ class Car3DViewerWidget extends StatelessWidget {
         steeringAngle: steeringAngle,
         height: height,
         width: width,
+        cameraOrbit: cameraOrbit,
+        captureSnapshot: captureSnapshot,
+        onSnapshot: onSnapshot,
       );
     }
     return Car3DViewerWebMobile(

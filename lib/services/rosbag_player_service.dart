@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'ros_service.dart';
 
-/// Service to control rosbag playback via Docker container
+/// Service to control rosbag playback via Docker container or direct pipeline stream
 class RosbagPlayerService extends ChangeNotifier {
   static final RosbagPlayerService _instance = RosbagPlayerService._internal();
   factory RosbagPlayerService() => _instance;
@@ -52,9 +53,15 @@ class RosbagPlayerService extends ChangeNotifier {
     }
   }
 
-  /// Check if rosbag is currently playing in container
+  /// Check if rosbag or stream is currently playing
   Future<bool> isRosbagPlaying() async {
+    if (_playProcess != null) return true;
     try {
+      final pgrepStream = await Process.run('pgrep', ['-f', 'fase10_stream.py']);
+      if (pgrepStream.exitCode == 0 &&
+          pgrepStream.stdout.toString().trim().isNotEmpty) {
+        return true;
+      }
       final result = await Process.run('docker', [
         'exec',
         _containerName,
@@ -64,26 +71,39 @@ class RosbagPlayerService extends ChangeNotifier {
       ]);
       return result.exitCode == 0;
     } catch (e) {
-      debugPrint('Error checking rosbag status: $e');
       return false;
     }
   }
 
-  /// Force stop all rosbag processes in container
+  /// Force stop all rosbag and stream processes
   Future<void> forceStopAll() async {
     try {
-      await Process.run('docker', [
-        'exec',
-        _containerName,
-        'bash',
-        '-c',
-        'pkill -f "rosbag play" || true',
-      ]);
+      if (_playProcess != null) {
+        _playProcess!.kill(ProcessSignal.sigterm);
+        _playProcess = null;
+      }
+      await Process.run('pkill', ['-f', 'fase10_stream.py']);
+      try {
+        await Process.run('docker', [
+          'exec',
+          _containerName,
+          'bash',
+          '-c',
+          'pkill -f "rosbag play" || true',
+        ]);
+        await Process.run(
+          'docker-compose',
+          ['-f', _dockerComposeFile, 'stop', 'rosbag-player'],
+          workingDirectory: _dockerComposeDir,
+        );
+      } catch (_) {}
+
       _isPlaying = false;
       _currentFile = '';
-      _statusMessage = 'All rosbag processes stopped';
+      _statusMessage = 'Playback stopped';
+      RosService().setStreamingActive(false);
       notifyListeners();
-      debugPrint('🛑 Force stopped all rosbag processes');
+      debugPrint('🛑 Force stopped all rosbag and stream processes');
     } catch (e) {
       debugPrint('Error force stopping rosbag: $e');
     }
@@ -113,25 +133,27 @@ class RosbagPlayerService extends ChangeNotifier {
   /// Initialize service and check existing rosbag status
   Future<void> initialize() async {
     debugPrint('🎬 Initializing RosbagPlayerService...');
-    final isRunning = await isContainerRunning();
-    if (!isRunning) {
-      debugPrint('⚠️ Docker container not running');
-      _statusMessage = 'Docker container not running';
-      notifyListeners();
-      return;
-    }
-
-    // Check if rosbag is already playing
     final isPlaying = await isRosbagPlaying();
     if (isPlaying) {
-      debugPrint('⚠️ Rosbag already playing - stopping...');
+      debugPrint('⚠️ Rosbag or stream already playing - stopping...');
       await forceStopAll();
     }
     await _ensureTempDirExists();
     debugPrint('✅ RosbagPlayerService initialized');
   }
-  // Path to docker-compose file (relative to Flutter project root)
-  static const String _dockerComposeDir = '/home/yume/Documents/Davin/Belajar/flutter/dashboard-mevi/deployment';
+
+  // Path to docker-compose file (dynamically resolved)
+  static String get _dockerComposeDir {
+    final candidates = [
+      '${Directory.current.path}/deployment',
+      '/home/mevi/dashboard-mevi/deployment',
+      'deployment',
+    ];
+    for (final p in candidates) {
+      if (Directory(p).existsSync()) return p;
+    }
+    return '/home/mevi/dashboard-mevi/deployment';
+  }
   static const String _dockerComposeFile = 'docker-compose.rosbag.yml';
 
   /// Start Docker container using docker-compose
@@ -213,7 +235,7 @@ class RosbagPlayerService extends ChangeNotifier {
     }
   }
 
-  /// Start rosbag playback
+  /// Start rosbag playback or direct pipeline stream
   Future<bool> play({
     required String rosbagFile,
     bool loop = false,
@@ -225,24 +247,84 @@ class RosbagPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Extract filename from path
+      // 1. Force stop all existing processes first
+      await forceStopAll();
+
       String filename = rosbagFile;
       if (rosbagFile.contains('/')) {
         filename = rosbagFile.split('/').last;
       }
 
-      // Check if container is running
+      // 2. Check if this is a pipeline output directory or dataset
+      final pipelineDir = Directory('/home/mevi/pemrosesan_file_rosbag');
+      final fase10File =
+          File('/home/mevi/pemrosesan_file_rosbag/fase10_stream.py');
+      final isPipelineCandidate = filename.contains('output') ||
+          filename.contains('Pipeline') ||
+          filename.contains('Rosbag_Rute_03');
+
+      if (await pipelineDir.exists() &&
+          await fase10File.exists() &&
+          isPipelineCandidate) {
+        String outFolder = 'output_rute03';
+        if (filename.startsWith('output_')) {
+          outFolder = filename.split(' ').first;
+        }
+
+        String pythonBin = 'python3';
+        final venvPython =
+            File('/home/mevi/pemrosesan_file_rosbag/venv/bin/python3');
+        if (await venvPython.exists()) {
+          pythonBin = venvPython.path;
+        }
+
+        final args = [
+          'fase10_stream.py',
+          '--out',
+          outFolder,
+          '--speed',
+          rate.toString(),
+        ];
+        if (loop) {
+          args.add('--loop');
+        }
+
+        debugPrint('🚀 Launching pipeline stream: $pythonBin ${args.join(" ")}');
+        _playProcess = await Process.start(
+          pythonBin,
+          args,
+          workingDirectory: pipelineDir.path,
+          mode: ProcessStartMode.normal,
+        );
+
+        _playProcess!.exitCode.then((exitCode) {
+          debugPrint('🏁 Stream process finished (exit: $exitCode)');
+          _isPlaying = false;
+          _playProcess = null;
+          RosService().setStreamingActive(false);
+          notifyListeners();
+        });
+
+        _isPlaying = true;
+        _currentFile = filename;
+        _statusMessage =
+            'Streaming: $filename (Speed: ${rate}x, Loop: ${loop ? "On" : "Off"})';
+        _isLoading = false;
+        RosService().setStreamingActive(true);
+        notifyListeners();
+        return true;
+      }
+
+      // 3. Fallback: try Docker container playback
       final containerRunning = await isContainerRunning();
-      
       if (!containerRunning) {
-        // Auto-start container with the rosbag file
         debugPrint('🐳 Container not running, starting...');
         final started = await _startContainer(
           rosbagFile: filename,
           loop: loop,
           rate: rate,
         );
-        
+
         if (!started) {
           _lastError = 'Failed to start Docker container: $_lastError';
           _isLoading = false;
@@ -250,12 +332,12 @@ class RosbagPlayerService extends ChangeNotifier {
           notifyListeners();
           return false;
         }
-        
-        // Container started with rosbag - it auto-plays from docker-compose command
+
         _isPlaying = true;
         _currentFile = filename;
         _statusMessage = 'Playing: $filename';
         _isLoading = false;
+        RosService().setStreamingActive(true);
         notifyListeners();
         return true;
       }
@@ -273,6 +355,7 @@ class RosbagPlayerService extends ChangeNotifier {
         _currentFile = filename;
         _statusMessage = 'Playing: $filename';
         _isLoading = false;
+        RosService().setStreamingActive(true);
         notifyListeners();
         return true;
       } else {
@@ -298,23 +381,12 @@ class RosbagPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Stop container using docker-compose
-      final result = await Process.run(
-        'docker-compose',
-        ['-f', _dockerComposeFile, 'stop', 'rosbag-player'],
-        workingDirectory: _dockerComposeDir,
-      );
-
-      if (result.exitCode == 0) {
-        debugPrint('✅ Rosbag player stopped');
-      } else {
-        debugPrint('⚠️ Stop command returned: ${result.stderr}');
-      }
-
+      await forceStopAll();
       _isPlaying = false;
       _currentFile = '';
       _statusMessage = 'Stopped';
       _isLoading = false;
+      RosService().setStreamingActive(false);
       notifyListeners();
       return true;
     } catch (e) {
@@ -327,63 +399,84 @@ class RosbagPlayerService extends ChangeNotifier {
 
   /// Pause rosbag playback (press space in rosbag)
   Future<bool> pause() async {
-    // Note: rosbag play doesn't have a programmatic pause
-    // Would need to use rosbag play with --pause flag and signals
-    // For now, just stop
     return await stop();
   }
 
   /// List available rosbag files from host filesystem
-  /// This is more reliable than Docker exec since container may be stopped
+  /// This scans deployment directories and pipeline output folders
   Future<List<String>> listRosbagFiles() async {
+    final results = <String>{};
     try {
-      // Try multiple possible rosbag directories
-      final possiblePaths = [
-        // Relative to current working directory
+      final possibleDirs = [
         'deployment/rosbags',
-        // Absolute paths
-        '/home/yume/Documents/Davin/Belajar/flutter/dashboard-mevi/deployment/rosbags',
+        '${Directory.current.path}/deployment/rosbags',
+        '/home/mevi/dashboard-mevi/deployment/rosbags',
+        '/home/mevi/pemrosesan_file_rosbag/rosbags',
       ];
 
-      for (final path in possiblePaths) {
-        final dir = Directory(path);
+      for (final p in possibleDirs) {
+        final dir = Directory(p);
         if (await dir.exists()) {
           final files = await dir
               .list()
               .where((entity) => entity is File && entity.path.endsWith('.bag'))
               .map((entity) => entity.path.split('/').last)
               .toList();
-          
-          if (files.isNotEmpty) {
-            debugPrint('📁 Found ${files.length} rosbag files in $path');
-            return files;
+
+          results.addAll(files);
+        }
+      }
+
+      // Check for processed pipeline outputs (misal output_rute03)
+      final pipelineDir = Directory('/home/mevi/pemrosesan_file_rosbag');
+      if (await pipelineDir.exists()) {
+        final entities = await pipelineDir.list().toList();
+        for (final ent in entities) {
+          if (ent is Directory) {
+            final name = ent.path.split('/').last;
+            if (name.startsWith('output_') ||
+                await Directory('${ent.path}/fase5_payload').exists()) {
+              results.add(name);
+            }
           }
         }
       }
 
-      // Fallback: try Docker exec if host filesystem didn't work
-      debugPrint('⚠️ Host filesystem lookup failed, trying Docker...');
-      final result = await Process.run('docker', [
-        'exec',
-        _containerName,
-        'bash',
-        '-c',
-        '(ls $_containerRosbagDir/*.bag 2>/dev/null; ls $_containerTempDir/*.bag 2>/dev/null) | xargs -n1 basename | sort -u',
-      ]);
+      // Check Docker container if running
+      try {
+        final result = await Process.run('docker', [
+          'exec',
+          _containerName,
+          'bash',
+          '-c',
+          '(ls $_containerRosbagDir/*.bag 2>/dev/null; ls $_containerTempDir/*.bag 2>/dev/null) | xargs -n1 basename | sort -u',
+        ]);
 
-      if (result.exitCode == 0) {
-        final files = result.stdout
-            .toString()
-            .trim()
-            .split('\n')
-            .where((f) => f.isNotEmpty && f.endsWith('.bag'))
-            .toList();
-        return files;
+        if (result.exitCode == 0) {
+          final files = result.stdout
+              .toString()
+              .trim()
+              .split('\n')
+              .where((f) => f.isNotEmpty && f.endsWith('.bag'))
+              .toList();
+          results.addAll(files);
+        }
+      } catch (_) {}
+
+      // Fallback presets agar dropdown selalu siap pakai dan tidak kosong
+      if (results.isEmpty) {
+        results.addAll([
+          'output_rute03',
+          'Rosbag_Rute_03.bag',
+          'cbf_velo_yaw_cte_merged.bag',
+        ]);
       }
-      return [];
+
+      final list = results.toList()..sort();
+      return list;
     } catch (e) {
       debugPrint('Error listing rosbags: $e');
-      return [];
+      return ['output_rute03', 'Rosbag_Rute_03.bag', 'cbf_velo_yaw_cte_merged.bag'];
     }
   }
 

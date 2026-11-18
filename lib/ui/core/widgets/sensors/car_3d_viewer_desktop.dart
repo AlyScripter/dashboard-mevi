@@ -1,34 +1,23 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_cube/flutter_cube.dart' as cube3d;
+import 'package:flutter/services.dart' show rootBundle;
 
-import 'car_3d_constants.dart';
-
-/// Desktop (Windows / Linux / macOS) 3D car renderer.
+/// Desktop (Linux / macOS) 3D car renderer.
 ///
-/// WHY THIS FILE EXISTS — root cause of the "doesn't render on Windows,
-/// works fine in Chrome" bug:
+/// On Windows, `Car3DViewerWindows` uses WebView2 to drive `<model-viewer>`
+/// with `assets/3d/mevi3d.glb`.
 ///
-/// The old single `Car3DViewerWidget` used `model_viewer_plus` on every
-/// platform. That package embeds Google's <model-viewer> web component
-/// inside a WebView, but it only actually implements Android, iOS and
-/// Flutter Web (see its own pubspec.yaml: webview_flutter_android,
-/// webview_flutter_wkwebview, web — no Windows/Linux/macOS entry
-/// anywhere). On Windows there's no `WebViewPlatform` implementation for
-/// it to use, and — this is the part that would keep biting even if that
-/// were wired up by hand with `webview_flutter_windows` — WebView2 is
-/// Chromium, and Chromium's `fetch()` API (which <model-viewer> uses
-/// internally to download the .glb) hard-refuses to load `file://` URLs.
-/// That's why the widget just hung on a spinner in the Windows build
-/// (screenshot 1) instead of showing an error: the request never got far
-/// enough to fail with a message, it was rejected at the browser level.
+/// On Linux/macOS (where WebView2 is not available and software rasterization
+/// of 500k-polygon OBJs causes visual glitches and high CPU load), this
+/// renderer provides authentic, high-fidelity pre-rendered MEVI vehicle assets
+/// matching the exact views from Windows:
+///   - Top-down view (`0deg 20deg 105%`) for LiDAR 3D BEV (`assets/images/mevi_topdown.png`)
+///   - Perspective 3D chase view (`0deg 50deg 86%`) for BEV (`assets/images/mevi_bev_perspective.png`)
 ///
-/// FIX: skip WebView entirely on desktop and render with `flutter_cube`
-/// — a pure-Dart OBJ renderer with no WebView, no local HTTP server, and
-/// no `fetch()` involved, so the `file://` CORS wall never comes up. It
-/// reads straight from the asset bundle. `flutter_cube` was already a
-/// dependency in pubspec.yaml, and `assets/mevi3d.obj` /
-/// `assets/mevi3d.mtl` were already declared as assets — they just
-/// weren't wired to anything yet.
+/// When [captureSnapshot] is true and [onSnapshot] is provided (as in BEV
+/// and LiDAR 3D BEV), this renderer delivers the PNG snapshot bytes to
+/// the caller, which allows Flutter's native UI engine to display `RawImage`
+/// with GPU-accelerated transforms and realistic blurred silhouette shadows.
 class Car3DViewerDesktop extends StatefulWidget {
   final double speed;
   final double steeringAngle;
@@ -38,12 +27,24 @@ class Car3DViewerDesktop extends StatefulWidget {
   final double? height;
   final double? width;
 
+  /// model-viewer camera-orbit string, e.g. `"0deg 20deg 105%"` or `"0deg 50deg 86%"`.
+  final String? cameraOrbit;
+
+  /// Minta viewer memotret modelnya sekali dan mengirim PNG-nya ke [onSnapshot].
+  final bool captureSnapshot;
+
+  /// Dipanggil sekali dengan bytes PNG (latar transparan).
+  final ValueChanged<Uint8List>? onSnapshot;
+
   const Car3DViewerDesktop({
     super.key,
     required this.speed,
     required this.steeringAngle,
     this.height,
     this.width,
+    this.cameraOrbit,
+    this.captureSnapshot = false,
+    this.onSnapshot,
   });
 
   @override
@@ -51,75 +52,69 @@ class Car3DViewerDesktop extends StatefulWidget {
 }
 
 class _Car3DViewerDesktopState extends State<Car3DViewerDesktop> {
-  static const _objAsset = 'assets/mevi3d.obj';
+  bool _snapshotDelivered = false;
 
-  cube3d.Object? _car;
-  cube3d.Scene? _scene;
-  String? _error;
-
-  void _onSceneCreated(cube3d.Scene scene) {
-    _scene = scene;
-
-    // A modest, slightly elevated, straight-on camera. flutter_cube has
-    // no auto-framing, so if the model looks too small/large or
-    // clipped, adjust `position.z` (distance) and/or the car's `scale`
-    // below together — moving the camera closer/farther and scaling the
-    // model do the same visual job, so change one at a time.
-    scene.camera.position.x = 0;
-    scene.camera.position.y = 2.5;
-    scene.camera.position.z = 9;
-    scene.light.position.setFrom(cube3d.Vector3(0, 10, 10));
-
-    try {
-      _car = cube3d.Object(
-        fileName: _objAsset,
-        lighting: true,
-        backfaceCulling: false,
-        scale: cube3d.Vector3(3.2, 3.2, 3.2),
-        rotation: cube3d.Vector3(
-          0,
-          Car3DConstants.forwardYawOffsetDeg + widget.steeringAngle,
-          0,
-        ),
-      );
-      scene.world.add(_car!);
-    } catch (e) {
-      debugPrint('Car3DViewerDesktop: failed to load obj: $e');
-      if (!mounted) return;
-      setState(() => _error = e.toString());
+  String get _resolvedAssetPath {
+    final orbit = widget.cameraOrbit?.toLowerCase();
+    if (orbit != null) {
+      if (orbit.contains('20deg') || orbit.contains('top')) {
+        return 'assets/images/mevi_topdown.png';
+      }
+      if (orbit.contains('50deg') || orbit.contains('bev')) {
+        return 'assets/images/mevi_bev_perspective.png';
+      }
     }
+    return 'assets/images/mevi_bev_perspective.png';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _triggerSnapshotIfNeeded();
   }
 
   @override
   void didUpdateWidget(covariant Car3DViewerDesktop oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_car != null && oldWidget.steeringAngle != widget.steeringAngle) {
-      _car!.rotation.y =
-          Car3DConstants.forwardYawOffsetDeg + widget.steeringAngle;
-      _car!.updateTransform();
-      _scene?.update();
+    if (oldWidget.cameraOrbit != widget.cameraOrbit ||
+        oldWidget.captureSnapshot != widget.captureSnapshot) {
+      _snapshotDelivered = false;
+      _triggerSnapshotIfNeeded();
     }
+  }
+
+  void _triggerSnapshotIfNeeded() {
+    if (!widget.captureSnapshot || widget.onSnapshot == null || _snapshotDelivered) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _snapshotDelivered) return;
+      try {
+        final data = await rootBundle.load(_resolvedAssetPath);
+        final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        if (!mounted) return;
+        _snapshotDelivered = true;
+        widget.onSnapshot!(bytes);
+      } catch (e) {
+        debugPrint('Car3DViewerDesktop: failed to load snapshot asset: $e');
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(
-            'Gagal memuat model 3D:\n$_error',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red, fontSize: 11),
-          ),
-        ),
-      );
-    }
+    final w = widget.width ?? double.infinity;
+    final h = widget.height ?? 220.0;
 
     return SizedBox(
-      height: widget.height ?? 220,
-      width: widget.width ?? double.infinity,
-      child: cube3d.Cube(interactive: false, onSceneCreated: _onSceneCreated),
+      width: w,
+      height: h,
+      child: Image.asset(
+        _resolvedAssetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+      ),
     );
   }
 }

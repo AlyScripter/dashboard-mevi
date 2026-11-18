@@ -55,6 +55,29 @@ class RosService {
   Timer? _reconnectTimer;
   String _rosBridgeUrl = 'ws://127.0.0.1:9090';
 
+  // Streaming Gating: Stream data hanya dialirkan & dirender jika sudah di-Save & Apply / Play dari Settings
+  bool _isStreamingActive = false;
+  bool get isStreamingActive => _isStreamingActive && _isConnected;
+
+  final StreamController<bool> _streamingActiveController =
+      StreamController<bool>.broadcast();
+  Stream<bool> get streamingActiveStream => _streamingActiveController.stream;
+
+  void setStreamingActive(bool active) {
+    _isStreamingActive = active;
+    _safeAdd<bool>(_streamingActiveController, active);
+    if (!active) {
+      _lastBevSceneCache = null;
+      _currentSpeed = 0.0;
+      _safeAdd<double>(_speedometerController, 0.0);
+      _safeAdd<double>(_speedometerRosController, 0.0);
+      _safeAdd<double>(_vehicleSpeedController, 0.0);
+      _safeAdd<double>(_steeringAngleController, 0.0);
+      _safeAdd<Map<String, dynamic>>(_bevFrameController, {});
+      _safeAdd<Map<String, dynamic>>(_bevSceneController, {});
+    }
+  }
+
   // Track subscribed topics dynamically
   final Set<String> _subscribedTopics = {};
 
@@ -1016,9 +1039,9 @@ class RosService {
         final topic = data['topic'] as String;
         final msg = data['msg'] as Map<String, dynamic>;
 
-        // Debug logging untuk melihat topic yang masuk
-        if (kDebugMode) {
-          _log('📥 Received message from topic: $topic', level: 'DEBUG');
+        // Gating: Hanya alirkan & proses data jika sudah di-Save & Apply / Play dari Settings
+        if (!_isStreamingActive) {
+          return;
         }
 
         if (topic == '/scan') {
@@ -1037,12 +1060,6 @@ class RosService {
   }
 
   void _processTopicMessage(String topic, Map<String, dynamic> msg) {
-    if (kDebugMode) {
-      _log(
-        '🔄 Processing topic: $topic with data: ${msg.toString().length > 100 ? "${msg.toString().substring(0, 100)}..." : msg.toString()}',
-        level: 'DEBUG',
-      );
-    }
 
     switch (topic) {
       case '/velocity':
@@ -1211,14 +1228,6 @@ class RosService {
 
       final pointCount = pts is List ? pts.length : 0;
       final objectCount = obj is List ? obj.length : 0;
-      final waypointCount = wp is List ? wp.length : 0;
-
-      if (kDebugMode) {
-        _log(
-          '📦 [BEV] idx=$frameIdx t=$t titik=$pointCount objek=$objectCount wp=$waypointCount',
-          level: 'INFO',
-        );
-      }
 
       // Hitung otomatis Steering Angle & CTE jika tidak ada topik langsung dari ROS
       // (misalnya saat memutar rekaman rosbag yang hanya mengirimkan stream /bev/frame)
@@ -1265,16 +1274,6 @@ class RosService {
       final wp = scene['wp'];
       if (wp is List && wp.isNotEmpty) {
         _calculateDerivedSteeringAndCte(wp);
-      }
-
-      if (kDebugMode) {
-        final frameIdx = scene['i'];
-        final road = scene['road'];
-        final roadPolys = road is Map ? (road['p'] as List?)?.length ?? 0 : 0;
-        _log(
-          '🗺️ [BEV SCENE] idx=$frameIdx road_polys=$roadPolys wp=${(wp is List) ? wp.length : 0}',
-          level: 'DEBUG',
-        );
       }
     } catch (e) {
       _log('❌ Error parsing /bev/scene: $e', level: 'ERROR');
@@ -1352,12 +1351,6 @@ class RosService {
         _safeAdd<double>(_vehicleSpeedController, speedKmh);
         _safeAdd<double>(_speedometerController, speedKmh);
         _safeAdd<double>(_speedometerRosController, speedKmh);
-        if (kDebugMode) {
-          _log(
-            '🚗 /vehicle/speed: ${speedMs.toStringAsFixed(2)} m/s → ${speedKmh.toStringAsFixed(2)} km/h',
-            level: 'DEBUG',
-          );
-        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1379,12 +1372,6 @@ class RosService {
       }
       if (distMeters != null) {
         _safeAdd<double>(_vehicleDistanceController, distMeters);
-        if (kDebugMode) {
-          _log(
-            '📏 /vehicle/distance: ${distMeters.toStringAsFixed(2)} m',
-            level: 'DEBUG',
-          );
-        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1406,12 +1393,6 @@ class RosService {
       }
       if (nearestMeters != null) {
         _safeAdd<double>(_vehicleNearestController, nearestMeters);
-        if (kDebugMode) {
-          _log(
-            '⚠️ /vehicle/nearest: ${nearestMeters.toStringAsFixed(2)} m',
-            level: 'DEBUG',
-          );
-        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1436,12 +1417,6 @@ class RosService {
         _currentImu['yaw'] = yawDeg;
         _safeAdd<double>(_vehicleImuYawController, yawDeg);
         _safeAdd<Map<String, double>>(_imuController, Map.from(_currentImu));
-        if (kDebugMode) {
-          _log(
-            '🧭 /vehicle/imu_yaw: ${yawRad.toStringAsFixed(3)} rad → ${yawDeg.toStringAsFixed(1)}°',
-            level: 'DEBUG',
-          );
-        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1470,12 +1445,6 @@ class RosService {
           _currentGPS['lat'] = lat;
           _currentGPS['lng'] = lon;
           _safeAdd<Map<String, double>>(_gpsController, Map.from(_currentGPS));
-          if (kDebugMode) {
-            _log(
-              '📍 /vehicle/gps: (${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)})',
-              level: 'DEBUG',
-            );
-          }
         }
       }
     } catch (e) {
@@ -2208,6 +2177,7 @@ class RosService {
   /// Clean disconnect without auto-reconnect
   void disconnect() {
     _log('🔌 Disconnecting from ROS Bridge...', level: 'INFO');
+    setStreamingActive(false);
 
     // Cancel any pending reconnection
     _reconnectTimer?.cancel();
