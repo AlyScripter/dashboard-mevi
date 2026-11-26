@@ -89,12 +89,16 @@ class TripService {
       debugPrint('📤 [4/4] Sending START command to ROS...');
       rosService.publishNavigationCommand('start');
 
-      // Also write to file for backup/compatibility
-      await _publishToROSTopic('/destination_coordinate', {
-        'x': trip.destination.latitude,
-        'y': trip.destination.longitude,
-        'z': 0.0,
-      });
+      // Also write to file for backup/compatibility (tidak menggagalkan navigasi jika gagal di Windows)
+      try {
+        await _publishToROSTopic('/destination_coordinate', {
+          'x': trip.destination.latitude,
+          'y': trip.destination.longitude,
+          'z': 0.0,
+        });
+      } catch (fileErr) {
+        debugPrint('⚠️ Backup file write skipped: $fileErr');
+      }
 
       debugPrint('✅ Trip started successfully - All data sent to vehicle');
       debugPrint('🚗 Vehicle should now navigate to: ${trip.destination.name}');
@@ -167,15 +171,23 @@ class TripService {
     Map<String, dynamic> message,
   ) async {
     try {
-      // Use file-based communication
+      // Use file-based communication (fallback)
+      final baseDir = Platform.isWindows ? Directory.systemTemp.path : '/tmp';
+      final dir = Directory(baseDir);
+      if (!dir.existsSync()) {
+        try {
+          dir.createSync(recursive: true);
+        } catch (_) {}
+      }
+
       if (topic == '/journey_control') {
-        final file = File('/tmp/flutter_ros_command.txt');
+        final file = File('$baseDir/flutter_ros_command.txt');
         await file.writeAsString(
           '$topic:${message['data']}\n${DateTime.now().toIso8601String()}',
         );
         debugPrint('✅ Command written to file: $topic = ${message['data']}');
       } else if (topic == '/destination_coordinate') {
-        final file = File('/tmp/flutter_destination.txt');
+        final file = File('$baseDir/flutter_destination.txt');
         await file.writeAsString(
           '${message['x']},${message['y']},${message['z']}\n${DateTime.now().toIso8601String()}',
         );
@@ -183,15 +195,14 @@ class TripService {
           '✅ Destination written to file: ${message['x']}, ${message['y']}',
         );
       } else if (topic == '/reload_waypoints') {
-        final file = File('/tmp/flutter_reload_signal.txt');
+        final file = File('$baseDir/flutter_reload_signal.txt');
         await file.writeAsString(
           '${message['data']}\n${DateTime.now().toIso8601String()}',
         );
         debugPrint('✅ Reload signal written to file');
       }
     } catch (e) {
-      debugPrint('❌ Failed to write command file: $e');
-      rethrow;
+      debugPrint('⚠️ Skipped backup command file: $e');
     }
   }
 

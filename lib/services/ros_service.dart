@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'logging_service.dart';
+import '../model/cam_cloud_frame.dart';
 
 /// Full-resolution 2D LiDAR scan snapshot, used by the "2D LiDAR" data
 /// visualization page (Cartesian X/Y scatter, matplotlib-style).
@@ -42,6 +43,19 @@ class LidarScan2D {
   });
 
   double get fovDegrees => (angleMax - angleMin) * 180 / math.pi;
+}
+
+/// Visual style for a detected object class from `/bev/object_style`.
+class BevObjectStyle {
+  final String label;
+  final Color color;
+  final int clsId;
+
+  const BevObjectStyle({
+    required this.label,
+    required this.color,
+    required this.clsId,
+  });
 }
 
 class RosService {
@@ -151,6 +165,12 @@ class RosService {
   // Tahap 6a: proof-of-concept, cuma decode JSON + hitung titik & objek.
   final StreamController<Map<String, dynamic>> _bevFrameController =
       StreamController<Map<String, dynamic>>.broadcast();
+  Map<String, dynamic>? _lastBevFrameCache;
+
+  // BEV camera cloud stream (Fase 6b/10 — /bev/camcloud RGB-D point cloud).
+  final StreamController<CamCloudFrame> _bevCamCloudController =
+      StreamController<CamCloudFrame>.broadcast();
+  CamCloudFrame? _lastBevCamCloudCache;
 
   // BEV scene stream (Fase 6 — segmentasi jalan riil, curb, edge distance, pose, objek & waypoint).
   final StreamController<Map<String, dynamic>> _bevSceneController =
@@ -166,6 +186,11 @@ class RosService {
   final StreamController<Map<int, Color>> _bevClassColorMapController =
       StreamController<Map<int, Color>>.broadcast();
   Map<int, Color>? _bevClassColorMapCache;
+
+  // Gaya box per kelas objek (/bev/object_style) — dikirim sekali di awal oleh Fase 10.
+  final StreamController<Map<String, BevObjectStyle>> _bevObjectStyleController =
+      StreamController<Map<String, BevObjectStyle>>.broadcast();
+  Map<String, BevObjectStyle>? _bevObjectStyleCache;
 
   // Vehicle telemetry streams (Fase 6 — streaming topic terpisah dari Python)
   final StreamController<double> _vehicleSpeedController =
@@ -219,6 +244,11 @@ class RosService {
 
   // BEV payload stream — Tahap 6a proof-of-concept (Camera page > BEV/SDC)
   Stream<Map<String, dynamic>> get bevFrameStream => _bevFrameController.stream;
+  Map<String, dynamic>? get lastBevFrame => _lastBevFrameCache;
+
+  // BEV camera cloud stream — Fase 6b/10 (/bev/camcloud)
+  Stream<CamCloudFrame> get bevCamCloudStream => _bevCamCloudController.stream;
+  CamCloudFrame? get lastBevCamCloud => _lastBevCamCloudCache;
 
   // BEV scene stream — Fase 6 (Segmentasi jalan riil, curb, edge distance)
   Stream<Map<String, dynamic>> get bevSceneStream => _bevSceneController.stream;
@@ -231,6 +261,10 @@ class RosService {
   Stream<Map<int, Color>> get bevClassColorMapStream =>
       _bevClassColorMapController.stream;
   Map<int, Color>? get bevClassColorMap => _bevClassColorMapCache;
+
+  Stream<Map<String, BevObjectStyle>> get bevObjectStyleStream =>
+      _bevObjectStyleController.stream;
+  Map<String, BevObjectStyle>? get bevObjectStyle => _bevObjectStyleCache;
 
   // Telemetry streams (Fase 6 — topic terpisah)
   Stream<double> get vehicleSpeedStream => _vehicleSpeedController.stream;
@@ -900,12 +934,16 @@ class RosService {
       {'topic': '/bev/frame', 'type': 'std_msgs/String'},
       // Scene payload dari Fase 6 (Segmentasi jalan riil, curb ribbons, pose, edge dist)
       {'topic': '/bev/scene', 'type': 'std_msgs/String'},
+      // Camera RGB-D point cloud bersegmentasi (Fase 6b/10)
+      {'topic': '/bev/camcloud', 'type': 'std_msgs/String'},
       // Peta warna kelas (Fase 6) — dipublish SEKALI oleh node streaming
       // pas dia nyala, bukan per-frame. Tetap disubscribe terus (bukan
       // sekali fetch) karena kalau Flutter start duluan sebelum node
       // Python jalan, publish pertama itu akan lewat kalau kita belum
       // subscribe dari awal.
       {'topic': '/bev/class_color_map', 'type': 'std_msgs/String'},
+      // Gaya box per kelas objek (Fase 10 — dikirim sekali di awal)
+      {'topic': '/bev/object_style', 'type': 'std_msgs/String'},
       // Telemetri kendaraan (Fase 6 — streaming topic terpisah dari Python)
       {'topic': '/vehicle/speed', 'type': 'std_msgs/String'},
       {'topic': '/vehicle/distance', 'type': 'std_msgs/String'},
@@ -1123,8 +1161,14 @@ class RosService {
       case '/bev/scene':
         _handleBevSceneData(msg);
         break;
+      case '/bev/camcloud':
+        _handleBevCamCloudData(msg);
+        break;
       case '/bev/class_color_map':
         _handleBevClassColorMapData(msg);
+        break;
+      case '/bev/object_style':
+        _handleBevObjectStyleData(msg);
         break;
       case '/vehicle/speed':
         _handleVehicleSpeedData(msg);
@@ -1226,15 +1270,52 @@ class RosService {
         _calculateDerivedSteeringAndCte(wp);
       }
 
-      _safeAdd<Map<String, dynamic>>(_bevFrameController, {
+      final bevPayload = <String, dynamic>{
         'frame_idx': frameIdx,
         't': t,
         'point_count': pointCount,
         'object_count': objectCount,
         'raw': frame,
-      });
+      };
+      _lastBevFrameCache = bevPayload;
+      _safeAdd<Map<String, dynamic>>(_bevFrameController, bevPayload);
     } catch (e) {
       _log('❌ Error parsing /bev/frame: $e', level: 'ERROR');
+    }
+  }
+
+  // Handler /bev/camcloud (Fase 6b/10) — point cloud kamera RGB-D bersegmentasi.
+  void _handleBevCamCloudData(Map<String, dynamic> msg) {
+    try {
+      final rawData = msg['data'];
+      final Map<String, dynamic>? decoded = rawData is String
+          ? (_parseJsonString(rawData) ??
+              (jsonDecode(rawData) as Map<String, dynamic>?))
+          : (rawData is Map<String, dynamic> ? rawData : null);
+      if (decoded == null) return;
+
+      final camCloud = CamCloudFrame.tryParse(decoded);
+      if (camCloud == null) {
+        if (kDebugMode) {
+          _log(
+            '⚠️ [/bev/camcloud] Ditolak: payload tidak sesuai kontrak v1',
+            level: 'WARNING',
+          );
+        }
+        return;
+      }
+
+      _lastBevCamCloudCache = camCloud;
+      _safeAdd<CamCloudFrame>(_bevCamCloudController, camCloud);
+
+      if (kDebugMode) {
+        _log(
+          '☁️ [BEV CAMCLOUD] idx=${camCloud.idx} t=${camCloud.timestamp} n=${camCloud.count}',
+          level: 'DEBUG',
+        );
+      }
+    } catch (e) {
+      _log('❌ Error parsing /bev/camcloud: $e', level: 'ERROR');
     }
   }
 
@@ -1311,6 +1392,44 @@ class RosService {
       }
     } catch (e) {
       _log('❌ Error parsing /bev/class_color_map: $e', level: 'ERROR');
+    }
+  }
+
+  // Handler /bev/object_style (Fase 10) — dipublish SEKALI di awal:
+  // {"Car":{"label":"Mobil","hex":"#7b2cbf","cls":4}, ...}
+  void _handleBevObjectStyleData(Map<String, dynamic> msg) {
+    try {
+      final rawData = msg['data'];
+      final Map<String, dynamic>? decoded = rawData is String
+          ? (_parseJsonString(rawData) ??
+              (jsonDecode(rawData) as Map<String, dynamic>?))
+          : (rawData is Map<String, dynamic> ? rawData : null);
+      if (decoded == null) return;
+
+      final styles = <String, BevObjectStyle>{};
+      decoded.forEach((key, value) {
+        if (value is Map) {
+          final label = (value['label'] as String?) ?? key;
+          final hex = value['hex'] as String?;
+          final clsId = (value['cls'] as num?)?.toInt() ?? 0;
+          if (hex != null) {
+            styles[key] = BevObjectStyle(
+              label: label,
+              color: _hexToColor(hex),
+              clsId: clsId,
+            );
+          }
+        }
+      });
+
+      _bevObjectStyleCache = styles;
+      _safeAdd<Map<String, BevObjectStyle>>(_bevObjectStyleController, styles);
+
+      if (kDebugMode) {
+        _log('🏷️ [BEV] object_style diterima: ${styles.keys.toList()}', level: 'INFO');
+      }
+    } catch (e) {
+      _log('❌ Error parsing /bev/object_style: $e', level: 'ERROR');
     }
   }
 
@@ -2312,7 +2431,10 @@ class RosService {
     await _witmotionAccelerationController.close();
     await _witmotionAngularVelocityController.close();
     await _bevFrameController.close();
+    await _bevCamCloudController.close();
+    await _bevSceneController.close();
     await _bevClassColorMapController.close();
+    await _bevObjectStyleController.close();
     await _vehicleSpeedController.close();
     await _vehicleDistanceController.close();
     await _vehicleNearestController.close();

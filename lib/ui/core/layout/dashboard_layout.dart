@@ -9,6 +9,7 @@ import '../../pages/navigation/bloc/navigation_cubit.dart';
 import '../widgets/dashboard/weather_time_widget.dart';
 import '../../pages/data/data_index.dart';
 import '../../pages/camera/camera_index.dart';
+import '../../pages/depth3d/depth_3d_index.dart';
 import '../../pages/lidar/lidar_bev_page.dart';
 import '../../pages/settings/settings_index.dart';
 import '../../pages/bev/bev_page.dart';
@@ -35,7 +36,7 @@ enum RouteState {
 // value — like every other nav entry it swaps into the content area
 // directly (no slide/fade overlay), so the side nav rail stays visible
 // and selectable the whole time, same as Maps/Camera/LiDAR/Data/BEV.
-enum DashboardMenu { home, camera, lidar, data, bev, settings }
+enum DashboardMenu { home, camera, depth3d, lidar, data, bev, settings }
 
 class LayoutDashboard extends StatefulWidget {
   const LayoutDashboard({super.key});
@@ -72,6 +73,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
   static const List<SideNavItem> _navItems = [
     SideNavItem(id: 'maps', icon: LucideIcons.map, label: 'Peta'),
     SideNavItem(id: 'camera', icon: LucideIcons.camera, label: 'Kamera'),
+    SideNavItem(id: 'depth3d', icon: LucideIcons.box, label: 'Depth 3D'),
     SideNavItem(
       id: 'lidar',
       icon: LucideIcons.radar,
@@ -92,6 +94,8 @@ class _LayoutDashboardState extends State<LayoutDashboard>
         return 'maps';
       case DashboardMenu.camera:
         return 'camera';
+      case DashboardMenu.depth3d:
+        return 'depth3d';
       case DashboardMenu.lidar:
         return 'lidar';
       case DashboardMenu.data:
@@ -115,6 +119,9 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           break;
         case 'camera':
           _activeMenu = DashboardMenu.camera;
+          break;
+        case 'depth3d':
+          _activeMenu = DashboardMenu.depth3d;
           break;
         case 'lidar':
           _activeMenu = DashboardMenu.lidar;
@@ -795,6 +802,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
 
   Widget _buildDefaultLayoutWithFloatingNavbar() {
     final isCameraActive = _activeMenu == DashboardMenu.camera;
+    final isDepth3dActive = _activeMenu == DashboardMenu.depth3d;
     final isLidarActive = _activeMenu == DashboardMenu.lidar;
     final isBevActive = _activeMenu == DashboardMenu.bev;
     final isMapsActive = _activeMenu == DashboardMenu.home;
@@ -824,6 +832,17 @@ class _LayoutDashboardState extends State<LayoutDashboard>
               );
             },
           ),
+        if (isDepth3dActive)
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: appThemeMode,
+            builder: (context, themeMode, _) {
+              final isDark = themeMode == ThemeMode.dark;
+              return Container(
+                color: isDark ? Colors.black : const Color(0xFFF8FAFC),
+                child: const Depth3dPage(),
+              );
+            },
+          ),
         if (isLidarActive)
           ValueListenableBuilder<ThemeMode>(
             valueListenable: appThemeMode,
@@ -848,7 +867,7 @@ class _LayoutDashboardState extends State<LayoutDashboard>
           ),
         _buildTopOverlay(
           bevMode: isBevActive,
-          compactMode: isCameraActive || isLidarActive,
+          compactMode: isCameraActive || isDepth3dActive || isLidarActive,
         ),
         // _buildBottomOverlay sekarang theme-aware (tampil di halaman Peta dan Kamera)
         if (isMapsActive || isCameraActive) _buildBottomOverlay(),
