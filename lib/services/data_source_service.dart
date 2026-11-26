@@ -36,6 +36,13 @@ class DataSourceService extends ChangeNotifier {
   String _rosbagFile = '';
   String get rosbagFile => _rosbagFile;
 
+  // Rosbag playback options
+  bool _rosbagLoop = true;
+  bool get rosbagLoop => _rosbagLoop;
+
+  double _rosbagRate = 1.0;
+  double get rosbagRate => _rosbagRate;
+
   // Video file for camera playback (when using rosbag mode)
   String _videoFile = '';
   String get videoFile => _videoFile;
@@ -97,6 +104,8 @@ class DataSourceService extends ChangeNotifier {
     _liveCameraIp = prefs.getString('live_camera_ip') ?? _liveCameraIp;
     _rosbagRosUrl = prefs.getString('rosbag_ros_url') ?? _rosbagRosUrl;
     _rosbagFile = prefs.getString('rosbag_file') ?? '';
+    _rosbagLoop = prefs.getBool('rosbag_loop') ?? _rosbagLoop;
+    _rosbagRate = prefs.getDouble('rosbag_rate') ?? _rosbagRate;
     _videoFile = prefs.getString('video_file') ?? '';
 
     notifyListeners();
@@ -111,6 +120,8 @@ class DataSourceService extends ChangeNotifier {
     await prefs.setString('live_camera_ip', _liveCameraIp);
     await prefs.setString('rosbag_ros_url', _rosbagRosUrl);
     await prefs.setString('rosbag_file', _rosbagFile);
+    await prefs.setBool('rosbag_loop', _rosbagLoop);
+    await prefs.setDouble('rosbag_rate', _rosbagRate);
     await prefs.setString('video_file', _videoFile);
   }
 
@@ -144,10 +155,14 @@ class DataSourceService extends ChangeNotifier {
   Future<void> setRosbagSettings({
     String? rosUrl,
     String? rosbagFile,
+    bool? loop,
+    double? rate,
     String? videoFile,
   }) async {
     if (rosUrl != null) _rosbagRosUrl = rosUrl;
     if (rosbagFile != null) _rosbagFile = rosbagFile;
+    if (loop != null) _rosbagLoop = loop;
+    if (rate != null) _rosbagRate = rate;
     if (videoFile != null) _videoFile = videoFile;
     await _savePreferences();
     notifyListeners();

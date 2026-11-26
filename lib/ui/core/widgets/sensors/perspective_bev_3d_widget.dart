@@ -846,7 +846,8 @@ class _PerspectiveBev3DWidgetState extends State<PerspectiveBev3DWidget>
   Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    final isLiveConnected = _lastLiveFrameTime != null &&
+    final isLiveConnected = RosService().isStreamingActive &&
+        _lastLiveFrameTime != null &&
         DateTime.now().difference(_lastLiveFrameTime!).inSeconds < 4;
 
     // Mode Live: Jika belum ada data dari WebSocket / belum terkoneksi,
